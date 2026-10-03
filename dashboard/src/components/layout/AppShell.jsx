@@ -5,14 +5,13 @@ export default function AppShell({ view, onNavigate, connected, onCredentials, c
     <>
       <aside className="sidebar">
         <a className="brand" href="/">
-          <span className="brand-mark">
-            N<span>↗</span>
+          <span className="brand-mark" aria-hidden="true">
+            N
           </span>
           <span>
-            NoorPointer<small>AI SECURITY CONTROL PLANE</small>
+            NoorPointer<small>Control plane</small>
           </span>
         </a>
-        <div className="nav-label">WORKSPACE</div>
         <nav aria-label="Main menu">
           {Object.entries(views).map(([key, item]) => (
             <button
@@ -22,20 +21,13 @@ export default function AppShell({ view, onNavigate, connected, onCredentials, c
               aria-current={view === key ? 'page' : undefined}
               onClick={() => onNavigate(key)}
             >
-              <span>{item.icon}</span> {item.name}
+              {item.name}
             </button>
           ))}
         </nav>
-        <div className="sidebar-bottom">
-          <span className="status-dot" /> Control plane<small>Configure. Monitor. Control.</small>
-        </div>
       </aside>
       <main>
         <header className="topbar">
-          <span>
-            Workspace <span className="breadcrumb">/</span>{' '}
-            <strong id="breadcrumb">{views[view].name}</strong>
-          </span>
           <div className="topbar-actions">
             <span className={`connection ${connected ? 'online' : ''}`} id="connection">
               {connected ? 'API connected' : 'Disconnected'}
@@ -45,12 +37,7 @@ export default function AppShell({ view, onNavigate, connected, onCredentials, c
             </button>
           </div>
         </header>
-        <div className="content">
-          {children}
-          <footer className="page-footer">
-            NoorPointer <span>Policies · Events · Budgets</span>
-          </footer>
-        </div>
+        <div className="content">{children}</div>
       </main>
     </>
   );

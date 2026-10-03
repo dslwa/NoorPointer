@@ -10,6 +10,7 @@ GATEWAY_JWT = os.getenv("GATEWAY_JWT", "")
 SEMANTIC_URL = os.getenv("SEMANTIC_URL", "http://localhost:8001")
 CONTROLPLANE_URL = os.getenv("CONTROLPLANE_URL", "http://localhost:8082")
 ADMIN_TOKEN = os.getenv("ADMIN_TOKEN", "local-dev-admin")
+GATEWAY_TOKEN = os.getenv("GATEWAY_TOKEN", "local-dev-gateway")
 
 # Bez tokenu kazde zadanie do gatewaya zwroci 401, a komunikat testu nie powie dlaczego.
 # Uruchamiaj przez "make test" (wstrzykuje GATEWAY_JWT) albo ustaw recznie:
@@ -158,7 +159,7 @@ def test_model_scanner_malicious_pickle_blocked():
 # ============================================================================
 def test_policy_hot_reload():
     """Weryfikacja przeładowania konfiguracji bez restartu kontenera"""
-    resp = requests.post(f"{GATEWAY_URL}/admin/policy/reload", headers=gw_headers(), timeout=3)
+    resp = requests.post(f"{GATEWAY_URL}/admin/policy/reload", headers={"Authorization": f"Bearer {GATEWAY_TOKEN}"}, timeout=3)
     assert resp.status_code == 200
     assert resp.json().get("status") == "reloaded"
 

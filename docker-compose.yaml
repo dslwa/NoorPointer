@@ -114,6 +114,8 @@ services:
     depends_on:
       controlplane:
         condition: service_healthy
+      semantic-service:
+        condition: service_started
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:3000/"]
       interval: 10s

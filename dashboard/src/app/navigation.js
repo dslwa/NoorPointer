@@ -1,26 +1,27 @@
 export const views = {
   overview: {
     name: 'Overview',
-    title: 'Security in one place.',
-    description: 'Policies, events and usage across your AI agents.',
-    icon: '◫',
+    title: 'This week across your agents',
+    description: 'Decisions, blocks and spend reported by the gateway over the last 7 days.',
   },
   policies: {
     name: 'Policies',
-    title: 'Your policies, under control.',
-    description: 'Edit configurations and publish new versions for the gateway.',
-    icon: '◇',
+    title: 'Policy versions',
+    description: 'Save a version, validate it, then publish it to the gateway.',
   },
   events: {
     name: 'Events',
-    title: 'See what happened.',
-    description: 'Browse decisions and usage reports received from the gateway.',
-    icon: '≡',
+    title: 'Event log',
+    description: 'Every decision the gateway reported. Select one to see the full record.',
   },
   signatures: {
     name: 'Signatures',
-    title: 'Simple rules. One shared feed.',
-    description: 'Import signatures and make them available to the gateway.',
-    icon: '⌁',
+    title: 'Attack signatures',
+    description: 'Literal text patterns the gateway matches. Importing replaces every rule.',
+  },
+  prompt: {
+    name: 'Prompt check',
+    title: 'Check a prompt',
+    description: 'Paste a prompt or a model response and see what each check finds in it.',
   },
 };

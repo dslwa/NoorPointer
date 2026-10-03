@@ -54,7 +54,7 @@ export default function PoliciesPage({ active, request, dashboard, refreshKey, r
     const document = JSON.parse(documentText);
     document.controls[key][field] = value;
     setDocumentText(JSON.stringify(document, null, 2));
-    setValidation('Configuration changed — save a new version.');
+    setValidation('Configuration changed. Save a new version to keep it.');
   }
 
   return (
@@ -66,8 +66,8 @@ export default function PoliciesPage({ active, request, dashboard, refreshKey, r
             className={`revision ${revision.version === activeVersion ? 'current' : ''}`}
           >
             <div>
-              <span className="label">VERSION {revision.version}</span>
-              {revision.version === activeVersion && <span className="badge allow">ACTIVE</span>}
+              <span className="label">Version {revision.version}</span>
+              {revision.version === activeVersion && <span className="badge allow">Active</span>}
             </div>
             <h3>{revision.name}</h3>
             <p>{formatDate(revision.created_at)}</p>
@@ -213,7 +213,7 @@ export default function PoliciesPage({ active, request, dashboard, refreshKey, r
               disabled={!!pending}
               onChange={(event) => {
                 setDocumentText(event.target.value);
-                setValidation('Configuration changed — save a new version.');
+                setValidation('Configuration changed. Save a new version to keep it.');
               }}
             />
           </details>

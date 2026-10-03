@@ -30,7 +30,7 @@ export default function SignaturesPage({ active, authenticated, request, refresh
           <p>Import JSON / YAML to replace the entire current feed.</p>
         </div>
         <span id="signature-count" className="label">
-          {data?.signatures.length || 0} RULES
+          {data?.signatures.length || 0} rules
         </span>
       </div>
       <div className="editor-content">
@@ -41,10 +41,10 @@ export default function SignaturesPage({ active, authenticated, request, refresh
                 <div>
                   <strong>{signature.name}</strong>
                   <p>
-                    {signature.id} · {signature.category} · {signature.target}
+                    {signature.id}, {signature.category}, matched in {signature.target}
                   </p>
                   <a href={signature.source} target="_blank" rel="noopener noreferrer">
-                    Source ↗
+                    Source
                   </a>
                 </div>
                 <span className={`badge ${signature.action}`}>{signature.action}</span>

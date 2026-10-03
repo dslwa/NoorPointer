@@ -47,7 +47,7 @@ export default function EventsPage({ active, authenticated, request, refreshKey,
       <article className="card">
         <div className="card-header">
           <div>
-            <h2>Event log</h2>
+            <h2>Decisions and usage reports</h2>
             <p>Select an event to view its details. Sample data is marked DEMO.</p>
           </div>
           <div className="export-actions">
@@ -59,7 +59,7 @@ export default function EventsPage({ active, authenticated, request, refreshKey,
                 disabled={!!pending || !authenticated}
                 onClick={() => run('export', () => download(format))}
               >
-                {format.toUpperCase()} ↓
+                Export {format.toUpperCase()}
               </button>
             ))}
           </div>
@@ -153,7 +153,7 @@ export default function EventsPage({ active, authenticated, request, refreshKey,
                         disabled={!!pending}
                         aria-label={`Event details ${event.id}`}
                       >
-                        ↗
+                        Details
                       </button>
                     </td>
                   </tr>
@@ -183,7 +183,7 @@ export default function EventsPage({ active, authenticated, request, refreshKey,
               disabled={page === 0 || loading}
               onClick={() => setPage((value) => value - 1)}
             >
-              ← Previous
+              Previous
             </button>
             <button
               className="button secondary small"
@@ -191,7 +191,7 @@ export default function EventsPage({ active, authenticated, request, refreshKey,
               disabled={(page + 1) * 20 >= total || loading}
               onClick={() => setPage((value) => value + 1)}
             >
-              Next →
+              Next
             </button>
           </div>
         </div>
@@ -204,7 +204,7 @@ export default function EventsPage({ active, authenticated, request, refreshKey,
             id="close-detail"
             onClick={() => setDetail(null)}
           >
-            Close ×
+            Close
           </button>
         </div>
         <pre id="event-detail">{detail ? JSON.stringify(detail, null, 2) : ''}</pre>

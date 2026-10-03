@@ -6,6 +6,12 @@ export default defineConfig({
   server: {
     port: 5173,
     strictPort: true,
-    proxy: { '/api': process.env.CONTROLPLANE_URL || 'http://127.0.0.1:8082' },
+    proxy: {
+      '/api': process.env.CONTROLPLANE_URL || 'http://127.0.0.1:8082',
+      '/semantic': {
+        target: process.env.SEMANTIC_URL || 'http://127.0.0.1:8001',
+        rewrite: (path) => path.replace(/^\/semantic/, ''),
+      },
+    },
   },
 });

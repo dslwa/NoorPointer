@@ -6,35 +6,34 @@ export default function OverviewPage({ dashboard, onPolicies }) {
   const categories = Object.entries(summary?.categories || {}).sort((a, b) => b[1] - a[1]);
   const maximum = Math.max(...(summary?.trend || []).map((day) => day.requests), 1);
   const metrics = {
-    monthly_usd: 'Monthly cost · USD',
+    monthly_usd: 'Monthly cost, USD',
     daily_tokens: 'Daily tokens',
-    gpu_seconds_per_hour: 'GPU seconds · last hour',
+    gpu_seconds_per_hour: 'GPU seconds in the last hour',
   };
   return (
     <>
       <div className="notice">
-        <span className="notice-icon">◇</span>
         <div>
           <strong id="policy-name">
             {revision
-              ? `Active policy: ${revision.name} · v${revision.version}`
+              ? `Active policy: ${revision.name}, version ${revision.version}`
               : 'Waiting for connection'}
           </strong>
           <p id="policy-status">
             {revision
-              ? `${dashboard.controls_enabled} of ${dashboard.controls_total} controls enabled · ${revision.document.defaults.mode} mode · configuration available to the gateway`
+              ? `${dashboard.controls_enabled} of ${dashboard.controls_total} controls on, ${revision.document.defaults.mode} mode. The gateway can fetch this configuration.`
               : 'Connect with your token to load the configuration.'}
           </p>
         </div>
         <button className="button ghost small" id="open-policies" onClick={onPolicies}>
-          Manage policy ↗
+          Manage policy
         </button>
       </div>
       <div className="metrics">
         <article className="metric">
           <span>Gateway decisions</span>
           <strong id="stat-requests">{summary ? formatNumber(summary.requests) : '—'}</strong>
-          <small>Last 7 days · UTC</small>
+          <small>Last 7 days, UTC</small>
         </article>
         <article className="metric">
           <span>Blocked</span>
@@ -53,7 +52,7 @@ export default function OverviewPage({ dashboard, onPolicies }) {
         <article className="metric">
           <span>API cost</span>
           <strong id="stat-cost">{summary ? money(summary.cost_usd) : '—'}</strong>
-          <small>Last 7 days · USD</small>
+          <small>Last 7 days, USD</small>
         </article>
       </div>
       <div className="overview-grid">
@@ -108,7 +107,7 @@ export default function OverviewPage({ dashboard, onPolicies }) {
               <h2>Block categories</h2>
               <p>As reported by the gateway</p>
             </div>
-            <span className="label">OWASP</span>
+            <span className="label">OWASP categories</span>
           </div>
           <div id="categories" className={`categories${categories.length ? '' : ' empty'}`}>
             {categories.length
@@ -142,9 +141,8 @@ export default function OverviewPage({ dashboard, onPolicies }) {
         <div className="card-header">
           <div>
             <h2>Budgets</h2>
-            <p>Usage reported by the gateway · UTC periods</p>
+            <p>Usage reported by the gateway, in UTC periods</p>
           </div>
-          <span className="label">LIVE DATA</span>
         </div>
         <div id="budgets" className="budget-grid">
           {dashboard?.budgets.length ? (

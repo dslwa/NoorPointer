@@ -32,8 +32,8 @@ export default function LoginDialog({
     <Modal id="login-dialog" open={open} required={required} onDismiss={onDismiss}>
       <form id="login-form" onSubmit={connect}>
         <div className="dialog-heading">
-          <span className="brand-mark">
-            N<span>↗</span>
+          <span className="brand-mark" aria-hidden="true">
+            N
           </span>
           <h2>Connect to the control plane</h2>
           <p>Enter your administrator token to access the API.</p>
