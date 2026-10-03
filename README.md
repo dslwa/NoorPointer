@@ -76,6 +76,7 @@ make urls                  # adresy usług i dane logowania
 | Feed sygnatur | Nginx | 8085 | `http://localhost:8085/signatures.json` |
 | Mock LLM | Python (API OpenAI i Ollama) | 11434 | `http://localhost:11434` |
 | PostgreSQL / Redis | — | 5432 / 6379 | dane audytu i liczniki zużycia |
+| Gateway — metryki | — | 9090 | port zarezerwowany dla `GET /metrics`; brama jeszcze go nie wystawia, pilnuje tego alert `GatewayMetricsMissing` |
 
 ## Architektura
 
