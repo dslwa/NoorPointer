@@ -15,14 +15,14 @@ Serwis analizuje kontekst, intencję promptów, próby Jailbreaku oraz wycieki d
 
 1. **Detekcja Prompt Injection & Jailbreak**:
    - Klasyfikacja złośliwych promptów i prób ominięcia ograniczeń systemowych (Direct & Indirect Prompt Injection).
-   - Wykorzystanie lekkiego, lokalnego modelu transformerowego (np. `protectai/deberta-v3-base-prompt-injection-v2`).
+   - Wykorzystanie lekkiego modelu transformerowego `protectai/deberta-v3-base-prompt-injection-v2`.
    - Zwracanie flagi oraz wartości pewności (`score: 0.0 - 1.0`) do porównania z progiem `threshold` z polityki.
-2. **Zaawansowane PII (Presidio / NER)**:
-   - Rozpoznawanie encji nazwanych (imiona, nazwiska, lokalizacje, kontekstowe dane medyczne/finansowe) w języku naturalnym, trudne do wychwycenia regexem.
-3. **Ocena Bezpieczeństwa Treści (Content Safety / Llama Guard)**:
-   - Ewaluacja wejścia i wyjścia pod kątem toksyczności, mowy nienawiści, nieautoryzowanego generowania kodu exploitów (opcjonalnie z użyciem Llama Guard 3 na Ollamie lub wyspecjalizowanych klasyfikatorów).
-4. **Skaner Artefaktów Modeli (Unsafe Deserialization / Pickle RCE)**:
-   - Moduł skanujący pliki wag i repozytoria modeli (np. pliki `.bin`, `.pt`, `.pkl`) pod kątem obecności złośliwych kodów operacji `pickle` (np. integracja z `picklescan` / AST parser).
+2. **Zaawansowane PII (GLiNER Zero-Shot NER)**:
+   - Rozpoznawanie encji nazwanych (imiona, nazwiska, adresy, dane medyczne/finansowe) w języku naturalnym za pomocą modelu `urchade/gliner_small-v2.1` bez korporacyjnego narzutu Microsoftu.
+3. **Ocena Bezpieczeństwa Treści (Content Safety)**:
+   - Ewaluacja wejścia i wyjścia pod kątem wycieku promptu systemowego oraz generowania złośliwego kodu.
+4. **Skaner Artefaktów Modeli (picklescan / Unsafe Deserialization RCE)**:
+   - Moduł skanujący pliki wag modeli (`.bin`, `.pt`, `.pkl`) pod kątem obecności niebezpiecznych kodów operacji `pickle` (`os.system`, `subprocess.Popen`) bez ich uruchamiania.
    - Odpowiedź na wymaganie dotyczące mitygacji historycznych ataków typu supply-chain w ekosystemie AI.
 5. **Wykrywanie Wycieku System Promptu (Leakage Prevention)**:
    - Weryfikacja odpowiedzi modelu (output guardrail) pod kątem powtarzania tajnych instrukcji systemowych firmy.
