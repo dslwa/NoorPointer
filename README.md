@@ -190,8 +190,8 @@ Eksport dla narzędzi SIEM (wymaga `ADMIN_TOKEN`): `GET /api/v1/audit/export?for
 ### 4. Polityka
 
 Gateway pobiera ją z `GET {CONTROLPLANE_URL}/api/gateway/policy` (nagłówek `Authorization: Bearer $GATEWAY_TOKEN`).
-Kształt dokumentu (`config/policy.yaml` w repozytorium jest starszym plikiem prototypowym i nie jest tym,
-co widzi gateway):
+Prototypowy `config/policy.yaml` został usunięty z repozytorium: nie był czytany przez żaden komponent,
+a jego format różnił się od poniższego. Kształt dokumentu, który widzi gateway:
 
 ```json
 {
