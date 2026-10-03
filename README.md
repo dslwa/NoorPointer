@@ -40,7 +40,7 @@ Zarządzanie odbywa się centralnie przez **Control Plane**, a wyniki i telemetr
 Cały system uruchamia się jednym poleceniem – bez konieczności pobierania modeli z internetu w trakcie prezentacji:
 
 ```bash
-# A. Tryb dla Developerów (tylko Postgres, Redis, Ollama, Threat Feed i Telemetria):
+# A. Tryb dla Developerów (tylko Postgres, Redis, mock LLM, Threat Feed i Telemetria):
 make dev-infra
 
 # B. Tryb Pełny (uruchomienie wszystkich 10 serwisów w kontenerach):
@@ -67,7 +67,7 @@ make demo
 | **Control Plane API** | Java / Spring Boot | `8082` | `http://localhost:8082/api/v1` (Eksport SIEM: `/audit/export?format=cef`) |
 | **Semantic Service** | Python | `8001` / `50051` | `http://localhost:8001` (Główny gRPC: `:50051`) |
 | **Signatures Feed** | Nginx | `8085` | `http://localhost:8085/signatures.json` |
-| **Ollama (Upstream LLM)**| Ollama | `11434` | `http://localhost:11434` (`llama3.2:1b`) |
+| **Mock LLM (Upstream)**| Python, API zgodne z OpenAI/Ollama | `11434` | `http://localhost:11434` |
 
 ---
 

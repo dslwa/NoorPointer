@@ -18,11 +18,19 @@ services:
       - SEMANTIC_GRPC_URL=semantic-service:50051
       - CONTROLPLANE_URL=http://controlplane:8082
       - GATEWAY_TOKEN=${GATEWAY_TOKEN:-local-dev-gateway}
-      - UPSTREAM_LLM_URL=http://ollama:11434
+      - UPSTREAM_LLM_URL=http://mock-llm:11434
       - POLICY_FILE=/app/config/policy.yaml
       - SIGNATURES_FEED_URL=http://signatures-feed:8085/signatures.json
+      - JWT_PUBLIC_KEY=/etc/noorpointer/jwt.pub
     volumes:
       - ./config/policy.yaml:/app/config/policy.yaml:ro
+      - ./gateway/keys/jwt.pub:/etc/noorpointer/jwt.pub:ro
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:8080/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
     depends_on:
       redis:
         condition: service_healthy
@@ -31,6 +39,8 @@ services:
       signatures-feed:
         condition: service_started
       controlplane:
+        condition: service_healthy
+      mock-llm:
         condition: service_healthy
     restart: unless-stopped
     networks:
@@ -50,8 +60,13 @@ services:
     environment:
       - PORT=8001
       - GRPC_PORT=50051
-      - OLLAMA_URL=http://ollama:11434
+      - OLLAMA_URL=http://mock-llm:11434
+      - GUARD_MODEL=llama-guard3:1b
+      - TORCH_THREADS=4
       - PYTHONUNBUFFERED=1
+    depends_on:
+      mock-llm:
+        condition: service_healthy
     restart: unless-stopped
     networks:
       - noorpointer-net
@@ -99,6 +114,12 @@ services:
     depends_on:
       controlplane:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:3000/"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
     restart: unless-stopped
     networks:
       - noorpointer-net
@@ -157,15 +178,16 @@ services:
       - noorpointer-net
 
   # ========================================================
-  # UPSTREAM LOCAL LLM (Ollama llama3.2:1b)
+  # MOCK LLM UPSTREAM (OpenAI- + Ollama-compatible, zero deps)
+  # Swap for real Ollama/OpenAI later via UPSTREAM_LLM_URL / OLLAMA_URL.
   # ========================================================
-  ollama:
-    image: ollama/ollama:latest
-    container_name: noorpointer-ollama
+  mock-llm:
+    build:
+      context: ./mock-llm
+      dockerfile: Dockerfile
+    container_name: noorpointer-mock-llm
     ports:
-      - "11434:11434"
-    volumes:
-      - ollama-models:/root/.ollama
+      - "11434:11434" # drop-in for the old ollama port (curl debugging)
     restart: unless-stopped
     networks:
       - noorpointer-net
@@ -180,6 +202,7 @@ services:
       - "9091:9090" # Zewnętrzny 9091 (unikamy konfliktu z gateway:9090)
     volumes:
       - ./telemetry/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./telemetry/alert.rules.yml:/etc/prometheus/alert.rules.yml:ro
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
       - "--storage.tsdb.path=/prometheus"
@@ -246,4 +269,3 @@ networks:
 
 volumes:
   postgres-data:
-  ollama-models:

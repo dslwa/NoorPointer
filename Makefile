@@ -1,13 +1,14 @@
-.PHONY: help up dev-infra down restart logs status build test bench demo clean postgres-up postgres-test-up controlplane-run controlplane-test controlplane-build dashboard-dev
+.PHONY: help up dev-infra down restart logs status build test bench demo clean postgres-up postgres-test-up controlplane-run controlplane-test controlplane-build dashboard-dev smoke bench-flood bench-budget offline-check report demo-full demo-strict verify verify-strict keys token
 
 help: ## Pokazuje dostępne komendy
 	@echo "🛡️ NoorPointer Hackathon Commands:"
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2}'
 
-dev-infra: ## Uruchamia TYLKO bazy i telemetrię (Postgres, Redis, Ollama, Threat Feed, Prometheus, Grafana) dla pracy lokalnej
-	docker compose up -d postgres redis ollama signatures-feed prometheus grafana
+dev-infra: ## Uruchamia TYLKO bazy i telemetrię (Postgres, Redis, mock LLM, Threat Feed, Prometheus, Grafana) dla pracy lokalnej
+	docker compose up -d postgres redis mock-llm signatures-feed prometheus grafana
 
 up: ## Uruchamia WSZYSTKIE serwisy w kontenerach (pełny stos demonstracyjny dla Jury)
+	@test -f gateway/keys/jwt.pub || $(MAKE) keys
 	docker compose up -d --build
 
 down: ## Zatrzymuje całe środowisko
@@ -25,13 +26,13 @@ status: ## Pokazuje stan kontenerów i ich porty
 	docker compose ps
 
 test: ## Uruchamia automatyczny pakiet testów e2e (z generowaniem raportu HTML)
-	docker compose run --rm tests
+	docker compose run --rm -e GATEWAY_JWT="$$(./scripts/token.sh)" tests
 
 bench: ## Uruchamia benchmarki wydajnościowe k6 (narzut p95)
-	docker compose run --rm benchmarks run /benchmarks/benchmark_baseline.js
+	docker compose run --rm -e GATEWAY_JWT="$$(./scripts/token.sh)" benchmarks run /benchmarks/benchmark_baseline.js
 
 demo: ## Uruchamia scenariusze demonstracyjne agenta
-	./agent-demo/run.sh all
+	GATEWAY_JWT="$$(./scripts/token.sh)" ./agent-demo/run.sh all
 
 clean: ## Czyści wolumeny i nieużywane obrazy Dockera
 	docker compose down -v --remove-orphans
@@ -53,3 +54,43 @@ controlplane-build: postgres-test-up ## Sprawdza Javę na PostgreSQL i buduje JA
 
 dashboard-dev: ## Uruchamia React z hot reload na :5173 (API Javy musi działać na :8082)
 	cd dashboard && npm ci --no-audit --no-fund && npm run dev
+
+smoke: ## Sprawdza spięcie całego stosu (health + proxy + auth controlplane), zapisuje reports/smoke.txt
+	@mkdir -p reports
+	./scripts/smoke.sh | tee reports/smoke.txt
+
+bench-flood: ## k6: zalew złośliwych promptów (fast-block)
+	docker compose run --rm -e GATEWAY_JWT="$$(./scripts/token.sh)" benchmarks run /benchmarks/benchmark_malicious_flood.js
+
+bench-budget: ## k6: równoległe zapytania jednego agenta (atomowość budżetu)
+	docker compose run --rm -e GATEWAY_JWT="$$(./scripts/token.sh)" benchmarks run /benchmarks/benchmark_budget_concurrency.js
+
+offline-check: ## Lint: brak instalacji/pobierania w runtime (finalny stage obrazów)
+	./scripts/offline-check.sh
+
+report: ## Zbiera dowody dla jury do reports/INDEX.md
+	./scripts/report.sh
+
+demo-full: ## Pełne demo: run.sh (5 scenariuszy) + scenariusze zaawansowane (PENDING dozwolone)
+	GATEWAY_JWT="$$(./scripts/token.sh)" ./agent-demo/run.sh all
+	./agent-demo/scenarios.sh
+
+demo-strict: ## Jak demo-full, ale PENDING (gateway bez guardraili) liczy się jako FAIL
+	GATEWAY_JWT="$$(./scripts/token.sh)" ./agent-demo/run.sh all
+	./agent-demo/scenarios.sh --strict
+
+verify: ## Zero-prep: smoke + offline-check + scenariusze demo (PENDING dozwolone)
+	./scripts/smoke.sh
+	./scripts/offline-check.sh
+	./agent-demo/scenarios.sh
+
+verify-strict: ## Jak verify, ale PENDING liczy się jako FAIL (po guardrailach gatewaya)
+	./scripts/smoke.sh
+	./scripts/offline-check.sh
+	./agent-demo/scenarios.sh --strict
+
+keys: ## Generuje lokalną parę kluczy JWT gatewaya (gateway/keys, gitignored)
+	cd gateway && make keys
+
+token: ## Wypisuje świeży JWT dla gatewaya (AGENT=... TEAM=... TTL=...)
+	./scripts/token.sh
