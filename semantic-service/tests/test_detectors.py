@@ -276,3 +276,17 @@ def test_sentences_join_back_to_the_text():
     text = "First one. Second?  Third!\nFourth line\n\nlast"
     assert "".join(sentences(text)) == text
     assert len(sentences(text)) == 5
+
+
+async def test_guard_model_is_kept_loaded_between_checks():
+    # Ollama unloads an idle model after 5 minutes, and reloading it blew every check budget
+    sent = []
+
+    def handler(request):
+        sent.append(__import__("json").loads(request.content))
+        return httpx.Response(200, json={"message": {"content": "safe"}, "prompt_eval_count": 10})
+
+    d = fake_ollama(handler)
+    d.state = "ready"
+    await d.check(ScanRequest(text="hello"))
+    assert sent and all(body["keep_alive"] == -1 for body in sent)

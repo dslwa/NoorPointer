@@ -928,37 +928,214 @@ dialog::backdrop {
 }
 
 .prompt-input {
-  min-height: 200px;
+  min-height: 140px;
   resize: vertical;
   line-height: 1.6;
+  font-size: 15px;
 }
+
+/* ---------- Prompt check result ---------- */
 .prompt-results {
-  border-top: 1px solid var(--rule);
+  display: grid;
 }
-.prompt-verdict,
-.prompt-section {
-  padding: 20px 24px;
+/* The decision leads, tinted by what the gateway did with the text. */
+.prompt-verdict {
+  --tone: var(--muted);
+  --tone-wash: var(--sunk);
+  display: grid;
+  gap: 6px;
+  margin: 20px 24px 8px;
+  padding: 18px 20px;
+  border-radius: var(--radius-sm);
+  background: var(--tone-wash);
+  box-shadow: inset 4px 0 0 var(--tone);
+}
+.prompt-verdict.block {
+  --tone: var(--signal);
+  --tone-wash: var(--signal-wash);
+}
+.prompt-verdict.allow {
+  --tone: var(--pass);
+  --tone-wash: var(--pass-wash);
+}
+.prompt-verdict.redact {
+  --tone: var(--caution);
+  --tone-wash: var(--caution-wash);
+}
+.prompt-verdict.monitor {
+  --tone: var(--lamp);
+  --tone-wash: var(--lamp-wash);
+}
+.prompt-verdict-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 .prompt-verdict .badge {
-  margin-right: 12px;
+  font-size: 15px;
+  font-weight: 650;
+  padding: 4px 14px;
+  background: var(--tone);
+  color: var(--on-strong);
+}
+.prompt-verdict code {
+  font-size: 12px;
+  color: var(--ink-2);
+  background: var(--surface);
+}
+.prompt-verdict > strong {
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.prompt-verdict .help {
+  margin: 0;
+}
+.prompt-findings {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+}
+.prompt-findings li {
+  font-size: 13px;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--ink-2);
+}
+.prompt-findings strong {
+  color: var(--ink);
+  font-weight: 600;
 }
 .prompt-warning {
+  margin: 8px 24px 0;
+  font-size: 14px;
   color: var(--caution);
-  padding-inline: 24px;
 }
 .prompt-results caption {
   text-align: left;
-  padding: 16px 24px;
+  padding: 20px 24px 10px;
+  font-size: 15px;
   font-weight: 600;
+  color: var(--ink);
+}
+.prompt-table {
+  white-space: normal;
+}
+.prompt-table td {
+  vertical-align: middle;
+}
+.prompt-control {
+  color: var(--ink);
+  font-weight: 550;
+  white-space: nowrap;
+}
+.prompt-action {
+  font-family: var(--mono);
+  font-size: 13px;
+}
+.prompt-details {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  min-width: 220px;
+}
+.prompt-categories {
+  display: inline-flex;
+  gap: 4px;
+}
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 550;
+  color: var(--ink-2);
+}
+.status-pill::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--placeholder);
+}
+.status-pill.pass {
+  color: var(--pass);
+}
+.status-pill.pass::before {
+  background: var(--pass);
+}
+.status-pill.found {
+  color: var(--signal);
+}
+.status-pill.found::before {
+  background: var(--signal);
+}
+.status-pill.trouble {
+  color: var(--caution);
+}
+.status-pill.trouble::before {
+  background: var(--caution);
 }
 .prompt-score {
   display: flex;
   align-items: center;
   gap: 10px;
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+  color: var(--ink-2);
 }
 .prompt-score progress {
-  width: 100px;
-  accent-color: var(--lamp);
+  appearance: none;
+  width: 90px;
+  height: 6px;
+  border: 0;
+  border-radius: 3px;
+  background: var(--sunk);
+  overflow: hidden;
+}
+.prompt-score progress::-webkit-progress-bar {
+  background: var(--sunk);
+}
+.prompt-score progress::-webkit-progress-value {
+  background: var(--ink-2);
+  border-radius: 3px;
+}
+.prompt-score progress::-moz-progress-bar {
+  background: var(--ink-2);
+  border-radius: 3px;
+}
+.prompt-score.found progress::-webkit-progress-value {
+  background: var(--signal);
+}
+.prompt-score.found progress::-moz-progress-bar {
+  background: var(--signal);
+}
+.prompt-score.found span {
+  color: var(--signal);
+  font-weight: 600;
+}
+.prompt-section {
+  padding: 8px 24px 24px;
+}
+.prompt-section h3 {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 12px 0 10px;
+}
+.prompt-message .label {
+  display: block;
+  margin-bottom: 6px;
+}
+.prompt-message pre {
+  white-space: pre-wrap;
+  max-height: 240px;
 }
 
 /* ---------- Narrower screens ---------- */
