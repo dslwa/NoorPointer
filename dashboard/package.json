@@ -14,7 +14,8 @@
     "format:check": "prettier --check src vite.config.js index.html package.json"
   },
   "dependencies": {
-    "@fontsource/architects-daughter": "5.3.0",
+    "@fontsource-variable/geist": "5.3.0",
+    "@fontsource-variable/geist-mono": "5.3.0",
     "react": "19.3.0",
     "react-dom": "19.3.0"
   },

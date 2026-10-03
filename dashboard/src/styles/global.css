@@ -1,78 +1,78 @@
-@import '@fontsource/architects-daughter';
+@import '@fontsource-variable/geist';
+@import '@fontsource-variable/geist-mono';
 
-/* Notebook (21st.dev / tweakcn "notebook"): graphite on paper, pencil-grey rules, a yellow highlighter
-   for "the lamp found or will look at this". Red and green stay, muted, for verdicts only. */
+/* Ruixen-style: white sheets on a pale grey frame, true-black type and pill buttons, hairline greys.
+   One blue for "the lamp found or will look at this"; red and green are verdicts only. */
 :root {
-  --paper: oklch(0.9821 0 0);
-  --surface: oklch(1 0 0);
-  --sunk: oklch(0.9158 0 0);
-  --ink: oklch(0.3485 0 0);
-  --ink-2: oklch(0.4313 0 0);
-  --muted: oklch(0.5 0 0);
-  --placeholder: oklch(0.62 0 0);
-  --rule: oklch(0.5538 0.0025 17.232);
-  --rule-soft: oklch(0.8078 0 0);
-  --lamp: oklch(0.4891 0 0);
-  --lamp-deep: oklch(0.3485 0 0);
-  --lamp-wash: oklch(0.9354 0.0456 94.8549);
-  --on-strong: oklch(0.9551 0 0);
-  /* theme destructive, deepened so text on white reaches 4.5:1 */
-  --signal: oklch(0.5 0.11 22);
-  --signal-wash: oklch(0.95 0.02 20);
-  --pass: oklch(0.47 0.06 155);
-  --pass-wash: oklch(0.95 0.02 155);
-  --marker: oklch(0.9 0.1 95);
-  --caution: oklch(0.4015 0.0436 37.9587);
-  --caution-wash: oklch(0.9354 0.0456 94.8549);
-  --bar: oklch(0.683 0 0);
-  --sidebar: oklch(0.9551 0 0);
-  --backdrop: oklch(0.3485 0 0 / 0.4);
-  --radius: 0.625rem;
-  --radius-sm: calc(var(--radius) - 4px);
-  --shadow-sm: 1px 4px 5px 0px hsl(0 0% 0% / 0.03), 1px 1px 2px -1px hsl(0 0% 0% / 0.03);
-  --shadow-md: 1px 4px 5px 0px hsl(0 0% 0% / 0.03), 1px 2px 4px -1px hsl(0 0% 0% / 0.03);
-  --shadow-xl: 1px 4px 5px 0px hsl(0 0% 0% / 0.03), 1px 8px 10px -1px hsl(0 0% 0% / 0.03);
-  --shadow-2xl: 1px 4px 5px 0px hsl(0 0% 0% / 0.07);
-  --sans: 'Architects Daughter', 'Comic Neue', sans-serif;
-  --serif: Georgia, 'Times New Roman', serif;
-  --mono: 'Fira Code', 'Courier New', Courier, monospace;
+  --paper: #f5f5f5;
+  --surface: #ffffff;
+  --sunk: #f0f0f0;
+  --ink: #0a0a0a;
+  --ink-2: #404040;
+  --muted: #6b6b6b;
+  --placeholder: #a3a3a3;
+  --rule: #e5e5e5;
+  --rule-soft: #efefef;
+  --lamp: #2563eb;
+  --lamp-deep: #1d4ed8;
+  --lamp-wash: #eff4ff;
+  --on-strong: #ffffff;
+  --signal: #dc2626;
+  --signal-wash: #fef2f2;
+  --pass: #15803d;
+  --pass-wash: #f0fdf4;
+  --marker: #fde68a;
+  --caution: #a16207;
+  --caution-wash: #fefce8;
+  --bar: #d4d4d4;
+  --sidebar: #fafafa;
+  --backdrop: rgb(10 10 10 / 0.35);
+  --radius: 14px;
+  --radius-sm: 8px;
+  --radius-pill: 999px;
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.05);
+  --shadow-md: 0 1px 2px rgb(0 0 0 / 0.04), 0 1px 1px rgb(0 0 0 / 0.02);
+  --shadow-xl: 0 12px 32px -12px rgb(0 0 0 / 0.18);
+  --shadow-2xl: 0 24px 64px -16px rgb(0 0 0 / 0.25);
+  --sans: 'Geist Variable', 'Inter', system-ui, sans-serif;
+  --serif: 'Geist Variable', system-ui, sans-serif;
+  --mono: 'Geist Mono Variable', ui-monospace, monospace;
   font-family: var(--sans);
   font-size: 15px;
   line-height: 1.5;
-  letter-spacing: 0.5px;
   color: var(--ink);
   color-scheme: light;
-  /* Architects Daughter has one weight: hierarchy comes from size, not faux bold */
   font-synthesis: none;
+  font-feature-settings: 'ss01';
   -webkit-font-smoothing: antialiased;
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --paper: oklch(0.2891 0 0);
-    --surface: oklch(0.3211 0 0);
-    --sunk: oklch(0.3904 0 0);
-    --ink: oklch(0.8945 0 0);
-    --ink-2: oklch(0.8078 0 0);
-    --muted: oklch(0.7058 0 0);
-    --placeholder: oklch(0.6 0 0);
-    --rule: oklch(0.4276 0 0);
-    --rule-soft: oklch(0.3904 0 0);
-    --lamp: oklch(0.7572 0 0);
-    --lamp-deep: oklch(0.9067 0 0);
-    --lamp-wash: oklch(0.42 0.04 95);
-    --on-strong: oklch(0.2891 0 0);
-    --signal: oklch(0.7915 0.0491 18.241);
-    --signal-wash: oklch(0.36 0.04 20);
-    --pass: oklch(0.8 0.06 155);
-    --pass-wash: oklch(0.36 0.035 155);
-    --marker: oklch(0.5 0.08 95);
-    --caution: oklch(0.88 0.06 90);
-    --caution-wash: oklch(0.4 0.04 95);
-    --bar: oklch(0.5452 0 0);
-    --sidebar: oklch(0.2478 0 0);
-    --backdrop: oklch(0 0 0 / 0.55);
-    --shadow-xl: 1px 4px 5px 0px hsl(0 0% 0% / 0.2), 1px 8px 10px -1px hsl(0 0% 0% / 0.2);
-    --shadow-2xl: 1px 4px 5px 0px hsl(0 0% 0% / 0.3);
+    --paper: #0a0a0a;
+    --surface: #141414;
+    --sunk: #1f1f1f;
+    --ink: #fafafa;
+    --ink-2: #d4d4d4;
+    --muted: #a3a3a3;
+    --placeholder: #737373;
+    --rule: #262626;
+    --rule-soft: #1f1f1f;
+    --lamp: #60a5fa;
+    --lamp-deep: #93c5fd;
+    --lamp-wash: #172036;
+    --on-strong: #0a0a0a;
+    --signal: #f87171;
+    --signal-wash: #2a1414;
+    --pass: #4ade80;
+    --pass-wash: #10241a;
+    --marker: #854d0e;
+    --caution: #facc15;
+    --caution-wash: #2a2410;
+    --bar: #404040;
+    --sidebar: #0f0f0f;
+    --backdrop: rgb(0 0 0 / 0.6);
+    --shadow-xl: 0 12px 32px -12px rgb(0 0 0 / 0.6);
+    --shadow-2xl: 0 24px 64px -16px rgb(0 0 0 / 0.7);
     color-scheme: dark;
   }
 }
@@ -136,6 +136,7 @@ a {
   text-decoration: none;
   font-weight: 700;
   font-size: 17px;
+  letter-spacing: -0.02em;
 }
 .brand small {
   display: block;
@@ -176,7 +177,7 @@ a {
   display: block;
   width: calc(100% - 24px);
   margin: 2px 12px;
-  border-radius: var(--radius);
+  border-radius: var(--radius-pill);
   border: 0;
   background: transparent;
   color: var(--ink-2);
@@ -188,10 +189,11 @@ a {
   color: var(--ink);
   background: var(--sunk);
 }
-/* the current page is highlighted the way you'd mark a notebook line */
+/* the current page sits on a grey pill, like a selected segment */
 .nav-item.active {
-  color: var(--caution);
-  background: var(--lamp-wash);
+  color: var(--ink);
+  background: var(--sunk);
+  font-weight: 560;
 }
 main {
   margin-left: 232px;
@@ -242,11 +244,12 @@ main {
   margin-bottom: 36px;
 }
 h1 {
-  font-size: 42px;
+  font-size: 44px;
   line-height: 1.05;
-  font-weight: 720;
+  font-weight: 600;
   margin: 0;
   max-width: 24ch;
+  letter-spacing: -0.04em;
 }
 .subtitle {
   color: var(--ink-2);
@@ -263,7 +266,7 @@ h1 {
 /* ---------- Controls ---------- */
 .button {
   border: 1px solid transparent;
-  border-radius: var(--radius);
+  border-radius: var(--radius-pill);
   padding: 9px 18px;
   font-weight: 600;
   font-size: 14px;
@@ -273,12 +276,11 @@ h1 {
     border-color 0.15s;
 }
 .button.primary {
-  background: var(--lamp);
+  background: var(--ink);
   color: var(--on-strong);
-  box-shadow: var(--shadow-sm);
 }
 .button.primary:hover:not(:disabled) {
-  background: var(--ink);
+  background: var(--ink-2);
 }
 .button.lamp {
   background: var(--lamp);
@@ -288,7 +290,7 @@ h1 {
   background: var(--lamp-deep);
 }
 .button.secondary {
-  background: transparent;
+  background: var(--surface);
   border-color: var(--rule);
   color: var(--ink);
 }
@@ -305,11 +307,13 @@ h1 {
   background: var(--sunk);
 }
 .button.danger {
-  background: var(--signal);
-  color: var(--on-strong);
+  background: var(--surface);
+  border-color: var(--rule);
+  color: var(--signal);
 }
 .button.danger:hover:not(:disabled) {
-  background: color-mix(in oklch, var(--signal) 80%, var(--ink));
+  background: var(--signal-wash);
+  border-color: color-mix(in oklch, var(--signal) 35%, transparent);
 }
 .button.small {
   padding: 6px 12px;
@@ -327,7 +331,7 @@ input,
 select,
 textarea {
   border: 1px solid var(--rule);
-  border-radius: var(--radius);
+  border-radius: var(--radius-sm);
   background: var(--surface);
   color: var(--ink);
   padding: 8px 11px;
@@ -372,7 +376,7 @@ pre {
   margin: 0;
   padding: 16px 18px;
   background: var(--paper);
-  border-radius: var(--radius);
+  border-radius: var(--radius-sm);
   overflow: auto;
   white-space: pre-wrap;
   word-break: break-word;
@@ -421,8 +425,9 @@ summary {
 }
 h2 {
   font-size: 18px;
-  font-weight: 680;
+  font-weight: 600;
   margin: 0;
+  letter-spacing: -0.015em;
 }
 .card-header p {
   font-size: 14px;
@@ -468,7 +473,7 @@ h2 {
 .badge {
   display: inline-block;
   padding: 2px 9px;
-  border-radius: var(--radius);
+  border-radius: var(--radius-pill);
   font-size: 13px;
   font-weight: 550;
   background: var(--sunk);
@@ -543,9 +548,11 @@ h2 {
 .metric strong {
   display: block;
   font-size: 38px;
-  font-weight: 650;
+  font-weight: 600;
   line-height: 1.1;
   margin: 8px 0 6px;
+  letter-spacing: -0.035em;
+  font-variant-numeric: tabular-nums;
 }
 .metric small {
   font-size: 13px;
@@ -768,6 +775,7 @@ table {
   text-align: left;
   font-size: 14px;
   white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 th {
   font-size: 13px;
@@ -865,7 +873,7 @@ td small {
 /* ---------- Dialogs and toast ---------- */
 dialog {
   border: 1px solid var(--rule);
-  border-radius: var(--radius);
+  border-radius: 20px;
   box-shadow: var(--shadow-2xl);
   padding: 30px;
   color: var(--ink);
@@ -886,6 +894,7 @@ dialog::backdrop {
 }
 .dialog-heading h2 {
   font-size: 24px;
+  letter-spacing: -0.025em;
 }
 .dialog-heading p {
   font-size: 15px;
@@ -909,7 +918,7 @@ dialog::backdrop {
   color: var(--paper);
   padding: 13px 18px;
   max-width: min(520px, calc(100vw - 32px));
-  border-radius: var(--radius);
+  border-radius: var(--radius-sm);
   box-shadow: var(--shadow-xl);
   font-size: 14px;
   z-index: 10;
@@ -952,6 +961,7 @@ dialog::backdrop {
   font-size: 17px;
   font-weight: 650;
   margin: 0;
+  letter-spacing: -0.01em;
 }
 .verdict.stopped {
   color: var(--signal);
@@ -967,12 +977,12 @@ dialog::backdrop {
   display: inline-flex;
   padding: 3px;
   background: var(--sunk);
-  border-radius: var(--radius);
+  border-radius: var(--radius-pill);
 }
 .segmented button {
   border: 0;
   background: transparent;
-  border-radius: var(--radius);
+  border-radius: var(--radius-pill);
   padding: 5px 14px;
   font-size: 13.5px;
   color: var(--ink-2);
