@@ -296,8 +296,8 @@ repozytorium):
 7. `make traffic` — realny ruch na panele: zadania przez gateway oraz skany semantyczne, które
    oznaczają próbę prompt injection i dane osobowe. Bez tego kroku panele usługi semantycznej są puste,
    bo gateway nie wywołuje jej jeszcze w ścieżce żądania.
-8. Panel `http://localhost:3000` (login `local-dev-admin`) — incydenty, rewizje polityki, katalog sygnatur
-i strona „Prompt check”, która uruchamia kontrole semantyczne bez terminala.
+8. Panel `http://localhost:3000` (login `local-dev-admin`) — incydenty, rewizje polityki i katalog sygnatur.
+   Control plane udostępnia opublikowaną politykę oraz sygnatury gatewayowi Go.
 9. Grafana `http://localhost:3001` (admin/admin) — dostępność usług, kontrole semantyczne, ruch
    w control plane i alerty. Panel gatewaya jest tam opisany jako pusty do czasu `GET /metrics`.
 10. `sudo make test` — pakiet testów, `reports/test_report.html` i `reports/INDEX.md` z listą

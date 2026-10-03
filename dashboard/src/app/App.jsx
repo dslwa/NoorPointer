@@ -12,7 +12,6 @@ import OverviewPage from '../pages/OverviewPage.jsx';
 import PoliciesPage from '../pages/PoliciesPage.jsx';
 import EventsPage from '../pages/EventsPage.jsx';
 import SignaturesPage from '../pages/SignaturesPage.jsx';
-import PromptCheckPage from '../pages/PromptCheckPage.jsx';
 
 export default function App() {
   const [token, setToken] = useState(() => sessionStorage.getItem('noorpointer-token'));
@@ -103,9 +102,6 @@ export default function App() {
             refreshKey={refreshKey}
             notify={notify}
           />
-        </section>
-        <section id="prompt" className="view" hidden={view !== 'prompt'}>
-          <PromptCheckPage active={view === 'prompt'} notify={notify} />
         </section>
       </AppShell>
       <LoginDialog

@@ -89,7 +89,7 @@ i `sudo SKIP_AUDIT=1 make db-tidy`.
 **4. Panel i wykresy** (dane demonstracyjne ładują się same przy starcie):
 
 - panel operacyjny: <http://localhost:3000> (token `local-dev-admin`) — incydenty, wersje zasad, katalog
-  sygnatur, budżety oraz strona **Prompt check**, na której można sprawdzić tekst bez terminala,
+  sygnatur i budżety; control plane udostępnia zasady i sygnatury gatewayowi Go,
 - Grafana: <http://localhost:3001> (logowanie wyłączone) — dostępność usług, kontrole semantyczne, ruch,
 - Prometheus: <http://localhost:9091/targets> i `/alerts`.
 
@@ -100,7 +100,7 @@ i `sudo SKIP_AUDIT=1 make db-tidy`.
 2. **Brama nie wystawia własnych metryk** (`GET /metrics`), więc jeden panel Grafany jest pusty,
    a w Prometheusie widać alert `GatewayMetricsMissing`. Jest celowy i zniknie sam, gdy metryki się pojawią.
 3. **Sprawdzanie treści działa w osobnym serwisie i nie jest jeszcze wywoływane w ścieżce żądania** —
-   widać je w panelu (Prompt check) i przez `make scan`.
+   można je uruchomić osobno przez `make scan`.
 
 Pakiety testów rozróżniają dwie sytuacje: `PENDING` (kontroli jeszcze nie ma) i `FAIL` (kontrola jest,
 ale nie działa). Nie ukrywamy pierwszego pod drugim.
