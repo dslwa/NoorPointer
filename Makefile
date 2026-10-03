@@ -1,4 +1,4 @@
-.PHONY: help up dev-infra down restart logs status build test bench demo clean postgres-up postgres-test-up controlplane-run controlplane-test controlplane-build dashboard-dev smoke bench-flood bench-budget offline-check report demo-full demo-strict verify verify-strict keys token
+.PHONY: help up dev-infra down restart logs status build test bench demo clean postgres-up postgres-test-up controlplane-run controlplane-test controlplane-build dashboard-dev smoke bench-flood bench-budget offline-check report demo-full demo-strict verify verify-strict keys token doctor seed
 
 help: ## Pokazuje dostępne komendy
 	@echo "🛡️ NoorPointer Hackathon Commands:"
@@ -10,6 +10,7 @@ dev-infra: ## Uruchamia TYLKO bazy i telemetrię (Postgres, Redis, mock LLM, Thr
 up: ## Uruchamia WSZYSTKIE serwisy w kontenerach (pełny stos demonstracyjny dla Jury)
 	@test -f gateway/keys/jwt.pub || $(MAKE) keys
 	docker compose up -d --build
+	-@./scripts/seed.sh
 
 down: ## Zatrzymuje całe środowisko
 	docker compose down
@@ -25,13 +26,17 @@ logs: ## Wyświetla zagregowane logi ze wszystkich kontenerów
 status: ## Pokazuje stan kontenerów i ich porty
 	docker compose ps
 
-test: ## Uruchamia automatyczny pakiet testów e2e (z generowaniem raportu HTML)
+seed: ## Wypełnia bazę audytu danymi demo (wymagane dla eksportu CEF)
+	./scripts/seed.sh
+
+test: seed ## Uruchamia automatyczny pakiet testów e2e (seed + raport HTML)
 	docker compose run --rm -e GATEWAY_JWT="$$(./scripts/token.sh)" tests
 
 bench: ## Uruchamia benchmarki wydajnościowe k6 (narzut p95)
 	docker compose run --rm -e GATEWAY_JWT="$$(./scripts/token.sh)" benchmarks run /benchmarks/benchmark_baseline.js
 
-demo: ## Uruchamia scenariusze demonstracyjne agenta
+demo: ## Uruchamia scenariusze demonstracyjne agenta (z seedem danych demo)
+	-@./scripts/seed.sh
 	GATEWAY_JWT="$$(./scripts/token.sh)" ./agent-demo/run.sh all
 
 clean: ## Czyści wolumeny i nieużywane obrazy Dockera
@@ -71,11 +76,13 @@ offline-check: ## Lint: brak instalacji/pobierania w runtime (finalny stage obra
 report: ## Zbiera dowody dla jury do reports/INDEX.md
 	./scripts/report.sh
 
-demo-full: ## Pełne demo: run.sh (5 scenariuszy) + scenariusze zaawansowane (PENDING dozwolone)
+demo-full: ## Pełne demo: seed + run.sh (5 scenariuszy) + scenariusze zaawansowane (PENDING dozwolone)
+	-@./scripts/seed.sh
 	GATEWAY_JWT="$$(./scripts/token.sh)" ./agent-demo/run.sh all
 	./agent-demo/scenarios.sh
 
 demo-strict: ## Jak demo-full, ale PENDING (gateway bez guardraili) liczy się jako FAIL
+	-@./scripts/seed.sh
 	GATEWAY_JWT="$$(./scripts/token.sh)" ./agent-demo/run.sh all
 	./agent-demo/scenarios.sh --strict
 
@@ -94,3 +101,6 @@ keys: ## Generuje lokalną parę kluczy JWT gatewaya (gateway/keys, gitignored)
 
 token: ## Wypisuje świeży JWT dla gatewaya (AGENT=... TEAM=... TTL=...)
 	./scripts/token.sh
+
+doctor: ## Pre-flight: klucze JWT, compose, token, wymuszanie auth (bez zmian w stacku)
+	./scripts/doctor.sh
