@@ -14,11 +14,14 @@ groups:
           description: "Prometheus nie moze pobrac metryk z gateway:9090/metrics (endpoint nie istnieje lub proces nie dziala)."
 
       - alert: SemanticDown
+        # Prog dluzszy niz dla pozostalych uslug: kontener wczytuje modele okolo 2 minut, wiec krotsze
+        # okno zglaszaloby "brak odpowiedzi" przy kazdym starcie, choc usluga jest w trakcie uruchamiania.
         expr: up{job="noorpointer-semantic"} == 0
-        for: 30s
+        for: 2m
         labels: { severity: critical }
         annotations:
           summary: "Brak odpowiedzi z uslugi semantycznej"
+          description: "Prometheus nie moze pobrac metryk z semantic-service:8001/metrics od ponad 2 minut. Krotkie przerwy w czasie startu (wczytywanie modeli) sa normalne i nie wyzwalaja alertu."
 
       - alert: ControlPlaneDown
         expr: up{job="noorpointer-controlplane"} == 0
@@ -29,11 +32,13 @@ groups:
 
       # --- kontrole semantyczne (zalozony prog 200 ms) -----------------------------------------------------
       - alert: SemanticSlow
-        expr: histogram_quantile(0.95, sum(rate(semantic_check_latency_seconds_bucket[1m])) by (le)) > 0.2
-        for: 1m
+        # Okno 5 minut, nie 1: przy malym ruchu p95 z minuty skacze przy pojedynczych pomiarach.
+        expr: histogram_quantile(0.95, sum(rate(semantic_check_latency_seconds_bucket[5m])) by (le)) > 0.2
+        for: 2m
         labels: { severity: warning }
         annotations:
           summary: "p95 kontroli semantycznych powyzej 200 ms"
+          description: "Percentyl 95 z 5-minutowego okna przekracza 200 ms. Budzet kontroli w polityce to 300 ms, wiec alert ostrzega przed zblizaniem sie do limitu."
 
       - alert: SemanticCheckFailing
         expr: sum(rate(semantic_check_latency_seconds_count{status=~"error|timeout"}[1m])) > 0
@@ -44,24 +49,28 @@ groups:
 
       # --- plaszczyzna danych (dziala po dodaniu /metrics w gatewayu) --------------------------------------
       - alert: GatewayBlockSpike
-        expr: sum(rate(gateway_requests_total{action="blocked"}[1m])) > 5
+        # Etykieta musi byc taka sama jak w metryce, ktora wystawi gateway. W kontrakcie zdarzenia
+        # audytowego akcje to allow|block|redact|monitor|timeout, wiec uzywamy "block", a nie "blocked".
+        expr: sum(rate(gateway_requests_total{action="block"}[1m])) > 5
         for: 1m
         labels: { severity: info }
         annotations:
           summary: "Skok liczby zablokowanych zadan (powyzej 5 na sekunde)"
+          description: "Gateway blokuje ponad 5 zadan na sekunde. Przy normalnej pracy to sygnal ataku; po wlaczeniu kontroli sprawdz, czy nie jest to falszywy alarm regulatora."
 
       # --- brak danych (metryka nie istnieje albo nie ma ruchu) --------------------------------------------
       # Alert oparty na rate() milczy zarowno wtedy, gdy wszystko dziala, jak i wtedy, gdy danych nie ma.
       # Ponizsze reguly rozrozniaja te dwie sytuacje i nazywaja je wprost.
       - alert: SemanticNoTraffic
-        # Licznik istnieje (eksportuje go prometheus_client), ale nic go nie zwiekszylo: usluga dziala,
-        # nie wykonano zadnej kontroli.
-        expr: sum(increase(semantic_check_latency_seconds_count[5m])) == 0
+        # Warunek wymaga ruchu w gatewayu: alert ma pokazywac brakujace podlaczenie semantyki do sciezki
+        # zadania, a nie przerwe w pracy zespolu. Bez tego warunku wyzwalalby sie za kazdym razem, gdy
+        # nikt nie korzysta z systemu (np. w nocy albo w trakcie przerwy w pokazie).
+        expr: sum(rate(gateway_requests_total[5m])) > 0 and sum(increase(semantic_check_latency_seconds_count[5m])) == 0
         for: 10m
         labels: { severity: info }
         annotations:
-          summary: "Brak ruchu do uslugi semantycznej"
-          description: "Usluga odpowiada na zapytania metryk, ale nie wykonala zadnej kontroli w ciagu 5 minut."
+          summary: "Gateway obsluguje ruch, a usluga semantyczna nie wykonuje zadnej kontroli"
+          description: "Przez 10 minut gateway przyjmowal zadania, a licznik kontroli semantycznych sie nie zmienil. To znaczy, ze sprawdzanie tresci nie jest jeszcze podlaczone do sciezki zadania."
 
       - alert: GatewayMetricsMissing
         # Warunek prawdziwy, bo metryka nie istnieje: gateway nie wystawia /metrics (znana luka).

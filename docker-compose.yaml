@@ -195,6 +195,8 @@ services:
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
       - "--storage.tsdb.path=/prometheus"
+      # Pozwala przeladowac reguly bez restartu kontenera: curl -X POST localhost:9091/-/reload
+      - "--web.enable-lifecycle"
     <<: *service
 
   grafana:

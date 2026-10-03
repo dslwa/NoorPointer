@@ -33,28 +33,31 @@ Odstęp między odpytaniami: 2 s (`global.scrape_interval`).
 
 Reguły alertów: `alert.rules.yml`, 8 pozycji.
 
-| Alert | Waga | Wykrywa |
-| :--- | :--- | :--- |
-| `GatewayDown` | critical | brak odpowiedzi `gateway:9090/metrics` |
-| `SemanticDown` | critical | brak odpowiedzi usługi semantycznej |
-| `ControlPlaneDown` | critical | brak odpowiedzi control plane (lub zerwane uwierzytelnianie metryk) |
-| `SemanticSlow` | warning | p95 kontroli semantycznych powyżej 200 ms |
-| `SemanticCheckFailing` | warning | kontroli semantycznych kończących się błędem lub przekroczeniem czasu |
-| `GatewayBlockSpike` | info | skok liczby zablokowanych żądań (powyżej 5 na sekundę) |
-| `SemanticNoTraffic` | info | usługa działa, ale nie wykonała żadnej kontroli w ostatnich 5 minutach |
-| `GatewayMetricsMissing` | info | metryki gatewaya nie istnieją (znana luka do czasu dodania `/metrics`) |
+| Alert | Waga | Wykrywa | Czy może zadziałać dziś |
+| :--- | :--- | :--- | :--- |
+| `GatewayDown` | critical | brak odpowiedzi `gateway:9090/metrics` | **nie** — nie ma zadania zbierającego, więc nie istnieje seria `up{job="noorpointer-gateway"}`; zadziała po dodaniu `/metrics` |
+| `SemanticDown` | critical | brak odpowiedzi usługi semantycznej dłużej niż 2 minuty | tak (krótsze przerwy w czasie startu są normalne: kontener wczytuje modele) |
+| `ControlPlaneDown` | critical | brak odpowiedzi control plane (lub zerwane uwierzytelnianie metryk) | tak |
+| `SemanticSlow` | warning | p95 kontroli semantycznych powyżej 200 ms (okno 5 minut) | tak |
+| `SemanticCheckFailing` | warning | kontroli semantycznych kończących się błędem lub przekroczeniem czasu | tak |
+| `GatewayBlockSpike` | info | skok liczby zablokowanych żądań (powyżej 5 na sekundę), etykieta `action="block"` | **nie** — czeka na `gateway_requests_total` z gatewaya |
+| `SemanticNoTraffic` | info | gateway obsługuje ruch, a usługa semantyczna nie wykonuje żadnej kontroli | tak, ale dopiero gdy gateway wystawi metryki (warunek wymaga ruchu w gatewayu) |
+| `GatewayMetricsMissing` | info | metryki gatewaya nie istnieją (znana luka do czasu dodania `/metrics`) | tak — to obecnie jedyny aktywny alert |
 
-Dwie ostatnie pozycje są celowe. Alerty oparte na `rate()` milczą zarówno wtedy, gdy wszystko działa,
-jak i wtedy, gdy danych po prostu nie ma — a to dwie różne sytuacje. Te reguły rozróżniają je jawnie.
+Trzy pozycje są celowe i opisują stan prac, a nie awarię. Alerty oparte na `rate()` milczą zarówno
+wtedy, gdy wszystko działa, jak i wtedy, gdy danych po prostu nie ma — a to dwie różne sytuacje.
+`GatewayMetricsMissing` rozpoznaje „metryki nie ma” po `absent()`, `GatewayBlockSpike` i
+`SemanticNoTraffic` czekają na metryki gatewaya, a `SemanticNoTraffic` ma dodatkowy warunek ruchu,
+żeby nie alarmować w przerwie w pracy zespołu.
 
 ## Pulpity Grafany
 
 Provisioning: `telemetry/grafana/provisioning/` (źródło danych + lista pulpitów), definicje:
 `telemetry/grafana/dashboards/`.
 
-- `noorpointer-overview.json` — opóźnienia ścieżki deterministycznej, liczba zablokowanych żądań,
-  wyzwolenia ogranicznika pętli, przepustowość.
-- `semantic-controlplane.json` — opóźnienia i błędy kontroli semantycznych oraz metryki HTTP control plane.
+- `noorpointer-overview.json` — dostępność usług, kontrole semantyczne (opóźnienia, statusy, oznaczenia
+  ryzyka) oraz ruch w control plane. Panel gatewaya jest tam opisany jako pusty do czasu `GET /metrics`.
+- `semantic-controlplane.json` — szczegóły kontroli semantycznych oraz metryki HTTP control plane.
 
 Pulpity dotyczące gatewaya pozostaną puste, dopóki nie pojawi się `gateway:9090/metrics`.
 Grafana ma wyłączone logowanie (`GF_AUTH_ANONYMOUS_ENABLED`), wejście: `http://localhost:3001`.
@@ -68,8 +71,16 @@ curl -s localhost:9091/api/v1/alerts                            # aktywne alerty
 curl -s --get --data-urlencode 'query=up' localhost:9091/api/v1/query
 ```
 
-Po zmianie `prometheus.yml` (główny plik konfiguracyjny) potrzebny jest restart kontenera:
-`sudo docker compose restart prometheus`. Plik z regułami alertów wczytuje się sam.
+Po zmianie konfiguracji (`prometheus.yml` albo `alert.rules.yml`) wystarczy walidacja i przeładowanie:
+
+```bash
+sudo docker compose exec prometheus promtool check config /etc/prometheus/prometheus.yml
+sudo docker compose exec prometheus promtool check rules /etc/prometheus/alert.rules.yml
+curl -X POST localhost:9091/-/reload
+```
+
+Restart kontenera (`sudo docker compose up -d prometheus`) jest potrzebny tylko wtedy, gdy zmieniają się
+flagi uruchomienia, na przykład przy pierwszym włączeniu `--web.enable-lifecycle`.
 
 ## Uwagi
 
