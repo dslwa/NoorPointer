@@ -38,12 +38,8 @@ PY
 
 echo "Sygnatura zapisana. Feed: http://localhost:8085/signatures.json (bez restartu kontenera)."
 
-# Import po stronie control plane nie jest jeszcze podlaczony: obecny kontrakt wymaga innego
-# formatu sygnatur, a ten endpoint nie istnieje. Raportujemy kod odpowiedzi, zeby nie bylo
-# watpliwosci, czy import sie powiodl.
-code="$(curl -s -o /dev/null -w '%{http_code}' -m 5 -X POST "$CONTROLPLANE_URL/api/v1/signatures/sync" || true)"
-case "${code:-000}" in
-  200|201|204) echo "Control plane: HTTP $code (import wykonany)." ;;
-  000)         echo "Control plane: brak odpowiedzi pod $CONTROLPLANE_URL." ;;
-  401|403)     echo "Control plane: HTTP $code - endpoint wymaga tokenu administratora, a import tego formatu nie jest podlaczony (patrz README)." ;;
-esac
+# Panel korzysta z kontraktu control plane (dopasowanie doslowne), wiec odswiezamy katalog tym samym
+# konwerterem, ktory wywoluje `make seed`. Blad importu nie uniewaznia aktualizacji pliku.
+if ! "$DIR/../scripts/import-signatures.sh"; then
+  echo "Uwaga: katalog sygnatur w control plane nie zostal odswiezony (plik feedu jest aktualny)." >&2
+fi

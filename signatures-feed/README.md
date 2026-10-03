@@ -46,16 +46,20 @@ Format wpisu (obecnie używany, oparty na wyrażeniach regularnych):
 Skrypt dopisuje nowy wpis do `signatures.json`; plik jest widoczny w feedzie natychmiast, bez restartu
 kontenera. Wykorzystujemy to w demonstracji dla jury.
 
-## Znane ograniczenie: dwa różne formaty sygnatur
+## Dwa formaty sygnatur (stan obecny)
 
 Feed używa wyrażeń regularnych (`pattern_type: regex`, `pattern`), natomiast kontrakt control plane
 (`controlplane/src/main/resources/contracts/signatures.schema.json`) dopuszcza wyłącznie dopasowanie
-dosłowne (`match.type: "literal"`) i wymaga pól `source`, `category`, `target`.
-Z tego powodu:
+dosłowne (`match.type: "literal"`) i wymaga pól `source`, `category`, `target`. To dwa różne kontrakty,
+więc nie da się ich wprost zamienić. Stan na dziś:
 
-- wpisy z tego feedu nie przechodzą walidacji importu w control plane,
-- skrypt `push_new_signature.sh` nie jest w stanie zsynchronizować wpisu z control plane
-  (wywołuje `POST /api/v1/signatures/sync`, którego w obecnym control plane nie ma — skrypt raportuje kod odpowiedzi),
-- ujednolicenie formatu (albo rozszerzenie kontraktu control plane o wyrażenia regularne) jest zadaniem otwartym.
+- **Panel (control plane)** jest zasilany: `scripts/import-signatures.sh`
+  (wywoływany przez `make seed`) czyta ten plik i zapisuje sygnatury do katalogu control plane,
+  biorąc z każdego wzorca **pierwszą alternatywę** jako wartość dosłowną oraz mapując
+  `target_component` na pole `target`. Katalog jest podmieniany w całości, więc operacja jest powtarzalna.
+- **Gateway** jeszcze nie konsumuje sygnatur — docelowo czyta ten plik pod `SIGNATURES_FEED_URL`
+  i kompiluje wyrażenia regularne (`refresh_s` w polityce).
+- **Ujednolicenie** formatu (wyrażenia regularne w kontrakcie control plane) jest zadaniem otwartym.
 
-Do czasu rozstrzygnięcia gateway korzysta z tego feedu, a control plane ma własny, węższy format.
+Skrypt `push_new_signature.sh` dopisuje wpis do pliku i odświeża katalog w panelu tym samym
+konwerterem, więc demonstracja „dodaj sygnaturę w trakcie działania" działa dla obu odbiorców.

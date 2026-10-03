@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Seed demo audit data via the control plane (POST /api/v1/demo-batches).
-# Needed so the audit/CEF export and the SOC dashboard have rows. Usage: make seed
-# Retries while the control plane is still starting (docker compose up -d returns before it is ready).
+# Wypelnia control plane danymi demonstracyjnymi: zdarzenia audytu (POST /api/v1/demo-batches)
+# oraz katalog sygnatur z feedu. Uruchamianie: make seed (wywolywane tez przez make up i make test).
+# Powtarza probe, dopoki control plane nie wstanie (docker compose up konczy sie przed gotowoscia).
 set -uo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"; cd "$ROOT"
 
@@ -19,15 +19,20 @@ for i in $(seq 1 "$ATTEMPTS"); do
   payload="${body%$'\n'*}"
 
   case "${code:-000}" in
-    200|201) echo "seed: HTTP $code ${payload:0:200}"; exit 0 ;;
+    200|201)
+      echo "seed: zdarzenia audytu, HTTP $code ${payload:0:180}"
+      # Katalog sygnatur jest niezalezny od audytu, wiec jego blad nie przerywa seeda.
+      ./scripts/import-signatures.sh || echo "seed: import sygnatur nie powiodl sie (patrz komunikat wyzej)" >&2
+      exit 0
+      ;;
     000|502|503|504)
       if [[ "$i" -eq "$ATTEMPTS" ]]; then
-        fail "control plane not ready at $CONTROLPLANE_URL after $ATTEMPTS attempts - run: make up"
+        fail "control plane nie odpowiada pod $CONTROLPLANE_URL po $ATTEMPTS probach - uruchom: make up"
       fi
       sleep "$DELAY"
       ;;
-    401|403) fail "HTTP $code - check ADMIN_TOKEN ($ADMIN_TOKEN)" ;;
-    404)     fail "HTTP 404 - control plane build predates /api/v1/demo-batches; rebuild: sudo docker compose up -d --build controlplane" ;;
+    401|403) fail "HTTP $code - sprawdz ADMIN_TOKEN ($ADMIN_TOKEN)" ;;
+    404)     fail "HTTP 404 - obraz control plane nie ma /api/v1/demo-batches; przebuduj: sudo docker compose up -d --build controlplane" ;;
     *)       fail "HTTP $code $payload" ;;
   esac
 done
