@@ -7,7 +7,9 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
+	"github.com/dslwa/NoorPointer/gateway/config"
 	"github.com/golang-jwt/jwt/v5"
 )
 
@@ -76,5 +78,87 @@ func TestNoPolicyIs503(t *testing.T) {
 	rec := do(s.routes(), http.MethodPost, "/v1/chat/completions", "Bearer "+sign(t, jwt.SigningMethodRS256, validClaims(), key))
 	if rec.Code != http.StatusServiceUnavailable {
 		t.Fatalf("got %d, want 503", rec.Code)
+	}
+}
+
+func TestRefreshPolicyErrorsKeepLastGood(t *testing.T) {
+	var mode atomic.Value
+	cp := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch mode.Load() {
+		case "500":
+			w.WriteHeader(http.StatusInternalServerError)
+		case "bad json":
+			w.Write([]byte(`{"defaults":`))
+		case "truncated":
+			w.Header().Set("Content-Length", "1000")
+			w.Write([]byte(`{"version":`))
+			w.(http.Flusher).Flush()
+			panic(http.ErrAbortHandler)
+		}
+	}))
+	defer cp.Close()
+
+	s, _ := NewServer(":0", "http://upstream", nil, cp.URL, "test-token")
+	last := &config.Policy{Version: 9}
+	s.policy.Store(last)
+
+	for _, m := range []string{"500", "bad json", "truncated"} {
+		t.Run(m, func(t *testing.T) {
+			mode.Store(m)
+			if err := s.refreshPolicy(t.Context()); err == nil {
+				t.Fatal("expected error")
+			}
+			if s.policy.Load() != last {
+				t.Fatal("last good policy was replaced")
+			}
+		})
+	}
+}
+
+func TestRefreshPolicyTransportErrors(t *testing.T) {
+	closed := httptest.NewServer(http.NotFoundHandler())
+	closed.Close()
+
+	for name, url := range map[string]string{
+		"bad url":     "http://bad host",
+		"unreachable": closed.URL,
+	} {
+		t.Run(name, func(t *testing.T) {
+			s, _ := NewServer(":0", "http://upstream", nil, url, "test-token")
+			if err := s.refreshPolicy(t.Context()); err == nil {
+				t.Fatal("expected error")
+			}
+		})
+	}
+}
+
+func TestPolicyReloadFailureIs502(t *testing.T) {
+	cp := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer cp.Close()
+	s, _ := NewServer(":0", "http://upstream", nil, cp.URL, "test-token")
+
+	rec := do(s.routes(), http.MethodPost, "/admin/policy/reload", "Bearer test-token")
+	if rec.Code != http.StatusBadGateway {
+		t.Fatalf("got %d, want 502", rec.Code)
+	}
+	if s.policyVersion() != 0 {
+		t.Fatalf("version %d, want 0 without policy", s.policyVersion())
+	}
+}
+
+func TestWatchPolicyLogsFailure(t *testing.T) {
+	var calls atomic.Int32
+	cp := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls.Add(1)
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer cp.Close()
+	s, _ := NewServer(":0", "http://upstream", nil, cp.URL, "test-token")
+
+	go s.watchPolicy(time.Hour)
+	for calls.Load() == 0 {
+		time.Sleep(time.Millisecond)
 	}
 }

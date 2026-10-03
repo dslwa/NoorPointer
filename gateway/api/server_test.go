@@ -3,8 +3,10 @@ package api
 import (
 	"crypto/rand"
 	"crypto/rsa"
+	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -146,5 +148,31 @@ func TestRejectedTokens(t *testing.T) {
 				t.Fatal("request reached upstream")
 			}
 		})
+	}
+}
+
+func TestNewServerEmptyGatewayToken(t *testing.T) {
+	if _, err := NewServer(":0", "http://upstream", nil, "http://cp", ""); err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestStartListenError(t *testing.T) {
+	s, err := NewServer(":-1", "http://upstream", nil, "http://127.0.0.1:1", "test-token")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Start(); err == nil {
+		t.Fatal("expected listen error")
+	}
+}
+
+func TestMakeHTTPHandleFuncError(t *testing.T) {
+	h := makeHTTPHandleFunc(func(http.ResponseWriter, *http.Request) error {
+		return errors.New("boom")
+	})
+	rec := do(h, http.MethodGet, "/", "")
+	if rec.Code != http.StatusBadRequest || !strings.Contains(rec.Body.String(), "boom") {
+		t.Fatalf("got %d %s", rec.Code, rec.Body)
 	}
 }

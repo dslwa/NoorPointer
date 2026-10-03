@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"time"
@@ -11,17 +12,23 @@ import (
 )
 
 func main() {
+	if err := run(os.Stdout); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func run(w io.Writer) error {
 	ttl, err := time.ParseDuration(env("TTL", "24h"))
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 	pem, err := os.ReadFile(env("JWT_PRIVATE_KEY", "keys/jwt.key"))
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 	key, err := jwt.ParseRSAPrivateKeyFromPEM(pem)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 
 	now := time.Now()
@@ -38,9 +45,10 @@ func main() {
 
 	token, err := jwt.NewWithClaims(jwt.SigningMethodRS256, claims).SignedString(key)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
-	fmt.Println(token)
+	_, err = fmt.Fprintln(w, token)
+	return err
 }
 
 func env(key, fallback string) string {
