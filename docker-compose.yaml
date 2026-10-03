@@ -192,10 +192,13 @@ services:
     container_name: noorpointer-prometheus
     ports:
       - "9091:9090" # Zewnętrzny 9091 (unikamy konfliktu z gateway:9090)
+    environment:
+      - ADMIN_TOKEN=${ADMIN_TOKEN:-local-dev-admin}
     volumes:
       - ./telemetry/prometheus.yml:/etc/prometheus/prometheus.yml:ro
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--config.expand-env"
       - "--storage.tsdb.path=/prometheus"
     restart: unless-stopped
     networks:
