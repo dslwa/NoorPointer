@@ -103,7 +103,7 @@
 - Testy pojedynczych części: brama w Go (4 zestawy) i zasady w Javie (3 zestawy). Testy Javy uruchamiamy w kontenerze, na osobnej bazie, żeby nie ruszyć danych z pokazu.
 - Testy obciążeniowe: 3 scenariusze — zwykły ruch, atak oraz równoległe pytania jednego agenta (sprawdzamy, czy budżet liczy się poprawnie).
 - Dodatkowe sprawdzenia: 16 kontroli spójności systemu, 12 kontroli przed startem i sprawdzenie, czy w czasie działania nic nie ściągamy z internetu.
-- Jedno polecenie dla osoby oceniającej: `sudo make checkpoint` — sprawdza środowisko, uruchamia system, wszystkie testy i przygotowuje raport.
+- Jedno polecenie dla osoby oceniającej: `sudo make jury` — sprawdza środowisko, uruchamia system, wszystkie testy, wysyła ruch na wykresy i zbiera dowody do katalogu `dowody/`.
 - Uczciwie: przechodzi **10 z 16** testów. Pozostałe 6 to kontrole, których brama jeszcze nie wykonuje. Odróżniamy dwie sytuacje: „kontroli jeszcze nie ma” (PENDING) i „kontrola jest, ale nie działa” (FAIL) — to nie to samo.
 
 ---
@@ -116,6 +116,7 @@
 - Klucze dostępowe tworzą się lokalnie, a hasła i klucze trzymamy poza repozytorium. Pilnuje tego automatyczne sprawdzenie.
 - Nowe zasady, sygnatury i budżety zmienia się w panelu — bez wdrażania nowej wersji programu.
 - Każda część ma swojego właściciela i opis w repozytorium, więc wiadomo, do kogo iść z pytaniem.
+- Do sprawdzenia bez czytania dokumentacji: `START.md` z jedną ścieżką uruchomienia i siedmioma komendami oraz katalog `dowody/` z gotowymi wynikami.
 
 ---
 

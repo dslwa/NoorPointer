@@ -1,0 +1,21 @@
+== health endpoints ==
+  PASS  gateway /healthz           200
+  PASS  semantic /healthz          200
+  PASS  controlplane health        200
+  PASS  dashboard /                200
+  PASS  mock-llm /healthz          200
+  PASS  signatures feed            200
+  PASS  prometheus ready           200
+  PASS  grafana health             200
+  PASS  semantic /readyz           200
+== proxy + guardrail wiring ==
+  PASS  gateway -> mock-llm        contains 'choices'
+  PASS  gateway auth enforced?     401
+  PASS  mock-llm guard /api/chat   contains 'safe'
+  PASS  signatures payload         contains 'signatures'
+  PASS  semantic /v1/scan          contains 'flagged'
+== control plane auth ==
+  PASS  audit export (no token)    401
+  PASS  audit export (admin)       200
+
+smoke: 16 passed, 0 failed

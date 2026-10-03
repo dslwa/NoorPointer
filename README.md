@@ -1,5 +1,9 @@
 # NoorPointer — warstwa kontroli dla systemów agentowych (AI Control Layer)
 
+> **Oceniasz projekt i chcesz go uruchomić?** Zacznij od [`START.md`](START.md): jedna komenda
+> (`sudo make jury`), siedem poleceń dla osób oceniających i gotowe dowody w katalogu `dowody/`.
+> Ten plik jest pełną dokumentacją techniczną, pisaną dla zespołu.
+
 NoorPointer to pośrednik (reverse proxy) między aplikacją/agentem a modelami LLM i usługami narzędziowymi.
 Ruch przechodzi przez niego w obie strony: przed wysłaniem do modelu i po otrzymaniu odpowiedzi.
 Warstwa ma egzekwować politykę bezpieczeństwa i budżety zdefiniowane centralnie, rejestrować decyzje
@@ -76,6 +80,7 @@ make urls                  # adresy usług i dane logowania
 | Feed sygnatur | Nginx | 8085 | `http://localhost:8085/signatures.json` |
 | Mock LLM | Python (API OpenAI i Ollama) | 11434 | `http://localhost:11434` |
 | PostgreSQL / Redis | — | 5432 / 6379 | dane audytu i liczniki zużycia |
+| Gateway — metryki | — | 9090 | port zarezerwowany dla `GET /metrics`; brama jeszcze go nie wystawia, pilnuje tego alert `GatewayMetricsMissing` |
 
 ## Architektura
 
@@ -142,6 +147,8 @@ Elementy oznaczone `[w toku]` to zakres, który nie jest jeszcze włączony w ś
 | [`mock-llm/`](mock-llm) | DevOps | Mock modelu (format OpenAI i Ollama), domyślny upstream gatewaya |
 | [`proto/`](proto) | Python + Go | Wspólny kontrakt gRPC `semantic.v1` |
 | [`deck/`](deck/README.md) | DevOps | Prezentacja zgłoszeniowa (10 slajdów: źródło Markdown + build do PDF) |
+| [`START.md`](START.md) | DevOps | Wejście dla osób oceniających: jedna komenda, siedem poleceń, lista ograniczeń |
+| [`dowody/`](dowody/README.md) | DevOps | Zrzut wyników z działającego systemu (raporty, testy, prezentacja PDF) |
 
 ## Kontrakty
 
