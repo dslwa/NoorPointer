@@ -23,7 +23,7 @@ K6        = $(COMPOSE) run --rm -e GATEWAY_JWT="$$jwt" benchmarks run
 
 .PHONY: help \
         up dev-infra down restart build clean logs status wait \
-        seed test test-unit test-local test-rebuild bench bench-flood bench-budget \
+        seed test test-unit test-local test-rebuild bench bench-flood bench-budget traffic \
         smoke verify verify-strict offline-check report checkpoint \
         demo demo-full demo-strict \
         keys mint-build token token-file reload-policy new-signature doctor urls \
@@ -102,6 +102,9 @@ bench-flood: ## k6: zalew zlosliwych promptow
 bench-budget: ## k6: rownolegle zapytania jednego agenta (atomowosc budzetu)
 	@$(JWT_GUARD); $(K6) /benchmarks/benchmark_budget_concurrency.js
 
+traffic: ## Realny ruch na panele Grafany: zadania przez gateway + skany semantyczne (LICZNIK=3)
+	./scripts/traffic.sh
+
 smoke: ## Spiecie calego stosu (health + proxy + auth), zapis do reports/smoke.txt
 	@mkdir -p reports
 	./scripts/smoke.sh | tee reports/smoke.txt
@@ -118,11 +121,12 @@ offline-check: ## Lint: brak pobierania/instalacji w runtime (finalny stage obra
 report: ## Zbiera dowody dla jury do reports/INDEX.md
 	./scripts/report.sh
 
-checkpoint: ## Zero-prep dowod: doctor -> up -> test -> raport + adresy
+checkpoint: ## Zero-prep dowod: doctor -> up -> testy (Go, e2e, Java) -> raport + adresy
 	-@./scripts/doctor.sh
 	$(MAKE) --no-print-directory up
 	-$(MAKE) --no-print-directory test-unit
 	-$(MAKE) --no-print-directory test
+	-$(MAKE) --no-print-directory controlplane-test
 	./scripts/report.sh
 	@echo ""
 	@echo "== adresy =="

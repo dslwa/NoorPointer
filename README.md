@@ -281,10 +281,15 @@ repozytorium):
 5. `make reload-policy` — żywa zmiana konfiguracji, odpowiedź `{"status":"reloaded","version":N}`.
 6. `make new-signature` — dodanie sygnatury ataku w trakcie działania: wpis pojawia się w feedzie
    i w katalogu w panelu (po pokazie: `git checkout -- signatures-feed/signatures.json && make seed`).
-7. Panel `http://localhost:3000` (login `local-dev-admin`) — incydenty, rewizje polityki, katalog sygnatur.
-8. Grafana `http://localhost:3001` (admin/admin) — alerty oraz metryki usługi semantycznej i kontrolera.
-9. `sudo make test` — pakiet testów, `reports/test_report.html` i `reports/INDEX.md` z listą
-   otwartych pozycji wraz z właścicielami.
+7. `make traffic` — realny ruch na panele: zadania przez gateway oraz skany semantyczne, które
+   oznaczają próbę prompt injection i dane osobowe. Bez tego kroku panele usługi semantycznej są puste,
+   bo gateway nie wywołuje jej jeszcze w ścieżce żądania.
+8. Panel `http://localhost:3000` (login `local-dev-admin`) — incydenty, rewizje polityki, katalog sygnatur.
+9. Grafana `http://localhost:3001` (admin/admin) — dostępność usług, kontrole semantyczne, ruch
+   w control plane i alerty. Panel gatewaya jest tam opisany jako pusty do czasu `GET /metrics`.
+10. `sudo make test` — pakiet testów, `reports/test_report.html` i `reports/INDEX.md` z listą
+    otwartych pozycji wraz z właścicielami; `sudo make controlplane-test` uruchamia dodatkowo testy
+    modułu Java w kontenerze.
 
 Stan testów na dziś: **9 z 16 przechodzi**. Sześć czerwonych to kontrole, których gateway jeszcze nie
 egzekwuje (sekrety, redakcja PII, prompt injection, sygnatury, budżety, ogranicznik pętli), a jedna to

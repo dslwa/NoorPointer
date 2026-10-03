@@ -11,130 +11,135 @@
   "panels": [
     {
       "collapsed": false,
-      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "green", "value": 1 }
+            ]
+          }
+        }
+      },
+      "gridPos": { "h": 4, "w": 8, "x": 0, "y": 0 },
       "id": 1,
-      "title": "Deterministic Path Latency (p95)",
-      "type": "stat",
+      "options": { "colorMode": "background", "graphMode": "none", "textMode": "value_and_name" },
       "targets": [
         {
           "datasource": "Prometheus",
-          "expr": "histogram_quantile(0.95, sum(rate(gateway_deterministic_duration_seconds_bucket[1m])) by (le)) * 1000 or vector(3.8)",
+          "expr": "up",
           "format": "time_series",
-          "legendFormat": "p95 ms"
+          "legendFormat": "{{job}}"
         }
       ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "ms",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "orange", "value": 5 },
-              { "color": "red", "value": 10 }
-            ]
-          }
-        }
-      }
+      "title": "Usługi odpowiadają (up)",
+      "type": "stat"
     },
     {
       "collapsed": false,
-      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+      "datasource": "Prometheus",
+      "gridPos": { "h": 4, "w": 8, "x": 8, "y": 0 },
       "id": 2,
-      "title": "Semantic Guardrail Latency (p95)",
-      "type": "stat",
       "targets": [
         {
           "datasource": "Prometheus",
-          "expr": "histogram_quantile(0.95, sum(rate(gateway_semantic_duration_seconds_bucket[1m])) by (le)) * 1000 or vector(124)",
+          "expr": "sum(rate(semantic_check_latency_seconds_count[1m])) by (status)",
           "format": "time_series",
-          "legendFormat": "p95 ms"
+          "legendFormat": "{{status}}"
         }
       ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "ms",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "yellow", "value": 150 },
-              { "color": "red", "value": 250 }
-            ]
-          }
-        }
-      }
+      "title": "Usługa semantyczna: kontrole / s",
+      "type": "stat"
     },
     {
       "collapsed": false,
-      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+      "datasource": "Prometheus",
+      "gridPos": { "h": 4, "w": 8, "x": 16, "y": 0 },
       "id": 3,
-      "title": "Blocked Threat Requests",
-      "type": "stat",
       "targets": [
         {
           "datasource": "Prometheus",
-          "expr": "sum(gateway_requests_total{action=\"blocked\"}) or vector(14)",
-          "format": "time_series"
+          "expr": "sum(rate(http_server_requests_seconds_count[1m]))",
+          "format": "time_series",
+          "legendFormat": "żądania / s"
         }
       ],
-      "fieldConfig": {
-        "defaults": {
-          "color": { "mode": "fixed", "fixedColor": "red" }
-        }
-      }
+      "title": "Control plane: żądania HTTP / s",
+      "type": "stat"
     },
     {
       "collapsed": false,
-      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
-      "id": 4,
-      "title": "Loop Breaker Triggers",
-      "type": "stat",
-      "targets": [
-        {
-          "datasource": "Prometheus",
-          "expr": "sum(gateway_loop_breaker_triggers_total) or vector(2)",
-          "format": "time_series"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "color": { "mode": "fixed", "fixedColor": "orange" }
-        }
-      }
-    },
-    {
-      "collapsed": false,
+      "datasource": "Prometheus",
+      "fieldConfig": { "defaults": { "unit": "ms" } },
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
-      "id": 5,
-      "title": "Throughput & Request Rate (RPS)",
-      "type": "timeseries",
+      "id": 4,
       "targets": [
         {
           "datasource": "Prometheus",
-          "expr": "sum(rate(gateway_requests_total[30s])) by (action) or vector(45)",
-          "legendFormat": "{{action}}"
+          "expr": "histogram_quantile(0.95, sum(rate(semantic_check_latency_seconds_bucket[1m])) by (le, check)) * 1000",
+          "legendFormat": "{{check}} p95"
         }
-      ]
+      ],
+      "title": "Usługa semantyczna: opóźnienie kontroli p95 (ms)",
+      "type": "timeseries"
     },
     {
       "collapsed": false,
+      "datasource": "Prometheus",
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
-      "id": 6,
-      "title": "Latency Distribution Over Time (ms)",
-      "type": "timeseries",
+      "id": 5,
       "targets": [
         {
           "datasource": "Prometheus",
-          "expr": "histogram_quantile(0.95, sum(rate(gateway_request_duration_seconds_bucket[1m])) by (le)) * 1000 or vector(4.2)",
-          "legendFormat": "Total p95"
-        },
+          "expr": "sum(rate(semantic_check_latency_seconds_count[1m])) by (check, status)",
+          "legendFormat": "{{check}} {{status}}"
+        }
+      ],
+      "title": "Usługa semantyczna: wyniki kontroli / s (ok, timeout, error)",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "datasource": "Prometheus",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+      "id": 6,
+      "targets": [
         {
           "datasource": "Prometheus",
-          "expr": "histogram_quantile(0.50, sum(rate(gateway_request_duration_seconds_bucket[1m])) by (le)) * 1000 or vector(2.1)",
-          "legendFormat": "Median p50"
+          "expr": "sum(rate(http_server_requests_seconds_count[1m])) by (uri, status)",
+          "legendFormat": "{{uri}} {{status}}"
         }
-      ]
+      ],
+      "title": "Control plane: żądania / s według endpointu i kodu",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "datasource": "Prometheus",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+      "id": 7,
+      "targets": [
+        {
+          "datasource": "Prometheus",
+          "expr": "sum(increase(semantic_check_flagged_total[1m])) by (check, direction)",
+          "legendFormat": "{{check}} {{direction}}"
+        }
+      ],
+      "title": "Usługa semantyczna: wyniki oznaczone jako ryzykowne / min",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 20 },
+      "id": 8,
+      "options": {
+        "mode": "markdown",
+        "content": "## Czego tu jeszcze nie ma\n\nPanel gatewaya jest **celowo pusty**: gateway nie wystawia `GET /metrics`, więc serie `gateway_*` nie istnieją w Prometheusie. Zamiast pokazywać wymyślone wartości, ta tablica pokazuje wyłącznie metryki, które naprawdę są zbierane:\n\n- `up{job=...}` — dostępność usług,\n- `semantic_check_*` — kontrole usługi semantycznej (opóźnienia, statusy, oznaczenia ryzyka),\n- `http_server_requests_seconds_*` — ruch w control plane.\n\nGdy gateway zacznie wystawiać metryki, dopisujemy tu panele na `gateway_requests_total` i `gateway_*_duration_seconds` (deklaracja portu `9090` i zmiennej `METRICS_PORT` już jest w `docker-compose.yaml`). Brak tych metryk sygnalizuje też alert `GatewayMetricsMissing` w `telemetry/alert.rules.yml`. Stan prac opisuje tabela „Stan na dziś” w głównym `README.md`."
+      },
+      "title": "Gateway: metryki jeszcze nie istnieją",
+      "type": "text"
     }
   ],
   "schemaVersion": 39,
@@ -143,6 +148,6 @@
     "from": "now-15m",
     "to": "now"
   },
-  "title": "NoorPointer — System Performance & Guardrails SLA",
+  "title": "NoorPointer — stan usług i kontrole semantyczne",
   "uid": "noorpointer-overview"
 }
