@@ -19,9 +19,12 @@ Co się dzieje po kolei (i ile to trwa):
 | :--- | :--- | :--- |
 | 0 | sprawdza narzędzia, klucze i konfigurację | kilka sekund |
 | 1 | buduje obrazy i uruchamia cały stos (10 usług) | 1–3 min, jeśli obrazy są już zbudowane; dłużej przy pierwszym uruchomieniu |
-| 2–4 | testy modułów (Go i Java) oraz 16 testów e2e | 2–4 min (Java startuje kontener) |
-| 5 | wysyła realny ruch, żeby wykresy miały dane | kilkanaście sekund |
-| 6 | zbiera dowody do katalogu `dowody/` | kilka sekund |
+| 2–5 | testy modułów (Go, Java, panel) oraz 16 testów e2e | 2–4 min (Java startuje kontener) |
+| 6 | wysyła realny ruch, żeby wykresy miały dane | kilkanaście sekund |
+| 7 | zbiera dowody do katalogu `dowody/` | kilka sekund |
+
+Dodatkowo dostępne są pełne pakiety testów modułów, których nie ma w przebiegu podstawowym:
+`make test-semantic` (117 testów usługi semantycznej) i `make dashboard-test` (31 testów panelu).
 
 Konsola pokazuje **wyniki, a nie pracę**: budowanie obrazów, logi Mavena i Springa oraz pełne wyjście
 testów trafiają do plików w `reports/`. Na końcu widzisz podsumowanie: ile usług działa, wyniki testów
