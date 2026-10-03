@@ -19,12 +19,12 @@ Co się dzieje po kolei (i ile to trwa):
 | :--- | :--- | :--- |
 | 0 | sprawdza narzędzia, klucze i konfigurację | kilka sekund |
 | 1 | buduje obrazy i uruchamia cały stos (10 usług) | 1–3 min, jeśli obrazy są już zbudowane; dłużej przy pierwszym uruchomieniu |
-| 2–5 | testy modułów (Go, Java, panel) oraz 16 testów e2e | 2–4 min (Java startuje kontener) |
+| 2–5 | testy modułów (Go, Java, panel) oraz 25 testów e2e | 2–4 min (Java startuje kontener) |
 | 6 | wysyła realny ruch, żeby wykresy miały dane | kilkanaście sekund |
 | 7 | zbiera dowody do katalogu `dowody/` | kilka sekund |
 
 Dodatkowo dostępne są pełne pakiety testów modułów, których nie ma w przebiegu podstawowym:
-`make test-semantic` (117 testów usługi semantycznej) i `make dashboard-test` (31 testów panelu).
+`make test-semantic` (testy usługi semantycznej) i `make dashboard-test` (31 testów panelu).
 
 Konsola pokazuje **wyniki, a nie pracę**: budowanie obrazów, logi Mavena i Springa oraz pełne wyjście
 testów trafiają do plików w `reports/`. Na końcu widzisz podsumowanie: ile usług działa, wyniki testów
@@ -117,12 +117,17 @@ przekłada się na zużycie RAM (na tej maszynie bezpiecznie mieści się ich ki
 
 ## Czego jeszcze nie ma (mówimy wprost)
 
-1. **Brama nie wykonuje jeszcze zasad bezpieczeństwa** — zostało dokończyć sześć kontroli. Dlatego
-   10 z 16 testów e2e przechodzi, a sześć pozostałych jest oznaczone jako jeszcze niezrealizowane.
+1. **Brama egzekwuje część kontroli** — działają: allowlista modeli, wykrywanie sekretów, redakcja danych
+   osobowych oraz kontrole semantyczne (prompt injection, content safety) przez gRPC. Zostało dokończyć:
+   sygnatury ataków, budżety, ogranicznik pętli i listę narzędzi MCP. Część z 25 przypadków e2e dotyczy
+   właśnie tych kontroli — aktualny wynik jest w `reports/INDEX.md`.
 2. **Brama nie wystawia własnych metryk** (`GET /metrics`), więc jeden panel Grafany jest pusty,
    a w Prometheusie widać alert `GatewayMetricsMissing`. Jest celowy i zniknie sam, gdy metryki się pojawią.
-3. **Sprawdzanie treści działa w osobnym serwisie i nie jest jeszcze wywoływane w ścieżce żądania** —
-   można je uruchomić osobno przez `make scan`.
+3. **Brama nie wysyła jeszcze zdarzeń audytowych** do control plane, więc dziennik w panelu zasilają
+   dane demonstracyjne z `make seed` (oznaczone jako `synthetic`).
+4. **PII w wolnym tekście i wyciek systemowego promptu** (`pii_ner`, `leakage`) działają w usłudze
+   semantycznej, ale brama woła na razie tylko prompt injection i content safety; każdą kontrolę można
+   uruchomić osobno przez `make scan`.
 
 Pakiety testów rozróżniają dwie sytuacje: `PENDING` (kontroli jeszcze nie ma) i `FAIL` (kontrola jest,
 ale nie działa). Nie ukrywamy pierwszego pod drugim.
@@ -135,7 +140,7 @@ ale nie działa). Nie ukrywamy pierwszego pod drugim.
 | `semantic-service/` | sprawdzanie treści w Pythonie: modele AI i skaner plików modeli |
 | `controlplane/` | zasady, katalog sygnatur i dziennik zdarzeń (Java, Spring Boot) |
 | `dashboard/` | panel operacyjny (React + Nginx) |
-| `tests/`, `benchmarks/` | 16 testów e2e i 3 scenariusze obciążeniowe |
+| `tests/`, `benchmarks/` | 25 testów e2e i 3 scenariusze obciążeniowe |
 | `telemetry/` | Prometheus, 9 reguł alertów, tablice Grafany |
 | `scripts/` | narzędzia, w tym te dla osób oceniających |
 | `deck/`, `dowody/` | prezentacja zgłoszeniowa i zrzuty wyników |

@@ -25,17 +25,19 @@ do sprawdzenia reguł przed ich włączeniem.
 | :--- | :--- | :--- |
 | Uwierzytelnianie na gatewayu | działa | JWT RS256 (`iss=noorpointer-cp`, `aud=noorpointer-gateway`), wszystkie trasy poza `/healthz`; klucze generuje `make keys` |
 | Pobieranie i przeładowanie polityki | działa | gateway pobiera politykę z control plane (`GET /api/gateway/policy`, `ETag`) i odświeża ją cyklicznie oraz na żądanie `make reload-policy` |
-| Egzekwowanie kontroli w gatewayu | **nie zaimplementowane** | `withPolicy` na razie tylko loguje tożsamość i wersję polityki |
-| Kontrole semantyczne (Python) | działa jako usługa | `/v1/scan` i `/v1/scan/model` odpowiadają poprawnie; gateway jeszcze ich nie wywołuje |
+| Egzekwowanie kontroli w gatewayu | **częściowo** | `withPolicy` egzekwuje allowlistę modeli oraz kontrole deterministyczne: sekrety (`block`) i `pii_regex` (`redact`); **brakuje**: sygnatur ataków, budżetów, ogranicznika pętli i listy narzędzi MCP |
+| Kontrole semantyczne (Python) | działa jako usługa i **w ścieżce żądania** | gateway woła gRPC `Analyze` dla `prompt_injection` i `content_safety` (timeout i `fail_closed` z polityki); `pii_ner` i `leakage` działają w usłudze, ale brama ich jeszcze nie woła |
 | Audyt i eksport SIEM | działa po stronie control plane | eksport CEF/JSON/CSV i panel działają; gateway nie wysyła jeszcze własnych zdarzeń, więc dziennik zawiera dane demonstracyjne z `make seed` |
 | Katalog sygnatur | działa | 7 reguł startowych z migracji `V2__Seed_default_signatures` + 5 wpisów z naszego feedu; dodawanie z panelu i przez `make new-signature PATTERN='...'` |
-| Metryki i alerty | częściowo | Prometheus zbiera `semantic-service` i `controlplane`; gateway nie wystawia jeszcze `/metrics` |
-| Testy e2e | 10 z 16 przechodzi | pozostałe 6 to kontrole, których gateway jeszcze nie egzekwuje; szczegóły w `reports/INDEX.md` |
+| Metryki i alerty | częściowo | Prometheus zbiera `semantic-service` (scrape naprawiony: `metrics_path: /metrics/` + `Host $http_host` w LB) i `controlplane`; gateway nie wystawia jeszcze `/metrics` |
+| Testy e2e | `tests/test_guardrails.py` — **25 przypadków** | pary dozwolone/blokowane (PII, sekrety, prompt injection, sygnatury, budżety, pętle, skaner modeli, hot-reload, eksport SIEM, kontrole semantyczne); aktualny wynik i lista otwartych pozycji w `reports/INDEX.md` |
 | Testy modułów | działają | `make test-unit` (Go, 4 pakiety) i `sudo make controlplane-test` (Java, 3 klasy w kontenerze, na osobnej bazie `noorpointer_test`) |
 
-Wniosek dla osób oceniających: działają mechanizmy wokół polityki (uwierzytelnianie, dystrybucja polityki,
-przeładowanie, audyt, panel, telemetria, testy), natomiast same kontrole w ścieżce żądania są w trakcie
-implementacji po stronie gatewaya. `make verify` pokazuje ten stan bez ukrywania czegokolwiek.
+Wniosek dla osób oceniających: działa cała otoczka wokół polityki (uwierzytelnianie, dystrybucja polityki,
+przeładowanie, audyt, panel, telemetria, testy), a w samej ścieżce żądania brama egzekwuje już allowlistę
+modeli, wykrywanie sekretów, redakcję danych osobowych oraz kontrole semantyczne (prompt injection,
+content safety) przez gRPC. Otwarte pozostają sygnatury ataków, budżety, ogranicznik pętli i lista narzędzi
+MCP — brakujące elementy wypisuje `reports/INDEX.md`. `make verify` pokazuje ten stan bez ukrywania czegokolwiek.
 
 ## Szybki start
 
@@ -94,7 +96,7 @@ make urls                  # adresy usług i dane logowania
         +-------------------------------------------------+
         |  GATEWAY (Go, data plane)                       |
         |  - uwierzytelnianie i autoryzacja agentów [dziala] |
-        |  - kontrole deterministyczne            [w toku] |
+        |  - kontrole deterministyczne            [dziala] |
         |  - budżety (Redis)                      [w toku] |
         |  - limity pętli i lista narzędzi MCP    [w toku] |
         |  - sygnatury znanych ataków             [w toku] |
@@ -127,10 +129,11 @@ make urls                  # adresy usług i dane logowania
 ```
 
 Opis ścieżki żądania: klient wysyła żądanie do gatewaya z tokenem JWT. Gateway sprawdza token, wczytuje
-aktualną politykę i — docelowo — wykonuje kontrole deterministyczne, a w razie potrzeby pyta usługę
-semantyczną. Następnie przekazuje żądanie do skonfigurowanego modelu (domyślnie `mock-llm`, opcjonalnie
-prawdziwa Ollama). Decyzje trafiają do control plane i są widoczne w panelu oraz w eksporcie.
-Elementy oznaczone `[w toku]` to zakres, który nie jest jeszcze włączony w ścieżce żądania.
+aktualną politykę, egzekwuje allowlistę modeli oraz kontrole deterministyczne (sekrety, redakcja danych
+osobowych) i — w razie potrzeby — pyta usługę semantyczną przez gRPC (prompt injection, content safety).
+Następnie przekazuje żądanie do skonfigurowanego modelu (domyślnie `mock-llm`, opcjonalnie prawdziwa Ollama).
+Elementy oznaczone `[w toku]` (sygnatury ataków, budżety, pętle, narzędzia MCP) nie są jeszcze włączone
+w ścieżce żądania; decyzje trafiają do control plane dopiero, gdy brama zacznie wysyłać zdarzenia audytowe.
 
 ## Struktura repozytorium
 
@@ -320,9 +323,10 @@ repozytorium):
     otwartych pozycji wraz z właścicielami; `sudo make controlplane-test` uruchamia dodatkowo testy
     modułu Java w kontenerze.
 
-Stan testów na dziś: **10 z 16 przechodzi**. Sześć czerwonych to kontrole, których gateway jeszcze nie
-egzekwuje (sekrety, redakcja PII, prompt injection, sygnatury, budżety, ogranicznik pętli). Mówimy o tym
-wprost i pokazujemy `reports/INDEX.md` — nie obiecujemy kontroli, których jeszcze nie ma.
+Stan testów: `tests/test_guardrails.py` ma **25 przypadków** w parach dozwolone/blokowane. Część z nich
+dotyczy kontroli, których brama jeszcze nie egzekwuje (sygnatury ataków, budżety, ogranicznik pętli) —
+aktualny wynik i lista otwartych pozycji są w `reports/INDEX.md`. Mówimy o tym wprost i nie obiecujemy
+kontroli, których jeszcze nie ma.
 
 ## Skalowanie usługi semantycznej
 
@@ -409,10 +413,10 @@ Wagi i nazwy kryteriów są przepisane z regulaminu konkursu.
 
 | Kryterium | Nasz materiał |
 | :--- | :--- |
-| Kontrole i odporność (30%) | Kontrole deterministyczne i semantyczne: 4 detektory AI, skaner plików modeli, 12 sygnatur ataków, zasady jako dane z przeładowaniem bez restartu. Kontrole działają w usłudze semantycznej i są testowane (168 testów); egzekwowanie ich w bramie jest w toku — brakujące elementy są wypisane w `reports/INDEX.md`. |
+| Kontrole i odporność (30%) | Kontrole deterministyczne i semantyczne: 4 detektory AI, skaner plików modeli, 12 sygnatur ataków, zasady jako dane z przeładowaniem bez restartu. Kontrole działają w usłudze semantycznej i są testowane; brama egzekwuje już allowlistę modeli, sekrety, redakcję PII i kontrole semantyczne, a otwarte pozostają sygnatury, budżety i ogranicznik pętli — brakujące elementy są wypisane w `reports/INDEX.md`. |
 | Architektura i wydajność (20%) | Rozdzielone płaszczyzny: brama (Go), zasady i audyt (Java), kontrole AI (Python w replikach), panel i telemetria. Pomiary: `make bench` (k6, p95 2,28 ms przy 50 klientach) oraz `make bench-semantic` (przepustowość kontroli AI i efekt skalowania). |
 | Raportowanie bezpieczeństwa (20%) | Panel z incydentami, wersjami zasad, katalogiem sygnatur i budżetami; eksport CEF/JSON/CSV do SIEM z filtrami; 9 reguł alertów i tablice Grafany. Dziennik jest zasilany danymi demonstracyjnymi (oznaczonymi jako `synthetic`), bo brama nie wysyła jeszcze własnych zdarzeń. |
-| Kompletność pakietu testów (20%) | 168 testów usługi semantycznej, 37 modułu Java, 31 testów panelu, 4 pakiety Go, 16 przypadków e2e (10 przechodzi), 3 scenariusze obciążeniowe, 16 sprawdzeń stosu, 12 kontroli przed startem, 9 sprawdzeń trybu offline. Wszystko uruchamiane z `make`, a ścieżka dla osoby oceniającej jest jedną komendą: `sudo make jury`. |
+| Kompletność pakietu testów (20%) | Testy usługi semantycznej (`make test-semantic`), 37 modułu Java, 31 testów panelu, 4 pakiety Go, **25 przypadków e2e**, 3 scenariusze obciążeniowe, 16 sprawdzeń stosu, 12 kontroli przed startem, 9 sprawdzeń trybu offline. Wszystko uruchamiane z `make`, a ścieżka dla osoby oceniającej jest jedną komendą: `sudo make jury`. |
 | Wdrożenie i skalowanie (10%) | Start całego stosu jedną komendą, brak pobierania czegokolwiek w czasie działania (`make offline-check`), podmiana modelu bez zmian w kodzie oraz skalowanie poziome usługi semantycznej z dowodem rozkładu ruchu (`make scale`, `make scale-check`). |
 
 ## Zasady pracy w zespole
