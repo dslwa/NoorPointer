@@ -22,7 +22,7 @@ JWT_GUARD = jwt="$$(./scripts/token.sh)"; [ -n "$$jwt" ] || { echo "BLAD: pusty 
 K6        = $(COMPOSE) run --rm -e GATEWAY_JWT="$$jwt" benchmarks run
 
 .PHONY: help \
-        up dev-infra down restart build clean logs status \
+        up dev-infra down restart build clean logs status wait \
         seed test test-unit test-local test-rebuild bench bench-flood bench-budget \
         smoke verify verify-strict offline-check report checkpoint \
         demo demo-full demo-strict \
@@ -36,10 +36,14 @@ help: ## Lista komend pogrupowana w sekcje
 
 ##@ Stos
 
-up: ## Pelny stos + seed danych demo; --remove-orphans sprzata kontenery po usunietych serwisach
+up: ## Pelny stos + seed danych demo; czeka na gotowosc (semantic laduje modele ~2 min)
 	@test -f gateway/keys/jwt.pub || $(MAKE) --no-print-directory keys
 	$(COMPOSE) up -d --build --remove-orphans
+	@./scripts/wait-ready.sh
 	-@./scripts/seed.sh
+
+wait: ## Czeka, az wszystkie uslugi odpowiedza (WAIT_TIMEOUT=sekundy, domyslnie 180)
+	./scripts/wait-ready.sh
 
 dev-infra: ## Tylko bazy i telemetria (Postgres, Redis, mock LLM, feed, Prometheus, Grafana)
 	$(COMPOSE) up -d postgres redis mock-llm signatures-feed prometheus grafana
