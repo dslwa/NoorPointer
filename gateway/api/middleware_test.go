@@ -32,7 +32,7 @@ func TestWithPolicy(t *testing.T) {
 		{"missing model", "enforce", http.MethodPost, "/v1/chat/completions", `{}`, 403, "MODEL_NOT_ALLOWED", false},
 		{"monitor mode only logs", "monitor", http.MethodPost, "/v1/chat/completions", `{"model":"gpt-4o"}`, 200, "", true},
 		{"invalid json", "enforce", http.MethodPost, "/v1/chat/completions", `{"model":`, 400, "", false},
-		{"body too large", "enforce", http.MethodPost, "/v1/chat/completions", `{"model":"` + strings.Repeat("a", maxBodyBytes) + `"}`, 400, "", false},
+		{"body too large", "enforce", http.MethodPost, "/v1/chat/completions", `{"model":"` + strings.Repeat("a", maxBodyBytes) + `"}`, 413, "", false},
 		{"get without body", "enforce", http.MethodGet, "/v1/models", "", 200, "", true},
 		{"native ollama api", "enforce", http.MethodPost, "/api/chat", `{"model":"mock-llm"}`, 404, "", false},
 	}

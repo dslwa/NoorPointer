@@ -63,7 +63,7 @@ func newTestServer(t *testing.T, pub *rsa.PublicKey) (*Server, *http.Request) {
 	}))
 	t.Cleanup(upstream.Close)
 
-	s, err := NewServer(":0", upstream.URL, pub, "http://unused", "test-token")
+	s, err := NewServer(":0", upstream.URL, pub, "http://unused", "test-token", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -98,7 +98,7 @@ func doBody(h http.Handler, method, path, auth, body string) *httptest.ResponseR
 
 func TestNewServerInvalidUpstream(t *testing.T) {
 	for _, u := range []string{"", "localhost:11434", "://bad", "http://"} {
-		if _, err := NewServer(":0", u, nil, "", "t"); err == nil {
+		if _, err := NewServer(":0", u, nil, "", "t", nil); err == nil {
 			t.Errorf("upstream %q: expected error", u)
 		}
 	}
@@ -173,13 +173,13 @@ func TestRejectedTokens(t *testing.T) {
 }
 
 func TestNewServerEmptyGatewayToken(t *testing.T) {
-	if _, err := NewServer(":0", "http://upstream", nil, "http://cp", ""); err == nil {
+	if _, err := NewServer(":0", "http://upstream", nil, "http://cp", "", nil); err == nil {
 		t.Fatal("expected error")
 	}
 }
 
 func TestStartListenError(t *testing.T) {
-	s, err := NewServer(":-1", "http://upstream", nil, "http://127.0.0.1:1", "test-token")
+	s, err := NewServer(":-1", "http://upstream", nil, "http://127.0.0.1:1", "test-token", nil)
 	if err != nil {
 		t.Fatal(err)
 	}

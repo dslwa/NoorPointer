@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -43,16 +44,16 @@ func (s *Server) withPolicy(next http.Handler) http.Handler {
 		log.Printf("request sub=%s team=%s policy=%d %s %s", claims.Subject, claims.Team, p.Version, r.Method, r.URL.Path)
 
 		if r.Method == http.MethodPost {
-			body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxBodyBytes))
-			if err != nil {
-				WriteJSON(w, http.StatusBadRequest, APIError{Error: "cannot read request body"})
-				return
-			}
-
-			dec := json.NewDecoder(bytes.NewReader(body))
+			// Decode straight from the capped stream: no raw copy of the body,
+			// and a 30 MB upload stops being read at maxBodyBytes.
+			dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxBodyBytes))
 			dec.UseNumber()
 			var doc map[string]any
 			if err := dec.Decode(&doc); err != nil {
+				if _, tooBig := errors.AsType[*http.MaxBytesError](err); tooBig {
+					WriteJSON(w, http.StatusRequestEntityTooLarge, APIError{Error: "request body too large"})
+					return
+				}
 				WriteJSON(w, http.StatusBadRequest, APIError{Error: "invalid JSON body"})
 				return
 			}
@@ -72,13 +73,18 @@ func (s *Server) withPolicy(next http.Handler) http.Handler {
 				return
 			}
 
+			if v := s.semantic(r, p, doc); v.code != "" && s.deny(w, p, v.status, v.code, v.msg) {
+				return
+			}
+
 			// Always forward the document we checked, never the raw bytes:
 			// duplicate keys or trailing data could read differently upstream.
 			var buf bytes.Buffer
+			buf.Grow(int(min(max(r.ContentLength, 0), maxBodyBytes)) + 512) // one alloc instead of doubling
 			enc := json.NewEncoder(&buf)
 			enc.SetEscapeHTML(false)
 			enc.Encode(doc) // re-encoding a document we just decoded cannot fail
-			body = bytes.TrimSuffix(buf.Bytes(), []byte("\n"))
+			body := bytes.TrimSuffix(buf.Bytes(), []byte("\n"))
 			r.Body = io.NopCloser(bytes.NewReader(body))
 			r.ContentLength = int64(len(body))
 		}
