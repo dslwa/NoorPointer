@@ -223,7 +223,7 @@ a jego format różnił się od poniższego. Kształt dokumentu, który widzi ga
 ```json
 {
   "version": 4,
-  "defaults": {"mode": "enforce", "semantic_timeout_ms": 1500, "on_semantic_timeout": "fail_closed"},
+  "defaults": {"mode": "enforce", "semantic_timeout_ms": 8000, "on_semantic_timeout": "fail_closed"},
   "models": {"allowed": ["llama3.1:8b", "llama3.2:1b", "mock-llm", "qwen2.5:7b"]},
   "controls": {
     "pii_regex": {"enabled": true, "action": "redact", "types": ["email", "pesel", "iban", "card"]},
@@ -301,7 +301,7 @@ Domyślnie (`make up`) mockowane są tylko te modele, które idą przez Ollamę:
 (DeBERTa) i dane osobowe (spaCy en+pl) to prawdziwe modele wbudowane w obraz usługi semantycznej,
 więc działają od razu po `make up`. Testy e2e i benchmarki zakładają odpowiedzi echo z mocka — przed
 nimi wróć na `make ollama-down`. Uwaga wydajnościowa: prawdziwy Llama Guard na CPU odpowiada ok. 0,9 s,
-a kontrola ma budżet `defaults.semantic_timeout_ms` (1500 ms) — na jednej maszynie to blisko limitu.
+a kontrola ma budżet `defaults.semantic_timeout_ms` (8000 ms) — z zapasem na zimny start (pierwsze zapytanie do Llama Guarda trwa ok. 4 s).
 
 Konfiguracja `docker-compose.ollama.yaml` nie publikuje portu Ollamy na hoście, więc nie koliduje
 z `mock-llm`. Pierwsza odpowiedź trwa dłużej (ładowanie modelu na CPU), a nazwa modelu musi być wpisana

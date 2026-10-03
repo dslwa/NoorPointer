@@ -1,7 +1,7 @@
 {
   "defaults": {
     "mode": "monitor",
-    "semantic_timeout_ms": 300,
+    "semantic_timeout_ms": 8000,
     "on_semantic_timeout": "fail_open"
   },
   "models": {

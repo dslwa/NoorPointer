@@ -42,7 +42,7 @@ Gateway pobiera polityke co sekunde, wiec zmiana dziala bez restartu i bez przeb
 Przyklady zmian, ktore od razu widac:
 
   "controls.pii_regex.action":  "redact"  ->  "block"
-  "defaults.semantic_timeout_ms": 300     ->  500
+  "defaults.semantic_timeout_ms": 8000    ->  10000
   "controls.attack_signatures": dopisz wlasna regule (wzor lub fraze)
 
 TEXT

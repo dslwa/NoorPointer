@@ -45,7 +45,7 @@ groups:
         labels: { severity: warning }
         annotations:
           summary: "p95 kontroli AI powyzej 200 ms"
-          description: "Limit z polityki to 1500 ms, wiec alert ostrzega, zanim zblizymy sie do limitu."
+          description: "Limit z polityki to 8000 ms, wiec alert ostrzega, zanim zblizymy sie do limitu."
 
       - alert: SemanticCheckFailing
         expr: sum(rate(semantic_check_latency_seconds_count{status=~"error|timeout"}[1m])) > 0
