@@ -1,4 +1,4 @@
-.PHONY: help up dev-infra down restart logs status build test bench demo clean postgres-up postgres-test-up controlplane-run controlplane-test controlplane-build
+.PHONY: help up dev-infra down restart logs status build test bench demo clean postgres-up postgres-test-up controlplane-run controlplane-test controlplane-build dashboard-dev
 
 help: ## Pokazuje dostępne komendy
 	@echo "🛡️ NoorPointer Hackathon Commands:"
@@ -42,11 +42,14 @@ postgres-up: ## Uruchamia PostgreSQL dla aplikacji i czeka na gotowość
 postgres-test-up: postgres-up ## Przygotowuje osobną bazę PostgreSQL dla testów Javy
 	docker compose exec -T postgres psql -U noor -d postgres -v ON_ERROR_STOP=1 < config/init-test-db.sql
 
-controlplane-run: postgres-up ## Uruchamia PostgreSQL, a następnie Javę i dashboard lokalnie na :8082
+controlplane-run: postgres-up ## Uruchamia PostgreSQL, buduje React i uruchamia Javę z panelem na :8082
 	cd controlplane && ./mvnw spring-boot:run
 
 controlplane-test: postgres-test-up ## Uruchamia testy modułu Java na osobnej bazie PostgreSQL
 	cd controlplane && ./mvnw test
 
-controlplane-build: postgres-test-up ## Sprawdza Javę na PostgreSQL i buduje JAR z frontendem z dashboard/
+controlplane-build: postgres-test-up ## Sprawdza Javę na PostgreSQL i buduje JAR z panelem React
 	cd controlplane && ./mvnw verify
+
+dashboard-dev: ## Uruchamia React z hot reload na :5173 (API Javy musi działać na :8082)
+	cd dashboard && npm ci --no-audit --no-fund && npm run dev

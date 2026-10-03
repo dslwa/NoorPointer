@@ -87,7 +87,7 @@ services:
       - noorpointer-net
 
   # ========================================================
-  # MANAGEMENT & SECURITY DASHBOARD (HTML/CSS/JavaScript + Nginx API proxy)
+  # MANAGEMENT & SECURITY DASHBOARD (React + Vite + Nginx API proxy)
   # ========================================================
   dashboard:
     build:

@@ -1,59 +1,42 @@
-# 📊 Dashboard (Security & Management UI)
+# NoorPointer — React control panel
 
-## Aktualna prosta implementacja
+Panel control plane’u jest napisany w **React + Vite**, z prostym CSS. Teksty interfejsu są po angielsku. Backend pozostaje w Javie / Spring Boot, a dane w PostgreSQL.
 
-Frontend HTML/CSS/JavaScript znajduje się w `index.html`, `app.js`, `styles.css` i `favicon.svg`. Nie wymaga Node ani Reacta. Pierwotną specyfikację zachowano w [SPEC.md](SPEC.md).
+## Uruchomienie
 
-- Lokalnie: z głównego katalogu repo uruchom `make controlplane-run` i otwórz **http://localhost:8082**. Ta komenda uruchamia także PostgreSQL w Dockerze, więc wymaga działającego Docker Desktop. Maven pakuje pliki z tego katalogu do JAR-a Javy.
-- W Compose: **http://localhost:3000**. Nginx serwuje te same pliki i przekazuje `/api/` do `controlplane:8082`. Przeglądarka wysyła API na ten sam origin, więc nie wymaga osobnej konfiguracji CORS ani zmiennych `VITE_*`.
-- Token lokalny: `local-dev-admin`. Wciśnij „Connect”, potem opcjonalnie „Load demo”. Dashboard jest po angielsku.
-- Widoki: statystyki i budżety, polityki, zdarzenia z eksportem, ręczny import sygnatur.
+Najprościej z głównego katalogu repo:
 
-Poniższe sekcje opisują docelowy zakres zespołu; zaawansowany score, React i pełne forensics nie są częścią bieżącego MVP.
+```sh
+make controlplane-run
+```
 
-## 👤 Właściciel (Owner)
-**Frontend Developer** / **Java / Fullstack Developer**
+Wymaga Docker Desktop, JDK 21+ i Node.js 22.12+ (zalecany 24). Make uruchamia PostgreSQL, a Maven wykonuje `npm ci`, buduje React i uruchamia Javę. Panel: **http://localhost:8082**. Kliknij **Connect** (lokalny token `local-dev-admin`), a następnie opcjonalnie **Load demo**.
 
----
+Do pracy nad frontendem, kiedy Java już działa, w drugim terminalu:
 
-## 🎯 Zakres (Scope)
-Interaktywny interfejs graficzny użytkownika (Dashboard UI). Stanowi **aż 20% łącznej oceny jury** (*Security Reporting*). 
-Odpowiada za wizualizację postury bezpieczeństwa, prezentację wykrytych incydentów w czasie rzeczywistym, kontrolę budżetów finansowych oraz umożliwia intuicyjny podgląd i edycję aktywnych guardraili dla dwóch grup odbiorców: kadry zarządzającej (Management) i oficerów bezpieczeństwa (Security Team).
+```sh
+make dashboard-dev
+```
 
----
+Vite działa na **http://localhost:5173**, przeładowuje zmiany i przekazuje `/api` do Javy na 8082. Inny backend można wskazać przez `CONTROLPLANE_URL`, np. `CONTROLPLANE_URL=http://127.0.0.1:8181 make dashboard-dev`.
 
-## 🛠️ Czym się zajmuje (Kluczowe Odpowiedzialności)
+W Docker Compose panel jest dostępny na **http://localhost:3000**. Obraz buduje Vite w etapie Node, a Nginx serwuje `dist/` i przekazuje `/api` do `controlplane:8082`. Node nie jest wymagany na hoście przy użyciu Dockera.
 
-1. **Widok dla Kadry Zarządzającej (Executive / Management View)**:
-   - **Wskaźnik Bezpieczeństwa (*Security Posture Score*)**: syntetyczny wskaźnik (0–100%) obrazujący aktualny poziom ochrony.
-   - **Wykresy Budżetowe i Kosztowe**:
-     - Wykorzystanie tokenów i kosztów w USD w czasie per zespół, agent i model.
-     - Ostrzeżenia o zbliżaniu się do limitów budżetowych.
-   - **Trendy Wolumenu Zapytań**: dozwolone vs zablokowane interakcje.
-2. **Widok dla Zespołu Bezpieczeństwa (Security Operations / SOC View)**:
-   - **Strumień Incydentów na Żywo (Threat Stream)**:
-     - Tabela zdarzeń z filtrowaniem po dacie, poziomie krytyczności, akcji (`BLOCKED`, `REDACTED`, `ALLOWED`).
-   - **Kategoryzacja wg OWASP**:
-     - Prezentacja zagrożeń pogrupowanych wg *OWASP Top 10 for LLMs* (np. LLM01: Prompt Injection, LLM06: Sensitive Information Disclosure) oraz *OWASP Agentic AI Threats*.
-   - **Szczegóły Incydentu (Forensics Modal)**:
-     - Podgląd promptu z zaznaczoną czerwoną flagą naruszenia (np. zanonimizowane PII, zablokowany exploit, dopasowana sygnatura CVE).
-3. **Katalog i Przełącznik Kontroli (Guardrails & Policy Control)**:
-   - Wyświetlenie stanu guardraili (np. Regex PII, DeBERTa Prompt Injection, Loop Breaker, Skaner Modeli).
-   - Możliwość przełączania profili bezpieczeństwa (`Strict`, `Balanced`, `Permissive`) lub ręcznego włączania/wyłączania kontroli na żywo podczas prezentacji dla jury.
-4. **Eksport Raportów**:
-   - Przycisk pobrania raportu audytowego w formacie CSV / JSON / CEF wygenerowanego przez Control Plane.
+## Funkcje
 
----
+- Overview: statystyki, wykres, kategorie blokad i budżety.
+- Policies: profile, przełączniki kontroli, próg prompt injection, edytor JSON/YAML, walidacja, wersje i publikacja.
+- Events: filtry, stronicowanie, szczegóły i eksport JSON/CSV/CEF.
+- Signatures: ręczny import JSON/YAML i zastąpienie feedu.
+- Token API w `sessionStorage`, odświeżanie danych co 15 sekund w Overview i Events. Niezapisane zmiany edytorów pozostają przy przełączaniu widoków i odświeżaniu danych.
 
-## 🔌 Interfejsy i Komunikacja
-- **Port aplikacji:** `3000` (React / Vite / Next.js)
-- **Komunikacja:** REST API z `controlplane:8082`
-- **Technologia:** React / TypeScript + Tailwind CSS / shadcn/ui lub gotowe komponenty wykresów (Recharts / Chart.js / Tremor).
+## Struktura i build
 
----
+- `src/App.jsx`: nawigacja, połączenie z API, token i komunikaty.
+- `src/components/`: widoki i dialog.
+- `src/api.js`, `src/hooks.js`: klient API i pobieranie danych.
+- `src/styles.css`, `public/favicon.svg`: style i ikona.
+- `npm ci && npm run build`: wynik w ignorowanym `dist/`.
+- Maven pakuje ten sam wynik do JAR-a; gotowy JAR działa bez Node.
 
-## 🏆 Definition of Done (Kryteria Sukcesu)
-- [ ] Po wejściu pod `http://localhost:3000` jury widzi przejrzysty, nowoczesny dashboard bez błędów w konsoli.
-- [ ] Zablokowanie niebezpiecznego promptu w teście natychmiast pojawia się na wykresie i w tabeli incydentów.
-- [ ] Wykresy kosztów i tokenów poprawnie sumują zużycie zasobów.
-- [ ] Dostępny jest widok kategoryzacji zagrożeń wg taksonomii OWASP.
+Pierwotny zakres zespołu zachowano w [SPEC.md](SPEC.md). Panel pokazuje konfigurację i raportowane dane; egzekwowanie kontroli oraz raportowanie audytu należą do gateway’a.

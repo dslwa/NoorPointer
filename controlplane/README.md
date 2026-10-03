@@ -1,12 +1,12 @@
 # NoorPointer — prosty control plane
 
-Pierwsza wersja części zarządzającej zabezpieczeniami agentów AI: **Java 21 / Spring Boot**, dashboard HTML/CSS/JavaScript i baza PostgreSQL. Źródła frontendu znajdują się w sąsiednim katalogu `dashboard/`. Maven kopiuje je do JAR-a, więc uruchomienie lokalne nie wymaga Node ani osobnego procesu. W Docker Compose frontend jest dodatkowo serwowany przez Nginx na porcie 3000 z proxy do API Javy.
+Pierwsza wersja części zarządzającej zabezpieczeniami agentów AI: **Java 21 / Spring Boot**, dashboard React / Vite i baza PostgreSQL. Źródła frontendu znajdują się w sąsiednim katalogu `dashboard/`. Maven instaluje zależności (`npm ci`), buduje React (`npm run build`) i kopiuje wynik z `dashboard/dist/` do JAR-a. Lokalny build wymaga Node.js 22.12+ (zalecany 24), ale gotowy JAR działa bez Node i bez osobnego procesu frontendu. W Docker Compose frontend jest dodatkowo serwowany przez Nginx na porcie 3000 z proxy do API Javy.
 
 ## Uruchomienie
 
 Komendy poniżej wykonuj w katalogu `controlplane/` (`cd controlplane`). Z katalogu głównego możesz użyć `make controlplane-run`, `make controlplane-test` i `make controlplane-build`.
 
-Wymagany JDK 21 lub nowszy i uruchomiony Docker Desktop (lub własny PostgreSQL). Maven Wrapper pobierze Maven i zależności przy pierwszym uruchomieniu.
+Wymagany JDK 21 lub nowszy, Node.js 22.12+ (zalecany 24) i uruchomiony Docker Desktop (lub własny PostgreSQL). Maven Wrapper pobierze Maven i zależności przy pierwszym uruchomieniu.
 
 Najprościej z głównego katalogu repo:
 
@@ -14,11 +14,13 @@ Najprościej z głównego katalogu repo:
 make controlplane-run
 ```
 
-Komenda uruchamia PostgreSQL w Dockerze, czeka na gotowość bazy i uruchamia Javę z dashboardem. Jeśli uruchamiasz aplikację bezpośrednio z `controlplane/`, najpierw wykonaj `make postgres-up` w głównym katalogu repo, a potem `./mvnw spring-boot:run`.
+Komenda uruchamia PostgreSQL w Dockerze, czeka na gotowość bazy, buduje React i uruchamia Javę z dashboardem. Jeśli uruchamiasz aplikację bezpośrednio z `controlplane/`, najpierw wykonaj `make postgres-up` w głównym katalogu repo, a potem `./mvnw spring-boot:run`.
 
 Otwórz **http://localhost:8082** i kliknij „Connect”. Domyślny lokalny token administratora jest wpisany w formularzu: `local-dev-admin`.
 
 Kliknij **„Load demo”**, aby dodać przykładowe decyzje i raporty zużycia. Każde kliknięcie dodaje nową partię zdarzeń z oznaczeniem `DEMO`. Bez tego baza incydentów jest pusta. Dane, wersje polityk i sygnatury pozostają po restarcie w PostgreSQL (wolumen `postgres-data` w Compose). Poprzednie pliki H2 w `data/` nie są już używane; zachowano je, ale ich zawartość nie jest automatycznie przenoszona.
+
+Do pracy nad frontendem uruchom w drugim terminalu `make dashboard-dev` z głównego katalogu. Vite na **http://localhost:5173** przeładowuje zmiany i przekazuje `/api` do Javy na 8082. Docker buduje React we własnym etapie Node; na hoście wymaga tylko Dockera.
 
 ## Co działa
 

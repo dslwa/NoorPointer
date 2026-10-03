@@ -1,0 +1,25 @@
+{
+  "name": "@noorpointer/control-panel",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "vite build",
+    "preview": "vite preview --host 127.0.0.1",
+    "format": "prettier --write src vite.config.js index.html package.json",
+    "format:check": "prettier --check src vite.config.js index.html package.json"
+  },
+  "dependencies": {
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "6.1.1",
+    "prettier": "3.6.2",
+    "vite": "8.3.2"
+  }
+}

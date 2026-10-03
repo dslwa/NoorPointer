@@ -4,7 +4,7 @@
   <parent><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-parent</artifactId><version>3.5.16</version><relativePath/></parent>
   <groupId>pl.noorpointer</groupId><artifactId>control-plane</artifactId><version>0.1.0</version>
   <name>NoorPointer Control Plane</name>
-  <properties><java.version>21</java.version></properties>
+  <properties><java.version>21</java.version><frontend.skip>false</frontend.skip></properties>
   <dependencies>
     <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-web</artifactId></dependency>
     <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-jdbc</artifactId></dependency>
@@ -24,11 +24,24 @@
     <resources>
       <resource><directory>src/main/resources</directory></resource>
       <resource>
-        <directory>${project.basedir}/../dashboard</directory>
+        <directory>${project.basedir}/../dashboard/dist</directory>
         <targetPath>static</targetPath>
-        <includes><include>index.html</include><include>app.js</include><include>styles.css</include><include>favicon.svg</include></includes>
       </resource>
     </resources>
-    <plugins><plugin><groupId>org.springframework.boot</groupId><artifactId>spring-boot-maven-plugin</artifactId></plugin></plugins>
+    <plugins>
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId><artifactId>exec-maven-plugin</artifactId><version>3.5.1</version>
+        <configuration><workingDirectory>${project.basedir}/../dashboard</workingDirectory><skip>${frontend.skip}</skip></configuration>
+        <executions>
+          <execution><id>frontend-install</id><phase>validate</phase><goals><goal>exec</goal></goals>
+            <configuration><executable>npm</executable><arguments><argument>ci</argument><argument>--no-audit</argument><argument>--no-fund</argument></arguments></configuration>
+          </execution>
+          <execution><id>frontend-build</id><phase>validate</phase><goals><goal>exec</goal></goals>
+            <configuration><executable>npm</executable><arguments><argument>run</argument><argument>build</argument></arguments></configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin><groupId>org.springframework.boot</groupId><artifactId>spring-boot-maven-plugin</artifactId></plugin>
+    </plugins>
   </build>
 </project>

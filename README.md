@@ -8,7 +8,7 @@
 
 ## Aktualny moduł Java i dashboard
 
-Control plane jest zaimplementowany w **Javie / Spring Boot** w `controlplane/`, a prosty frontend HTML/CSS/JavaScript w `dashboard/`.
+Control plane jest zaimplementowany w **Javie / Spring Boot** w `controlplane/`, a panel **React / Vite** w `dashboard/`.
 
 ```sh
 make controlplane-run    # PostgreSQL + Java + dashboard, http://localhost:8082
@@ -16,7 +16,7 @@ make controlplane-test   # testy integracyjne Javy na osobnej bazie PostgreSQL
 make controlplane-build  # JAR wraz z frontendem
 ```
 
-Wymagane: uruchomiony Docker Desktop i JDK 21+. Komendy wykonuj w głównym katalogu repo.
+Wymagane: uruchomiony Docker Desktop, JDK 21+ i Node.js 22.12+ (zalecany 24). Komendy wykonuj w głównym katalogu repo.
 
 W dashboardzie kliknij „Connect” (lokalny token: `local-dev-admin`), a następnie „Load demo”, jeśli chcesz dane przykładowe.
 
@@ -62,7 +62,7 @@ make demo
 | Usługa | Komponent | Port | URL / Punkt Wejścia |
 | :--- | :--- | :--- | :--- |
 | **Gateway (Data Plane)** | Go | `8080` / `9090` | `http://localhost:8080/v1` (Prometheus: `:9090/metrics`) |
-| **Security Dashboard** | HTML/CSS/JavaScript | `3000` | `http://localhost:3000` |
+| **Security Dashboard** | React / Vite | `3000` | `http://localhost:3000` |
 | **Grafana Telemetry** | Grafana | `3001` | `http://localhost:3001` (Auto-login: `admin` / `admin`) |
 | **Control Plane API** | Java / Spring Boot | `8082` | `http://localhost:8082/api/v1` (Eksport SIEM: `/audit/export?format=cef`) |
 | **Semantic Service** | Python | `8001` / `50051` | `http://localhost:8001` (Główny gRPC: `:50051`) |

@@ -8,3 +8,5 @@
 **/.pytest_cache/
 **/.venv/
 reports/
+**/node_modules/
+dashboard/dist/

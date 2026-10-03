@@ -1,10 +1,19 @@
+FROM node:24-alpine AS frontend
+WORKDIR /dashboard
+COPY dashboard/package.json dashboard/package-lock.json ./
+RUN npm ci --no-audit --no-fund
+COPY dashboard/index.html dashboard/vite.config.js ./
+COPY dashboard/src ./src
+COPY dashboard/public ./public
+RUN npm run build
+
 FROM maven:3.9.11-eclipse-temurin-21 AS build
 WORKDIR /workspace
 COPY controlplane/pom.xml controlplane/pom.xml
 RUN mvn -B -ntp -f controlplane/pom.xml dependency:resolve
 COPY controlplane/src controlplane/src
-COPY dashboard/index.html dashboard/app.js dashboard/styles.css dashboard/favicon.svg dashboard/
-RUN mvn -B -ntp -f controlplane/pom.xml package -DskipTests
+COPY --from=frontend /dashboard/dist dashboard/dist
+RUN mvn -B -ntp -f controlplane/pom.xml package -DskipTests -Dfrontend.skip=true
 
 FROM eclipse-temurin:21-jre-alpine
 RUN apk add --no-cache curl && addgroup -S app && adduser -S app -G app

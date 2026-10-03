@@ -44,7 +44,15 @@ class ControlPlaneIntegrationTest {
     @Test
     void staticDashboardAndHealthArePublicButDataRequiresAdmin() throws Exception {
         mvc.perform(get("/")).andExpect(status().isOk()).andExpect(forwardedUrl("index.html"));
-        mvc.perform(get("/index.html")).andExpect(status().isOk()).andExpect(content().string(org.hamcrest.Matchers.containsString("NoorPointer")));
+        String index = mvc.perform(get("/index.html")).andExpect(status().isOk())
+            .andExpect(content().string(org.hamcrest.Matchers.containsString("NoorPointer"))).andReturn().getResponse().getContentAsString();
+        var assets = java.util.regex.Pattern.compile("(?:src|href)=\"(/assets/[^\"]+)\"").matcher(index);
+        int assetCount = 0;
+        while (assets.find()) {
+            mvc.perform(get(assets.group(1))).andExpect(status().isOk());
+            assetCount++;
+        }
+        assertThat(assetCount).isGreaterThanOrEqualTo(2);
         mvc.perform(get("/actuator/health")).andExpect(status().isOk()).andExpect(jsonPath("$.status").value("UP"));
         mvc.perform(get("/api/dashboard")).andExpect(status().isUnauthorized());
         mvc.perform(get("/api/dashboard").header("Authorization",GATEWAY)).andExpect(status().isForbidden());

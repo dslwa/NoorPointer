@@ -49,7 +49,7 @@ class SecurityConfig {
         return http.csrf(csrf -> csrf.disable())
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/", "/index.html", "/app.js", "/styles.css", "/favicon.svg", "/actuator/health", "/error").permitAll()
+                .requestMatchers("/", "/index.html", "/assets/**", "/favicon.svg", "/actuator/health", "/error").permitAll()
                 .requestMatchers("/api/gateway/**", "/api/contracts/**").hasAnyRole("ADMIN", "GATEWAY")
                 .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/audit/events").hasAnyRole("ADMIN", "GATEWAY")
                 .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/policies").hasAnyRole("ADMIN", "GATEWAY")

@@ -1,62 +1,13 @@
 <!doctype html>
 <html lang="en">
-<head>
-  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>NoorPointer · Control Plane</title><link rel="icon" type="image/svg+xml" href="/favicon.svg">
-  <link rel="stylesheet" href="/styles.css"><script defer src="/app.js"></script>
-</head>
-<body>
-  <aside class="sidebar">
-    <a class="brand" href="/"><span class="brand-mark">N<span>↗</span></span><span>NoorPointer<small>AI SECURITY CONTROL PLANE</small></span></a>
-    <div class="nav-label">WORKSPACE</div>
-    <nav aria-label="Main menu">
-      <button class="nav-item active" data-view="overview"><span>◫</span> Overview</button>
-      <button class="nav-item" data-view="policies"><span>◇</span> Policies</button>
-      <button class="nav-item" data-view="events"><span>≡</span> Events</button>
-      <button class="nav-item" data-view="signatures"><span>⌁</span> Signatures</button>
-    </nav>
-    <div class="sidebar-bottom"><span class="status-dot"></span> Control plane<small>Configure. Monitor. Control.</small></div>
-  </aside>
-  <main>
-    <header class="topbar"><span>Workspace <span class="breadcrumb">/</span> <strong id="breadcrumb">Overview</strong></span><div class="topbar-actions"><span class="connection" id="connection">Disconnected</span><button class="button ghost small" id="credentials">API token</button></div></header>
-    <div class="content">
-      <div class="page-heading"><div><p class="eyebrow">NOORPOINTER / CONTROL CENTER</p><h1 id="page-title">Security in one place.</h1><p class="subtitle" id="page-description">Policies, events and usage across your AI agents.</p></div><div class="heading-actions"><button class="button secondary" id="refresh">↻ Refresh</button><button class="button primary" id="demo">＋ Load demo</button></div></div>
-      <section id="overview" class="view">
-        <div class="notice"><span class="notice-icon">◇</span><div><strong id="policy-name">Waiting for connection</strong><p id="policy-status">Connect with your token to load the configuration.</p></div><button class="button ghost small" id="open-policies">Manage policy ↗</button></div>
-        <div class="metrics">
-          <article class="metric"><span>Gateway decisions</span><strong id="stat-requests">—</strong><small>Last 7 days · UTC</small></article>
-          <article class="metric"><span>Blocked</span><strong id="stat-blocked">—</strong><small id="block-rate">—</small></article>
-          <article class="metric"><span>Tokens used</span><strong id="stat-tokens">—</strong><small>From gateway usage reports</small></article>
-          <article class="metric"><span>API cost</span><strong id="stat-cost">—</strong><small>Last 7 days · USD</small></article>
-        </div>
-        <div class="overview-grid">
-          <article class="card"><div class="card-header"><div><h2>Agent activity</h2><p>Decisions and blocks over the last 7 days</p></div><div class="legend"><span><i></i> All</span><span><i class="blocked"></i> Blocked</span></div></div><div id="trend" class="chart" role="img" aria-label="Agent activity over the last 7 days"></div></article>
-          <article class="card"><div class="card-header"><div><h2>Block categories</h2><p>As reported by the gateway</p></div><span class="label">OWASP</span></div><div id="categories" class="categories empty">No data yet.</div><div class="card-footer"><span id="control-coverage">—</span><small>Enabled controls reflect the policy configuration; gateway enforcement is tracked separately.</small></div></article>
-        </div>
-        <article class="card"><div class="card-header"><div><h2>Budgets</h2><p>Usage reported by the gateway · UTC periods</p></div><span class="label">LIVE DATA</span></div><div id="budgets" class="budget-grid"></div><div class="card-footer"><small>The gateway enforces limits. This dashboard displays reported usage.</small></div></article>
-      </section>
-      <section id="policies" class="view" hidden>
-        <div id="revision-list" class="revision-grid"></div>
-        <article class="card"><div class="card-header"><div><h2>New policy version</h2><p>Save a version, then publish it for the gateway.</p></div><select id="profile" aria-label="Load a preset profile"><option value="">Load a profile…</option><option value="permissive">Permissive</option><option value="balanced">Balanced</option><option value="strict">Strict</option></select></div>
-          <div class="editor-content"><label>Version name<input id="draft-name" maxlength="120" placeholder="e.g. balanced-v2" value="my-policy"></label><div id="quick-controls" class="quick-controls"></div><details><summary>Full JSON / YAML configuration</summary><textarea id="policy-document" class="code-editor" spellcheck="false" aria-label="Policy document"></textarea></details></div>
-          <div class="card-footer action-footer"><span id="validation-result">Each save creates a separate, immutable version.</span><div><button class="button secondary" id="validate-policy">Validate configuration</button><button class="button primary" id="save-policy">Save new version</button></div></div>
-        </article>
-      </section>
-      <section id="events" class="view" hidden>
-        <article class="card"><div class="card-header"><div><h2>Event log</h2><p>Select an event to view its details. Sample data is marked DEMO.</p></div><div class="export-actions"><button class="button secondary small" data-export="json">JSON ↓</button><button class="button secondary small" data-export="csv">CSV ↓</button><button class="button secondary small" data-export="cef">CEF ↓</button></div></div>
-          <form id="event-filters" class="filters"><select id="filter-action" aria-label="Action"><option value="">All actions</option><option value="block">Block</option><option value="allow">Allow</option><option value="redact">Redact</option><option value="monitor">Monitor</option><option value="timeout">Timeout</option></select><input id="filter-agent" placeholder="Agent ID" aria-label="Agent ID"><input id="filter-category" placeholder="Category" aria-label="Category"><button class="button primary small" type="submit">Filter</button><button class="button ghost small" type="reset">Clear</button></form>
-          <div class="table-wrap"><table><thead><tr><th>Time</th><th>Agent / model</th><th>Control</th><th>Category</th><th>Action</th><th></th></tr></thead><tbody id="event-rows"></tbody></table></div>
-          <div class="card-footer pagination"><span id="event-count">No events</span><div><button class="button secondary small" id="previous-page">← Previous</button><button class="button secondary small" id="next-page">Next →</button></div></div>
-        </article>
-      </section>
-      <section id="signatures" class="view" hidden>
-        <article class="card"><div class="card-header"><div><h2>Signature feed</h2><p>Import JSON / YAML to replace the entire current feed.</p></div><span id="signature-count" class="label">0 RULES</span></div><div class="editor-content"><div id="signature-list"></div><label>Feed document<textarea id="signature-document" class="code-editor" spellcheck="false"></textarea></label></div><div class="card-footer action-footer"><small>Rules match literal text and are enforced by the gateway.</small><button class="button primary" id="import-signatures">Replace feed</button></div></article>
-      </section>
-      <footer class="page-footer">NoorPointer <span>Policies · Events · Budgets</span></footer>
-    </div>
-  </main>
-  <dialog id="login-dialog"><form id="login-form"><div class="dialog-heading"><span class="brand-mark">N<span>↗</span></span><h2>Connect to the control plane</h2><p>Enter your administrator token to access the API.</p></div><label>Administrator token<input id="api-token" type="password" autocomplete="off" value="local-dev-admin" required></label><p class="help">Default local token: <code>local-dev-admin</code>. You can change it using <code>ADMIN_TOKEN</code>.</p><p id="login-error" class="error" role="alert"></p><button class="button primary full" type="submit">Connect</button></form></dialog>
-  <dialog id="detail-dialog"><div class="detail-header"><h2>Event details</h2><button class="button secondary small" id="close-detail">Close ×</button></div><pre id="event-detail"></pre></dialog>
-  <div id="toast" role="status" aria-live="polite" hidden></div>
-</body>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>NoorPointer · Control Plane</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
 </html>
