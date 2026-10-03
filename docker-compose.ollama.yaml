@@ -1,0 +1,28 @@
+# Optional real LLM upstream. Use together with docker-compose.yaml.
+# Start ollama and pull llama3.2:1b before starting gateway with this override.
+services:
+  ollama:
+    image: ollama/ollama:latest
+    environment:
+      - OLLAMA_HOST=0.0.0.0:11434
+    volumes:
+      - ollama-data:/root/.ollama
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - noorpointer-net
+
+  gateway:
+    environment:
+      - UPSTREAM_LLM_URL=http://ollama:11434
+    depends_on:
+      ollama:
+        condition: service_healthy
+
+volumes:
+  ollama-data:

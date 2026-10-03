@@ -24,6 +24,22 @@ Docker Compose uruchamia backend Java na **8082** i dashboard Nginx na **3000**.
 
 Gateway jest obecnie reverse proxy do Ollamy. Serwis Python ma kontrole semantyczne HTTP/gRPC oraz skaner modeli. Część poniższej architektury opisuje docelowy zakres: Go nie instaluje jeszcze polityki z API Java, a formaty starszego pliku polityki i feedu nie są tożsame z kontraktami Java. Samo publikowanie konfiguracji nie potwierdza jej zastosowania w gateway’u.
 
+### Prawdziwy model Llama przez Ollamę w Dockerze
+
+Opcjonalny `docker-compose.ollama.yaml` dodaje Ollamę i ustawia upstream gateway’a na `http://ollama:11434`. Z katalogu głównego repo:
+
+```sh
+docker compose -f docker-compose.yaml -f docker-compose.ollama.yaml up -d --wait ollama
+docker compose -f docker-compose.yaml -f docker-compose.ollama.yaml exec ollama ollama pull llama3.2:1b
+docker compose -f docker-compose.yaml -f docker-compose.ollama.yaml up -d --wait gateway
+```
+
+Gateway nadal przyjmuje żądania na `http://localhost:8080/v1/chat/completions` z JWT. Model `llama3.2:1b` powinien być dopuszczony w aktywnej polityce. Pierwsza odpowiedź może potrwać dłużej ze względu na ładowanie modelu. Konfiguracja używa CPU, a modele pozostają w wolumenie `ollama-data`.
+
+Serwis semantyczny nadal korzysta z mocka Llama Guard. Podłączenie prawdziwego modelu rozmów nie włącza egzekwowania kontroli w gateway’u. Testy E2E wymagające odpowiedzi echo uruchamiaj z mockiem; powrót do niego: `docker compose up -d --no-deps gateway`.
+
+Dokumentacja: [Ollama w Dockerze](https://docs.ollama.com/docker), [API zgodne z OpenAI](https://docs.ollama.com/api/openai-compatibility).
+
 ## 📌 O Projekcie
 **NoorPointer** to lekka, modularna i elastyczna warstwa kontroli (**AI Control Layer**) zaprojektowana do zabezpieczania i zarządzania interakcjami z systemami Agentic AI (agenci autonomiczni, serwisy MCP, modele LLM, zewnętrzne API). 
 
