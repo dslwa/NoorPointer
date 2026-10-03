@@ -27,7 +27,8 @@ if [[ -x gateway/bin/mint ]]; then ok "gateway/bin/mint" "prebuilt (token mintin
 else wn "gateway/bin/mint" "missing - run: make mint-build (fallback: go run with /tmp caches)"; fi
 
 echo "== compose =="
-if docker compose config --quiet 2>/dev/null; then ok "docker compose config" "valid"; else no "docker compose config" "invalid - run: docker compose config"; fi
+# Without --profile, docker compose config silently SKIPS profiled services (tests, benchmarks).
+if docker compose --profile tests --profile bench config --quiet 2>/dev/null; then ok "docker compose config" "valid (profiles rendered)"; else no "docker compose config" "invalid - run: docker compose --profile tests config"; fi
 
 echo "== token =="
 if [[ -f gateway/keys/jwt.key ]] && command -v go >/dev/null; then

@@ -1,4 +1,4 @@
-.PHONY: help up dev-infra down restart logs status build test bench demo clean postgres-up postgres-test-up controlplane-run controlplane-test controlplane-build dashboard-dev smoke bench-flood bench-budget offline-check report demo-full demo-strict verify verify-strict keys token doctor seed urls checkpoint ollama-up ollama-down mint-build
+.PHONY: help up dev-infra down restart logs status build test test-rebuild bench demo clean postgres-up postgres-test-up controlplane-run controlplane-test controlplane-build dashboard-dev smoke bench-flood bench-budget offline-check report demo-full demo-strict verify verify-strict keys token doctor seed urls checkpoint ollama-up ollama-down mint-build
 
 help: ## Pokazuje dostępne komendy
 	@echo "🛡️ NoorPointer Hackathon Commands:"
@@ -29,11 +29,16 @@ status: ## Pokazuje stan kontenerów i ich porty
 seed: ## Wypełnia bazę audytu danymi demo (wymagane dla eksportu CEF)
 	./scripts/seed.sh
 
-test: seed ## Uruchamia automatyczny pakiet testów e2e (seed + raport HTML)
-	./scripts/run-with-jwt.sh docker compose run --rm -e GATEWAY_JWT tests
+test: seed ## Uruchamia e2e (seed + raport HTML); --build, bo obraz testow wpieka kod testow
+	@jwt="$$(./scripts/token.sh)"; [ -n "$$jwt" ] || { echo "BLAD: pusty JWT - uruchom: make keys && make mint-build"; exit 1; }; \
+	docker compose run --rm --build -e GATEWAY_JWT="$$jwt" tests
+
+test-rebuild: ## Przebudowuje obraz testow (po zmianie requirements.txt)
+	docker compose build --no-cache tests
 
 bench: ## Uruchamia benchmarki wydajnościowe k6 (narzut p95)
-	./scripts/run-with-jwt.sh docker compose run --rm -e GATEWAY_JWT benchmarks run /benchmarks/benchmark_baseline.js
+	@jwt="$$(./scripts/token.sh)"; [ -n "$$jwt" ] || { echo "BLAD: pusty JWT - uruchom: make keys && make mint-build"; exit 1; }; \
+	docker compose run --rm -e GATEWAY_JWT="$$jwt" benchmarks run /benchmarks/benchmark_baseline.js
 
 demo: ## Uruchamia scenariusze demonstracyjne agenta (z seedem danych demo)
 	-@./scripts/seed.sh
@@ -65,10 +70,12 @@ smoke: ## Sprawdza spięcie całego stosu (health + proxy + auth controlplane), 
 	./scripts/smoke.sh | tee reports/smoke.txt
 
 bench-flood: ## k6: zalew złośliwych promptów (fast-block)
-	./scripts/run-with-jwt.sh docker compose run --rm -e GATEWAY_JWT benchmarks run /benchmarks/benchmark_malicious_flood.js
+	@jwt="$$(./scripts/token.sh)"; [ -n "$$jwt" ] || { echo "BLAD: pusty JWT - uruchom: make keys && make mint-build"; exit 1; }; \
+	docker compose run --rm -e GATEWAY_JWT="$$jwt" benchmarks run /benchmarks/benchmark_malicious_flood.js
 
 bench-budget: ## k6: równoległe zapytania jednego agenta (atomowość budżetu)
-	./scripts/run-with-jwt.sh docker compose run --rm -e GATEWAY_JWT benchmarks run /benchmarks/benchmark_budget_concurrency.js
+	@jwt="$$(./scripts/token.sh)"; [ -n "$$jwt" ] || { echo "BLAD: pusty JWT - uruchom: make keys && make mint-build"; exit 1; }; \
+	docker compose run --rm -e GATEWAY_JWT="$$jwt" benchmarks run /benchmarks/benchmark_budget_concurrency.js
 
 offline-check: ## Lint: brak instalacji/pobierania w runtime (finalny stage obrazów)
 	./scripts/offline-check.sh
