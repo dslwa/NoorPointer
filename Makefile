@@ -28,7 +28,7 @@ K6        = $(COMPOSE) run --rm -e GATEWAY_JWT="$$jwt" benchmarks run
         demo demo-full demo-strict \
         keys mint-build token token-file reload-policy new-signature db-tidy doctor urls \
         ollama-up ollama-down \
-        postgres-up postgres-test-up controlplane-run controlplane-test controlplane-build dashboard-dev
+        postgres-up postgres-test-up controlplane-run controlplane-test controlplane-build dashboard-dev dashboard-test
 
 # --- pomoc -----------------------------------------------------------------------------------------
 help: ## Lista komend pogrupowana w sekcje
@@ -240,3 +240,6 @@ controlplane-build: postgres-test-up ## Weryfikacja Javy + budowa JAR (w kontene
 
 dashboard-dev: ## React z hot reload na :5173 (API Javy musi dzialac na :8082)
 	cd dashboard && npm ci --no-audit --no-fund && npm run dev
+
+dashboard-test: ## Testy React i klientow API (bez uruchamiania backendow, Node.js 22.12+)
+	cd dashboard && npm ci --no-audit --no-fund && npm test

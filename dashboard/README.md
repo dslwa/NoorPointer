@@ -33,6 +33,13 @@ W Docker Compose panel jest dostępny na **http://localhost:3000**. Obraz buduje
 
 ## Struktura i build
 
+Testy frontendu: `make dashboard-test` z katalogu głównego lub `npm test` w `dashboard/`
+po instalacji zależności (`npm ci`). Vitest i React Testing Library sprawdzają klienty API,
+wyniki skanowania (także timeouty i błędy), usuwanie polityk oraz zachowanie niezapisanych
+zmian edytora. Odpowiedzi usług są zastępowane w testach; backendy i modele nie muszą działać.
+`npm run test:watch` uruchamia testy przy zmianach plików. Integrację Javy z PostgreSQL
+sprawdza osobno `make controlplane-test`.
+
 - `src/app/`: główny komponent aplikacji i definicja nawigacji.
 - `src/pages/`: osobne widoki Overview, Policies, Events i Signatures.
 - `src/components/layout/`: układ panelu i nagłówek strony.
