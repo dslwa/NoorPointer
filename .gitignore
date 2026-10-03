@@ -11,3 +11,4 @@
 reports/
 **/node_modules/
 dashboard/dist/
+.claude/
