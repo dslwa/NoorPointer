@@ -94,6 +94,7 @@
 - Sprawdzanie treści jest cięższe (pracują tam modele AI), ale mieści się w limicie: krótkie zdanie 116 ms, a po zwiększeniu liczby wątków 78 ms.
 - Pierwszy pomiar wypadł źle: 41 ms na jedno pytanie. Przyczyną było ustawienie połączenia sieciowego, a nie nasz program — po poprawce zostały pojedyncze milisekundy.
 - Każda kontrola ma własny limit czasu, więc jedna wolna kontrola nie zatrzymuje całej bramy.
+- Sprawdzanie treści działa w replikach za rozdzielaniem ruchu: przy tej samej konfiguracji trzy repliki dały +27% przepustowości (3,7 → 4,7 zapytań/s) i lepszą medianę (2842 → 1628 ms). Sufit wyznacza procesor tej maszyny — na osobnych serwerach zysk rośnie liniowo.
 
 ---
 
@@ -103,7 +104,7 @@
 - Testy pojedynczych części: brama w Go (4 zestawy) i zasady w Javie (3 zestawy). Testy Javy uruchamiamy w kontenerze, na osobnej bazie, żeby nie ruszyć danych z pokazu.
 - Testy obciążeniowe: 3 scenariusze — zwykły ruch, atak oraz równoległe pytania jednego agenta (sprawdzamy, czy budżet liczy się poprawnie).
 - Dodatkowe sprawdzenia: 16 kontroli spójności systemu, 12 kontroli przed startem i sprawdzenie, czy w czasie działania nic nie ściągamy z internetu.
-- Jedno polecenie dla osoby oceniającej: `sudo make checkpoint` — sprawdza środowisko, uruchamia system, wszystkie testy i przygotowuje raport.
+- Jedno polecenie dla osoby oceniającej: `sudo make jury` — sprawdza środowisko, uruchamia system, wszystkie testy, wysyła ruch na wykresy i zbiera dowody do katalogu `dowody/`.
 - Uczciwie: przechodzi **10 z 16** testów. Pozostałe 6 to kontrole, których brama jeszcze nie wykonuje. Odróżniamy dwie sytuacje: „kontroli jeszcze nie ma” (PENDING) i „kontrola jest, ale nie działa” (FAIL) — to nie to samo.
 
 ---
@@ -115,7 +116,9 @@
 - Model zastępczy można jednym poleceniem zamienić na prawdziwy model lokalny (Ollama) — bez zmian po stronie agenta.
 - Klucze dostępowe tworzą się lokalnie, a hasła i klucze trzymamy poza repozytorium. Pilnuje tego automatyczne sprawdzenie.
 - Nowe zasady, sygnatury i budżety zmienia się w panelu — bez wdrażania nowej wersji programu.
+- Sprawdzanie treści skaluje się poziomo: `sudo make scale REPLIKI=3` dodaje repliki, a `make scale-check` pokazuje, że ruch naprawdę się rozkłada (każda replika dostaje swoją część), a nie tylko że „ustawiliśmy liczbę”.
 - Każda część ma swojego właściciela i opis w repozytorium, więc wiadomo, do kogo iść z pytaniem.
+- Do sprawdzenia bez czytania dokumentacji: `START.md` z jedną ścieżką uruchomienia i siedmioma komendami oraz katalog `dowody/` z gotowymi wynikami.
 
 ---
 

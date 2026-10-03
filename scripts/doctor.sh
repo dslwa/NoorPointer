@@ -6,16 +6,20 @@ set -uo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"; cd "$ROOT"
 
 pass=0; warn=0; fail=0
-ok(){ printf '  OK    %-32s %s\n' "$1" "$2"; pass=$((pass+1)); }
-wn(){ printf '  OSTRZ %-32s %s\n' "$1" "$2"; warn=$((warn+1)); }
-no(){ printf '  BLAD  %-32s %s\n' "$1" "$2"; fail=$((fail+1)); }
+# QUIET=1 (uzywane przez `make jury`) pokazuje tylko ostrzezenia, bledy i podsumowanie.
+# Pelna lista sprawdzen jest dostepna przez: make doctor
+QUIET="${QUIET:-0}"
+sec(){ [[ "$QUIET" == "1" ]] || echo "== $1 =="; }
+ok(){ pass=$((pass+1)); [[ "$QUIET" == "1" ]] || printf '  OK    %-32s %s\n' "$1" "$2"; }
+wn(){ warn=$((warn+1)); printf '  OSTRZ %-32s %s\n' "$1" "$2"; }
+no(){ fail=$((fail+1)); printf '  BLAD  %-32s %s\n' "$1" "$2"; }
 
-echo "== narzedzia =="
+sec "narzedzia"
 command -v docker  >/dev/null && ok "docker"  "$(docker --version 2>/dev/null | cut -d, -f1)" || no "docker" "nie znaleziono"
 command -v go      >/dev/null && ok "go"      "$(go version 2>/dev/null | awk '{print $3}')" || wn "go" "nie znaleziono - potrzebne dla scripts/token.sh"
 command -v openssl >/dev/null && ok "openssl" "$(openssl version 2>/dev/null | awk '{print $1, $2}')" || wn "openssl" "nie znaleziono - potrzebne dla make keys"
 
-echo "== klucze JWT =="
+sec "klucze JWT"
 for f in gateway/keys/jwt.key gateway/keys/jwt.pub; do
   if   [[ -f "$f" ]]; then ok "$f" "plik klucza"
   elif [[ -d "$f" ]]; then no "$f" "katalog zamiast pliku (docker tworzy go, gdy montuje nieistniejacy plik): rm -rf $f && make keys"
@@ -26,11 +30,11 @@ done
 if [[ -x gateway/bin/mint ]]; then ok "gateway/bin/mint" "zbudowany (wystawianie tokenu dziala tez pod sudo)"
 else wn "gateway/bin/mint" "brak - uruchom: make mint-build (bez tego wymagane jest go)"; fi
 
-echo "== konfiguracja compose =="
+sec "konfiguracja compose"
 # Bez --profile polecenie docker compose config pomija serwisy z profilami (tests, benchmarks).
 if docker compose --profile tests --profile bench config --quiet 2>/dev/null; then ok "docker compose config" "poprawna (z profilami)"; else no "docker compose config" "niepoprawna - uruchom: docker compose --profile tests config"; fi
 
-echo "== sekrety lokalne =="
+sec "sekrety lokalne"
 if [[ -f .env ]]; then
   if grep -qE '^[A-Z_]*(API_KEY|TOKEN|SECRET)=sk-[A-Za-z0-9_-]{20,}' .env 2>/dev/null; then
     wn ".env" "zawiera klucz API (sk-...). Git go ignoruje i nigdy nie byl commitowany, ale ZIP lub kopia katalogu zabierze go ze soba - usun klucz albo trzymaj plik poza repo"
@@ -44,7 +48,7 @@ if git ls-files --error-unmatch .env >/dev/null 2>&1; then no ".env w git" "plik
 else ok ".env w git" "nie jest sledzony"; fi
 
 
-echo "== token =="
+sec "token"
 if [[ -f gateway/keys/jwt.key ]] && command -v go >/dev/null; then
   tok="$(./scripts/token.sh 2>/dev/null || true)"
   if [[ -n "$tok" ]]; then
@@ -64,7 +68,7 @@ else
   wn "wystawianie tokenu" "pominiete (brak klucza lub brak go)"
 fi
 
-echo "== dzialajacy gateway =="
+sec "dzialajacy gateway"
 code="$(curl -s -o /dev/null -w '%{http_code}' -m 5 -X POST http://localhost:8080/v1/chat/completions \
   -H 'Content-Type: application/json' -d '{"model":"mock-llm","messages":[]}' 2>/dev/null)"
 case "${code:-000}" in

@@ -12,7 +12,7 @@
       "pattern": "(/api/job/submit|ray\\.remote.*__import__)",
       "action": "block",
       "severity": "CRITICAL",
-      "description": "Próba wykorzystania luki w dashboardzie Ray do nieautoryzowanego wykonania kodu."
+      "description": "Pr\u00f3ba wykorzystania luki w dashboardzie Ray do nieautoryzowanego wykonania kodu."
     },
     {
       "id": "SIG-2024-002",
@@ -48,7 +48,7 @@
       "pattern": "(<tool_override>|<instruction>override system instructions|SYSTEM: disregard previous tool permissions)",
       "action": "block",
       "severity": "HIGH",
-      "description": "Próba nadpisania parametrów systemowych w opisach lub argumentach narzędzi MCP."
+      "description": "Pr\u00f3ba nadpisania parametr\u00f3w systemowych w opisach lub argumentach narz\u0119dzi MCP."
     },
     {
       "id": "SIG-2024-005",
@@ -61,6 +61,18 @@
       "action": "block",
       "severity": "MEDIUM",
       "description": "Ukryte instrukcje jailbreak w komentarzach HTML lub ukrytych tagach CSS."
+    },
+    {
+      "id": "SIG-20261003-210514",
+      "name": "Path traversal",
+      "cve": "CVE-LIVE-EMERGENCY",
+      "owasp_category": "LLM01: Prompt Injection",
+      "target_component": "prompt_filter",
+      "pattern_type": "regex",
+      "pattern": "(/etc/passwd|\\.\\./)",
+      "action": "block",
+      "severity": "CRITICAL",
+      "description": "Dynamicznie dodana regula podczas prezentacji dla jury."
     }
   ]
 }

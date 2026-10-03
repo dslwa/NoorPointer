@@ -969,6 +969,9 @@ dialog::backdrop {
 .verdict.clear {
   color: var(--pass);
 }
+.verdict.trouble {
+  color: var(--caution);
+}
 .verdict.idle {
   color: var(--ink-2);
   font-weight: 500;

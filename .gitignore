@@ -13,3 +13,6 @@ reports/
 **/node_modules/
 dashboard/dist/
 .claude/
+
+# Zrzut polityki do edycji przez osoby oceniajace (make policy-edit)
+policy.local.json

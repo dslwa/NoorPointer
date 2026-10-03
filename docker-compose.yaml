@@ -38,7 +38,7 @@ services:
     depends_on:
       redis:
         condition: service_healthy
-      semantic-service:
+      semantic-app:
         condition: service_started
       signatures-feed:
         condition: service_started
@@ -51,23 +51,54 @@ services:
   # ========================================================
   # AI GUARDRAILS (Python DeBERTa v3, Presidio NER, Llama Guard, Picklescan RCE via gRPC :50051)
   # ========================================================
-  semantic-service:
+  # Usluga skalowalna: `make scale REPLIKI=3` podnosi liczbe tych kontenerow.
+  # Nie publikuje portow (robiloby to konflikt przy drugiej replice) i nie ma nazwy kontenera -
+  # ruch z zewnatrz wchodzi przez load balancer `semantic-lb` ponizej.
+  semantic-app:
     build:
       context: ./semantic-service
       dockerfile: Dockerfile
-    container_name: noorpointer-semantic
-    ports:
-      - "8001:8001" # FastAPI HTTP API & /metrics
-      - "50051:50051" # gRPC noorpointer.semantic.v1.SemanticService
     environment:
       - PORT=8001
       - GRPC_PORT=50051
       - OLLAMA_URL=http://mock-llm:11434
       - GUARD_MODEL=llama-guard3:1b
-      - TORCH_THREADS=4
+      # Strojenie pod procesor. Wzgorze: repliki x PI_WORKERS x TORCH_THREADS <= liczba watkow CPU.
+      # Na tej maszynie (8 watkow) uklad domyslny 1x2x4 wykorzystuje ja co do watku, wiec dokladanie
+      # replik bez zmniejszenia tych dwoch liczb tylko dlawi procesor (zmierzone: 3 repliki po 2x4
+      # dawaly 2,5x mniejsza przepustowosc niz jedna). Skalowanie poziome ma sens na osobnych maszynach.
+      - TORCH_THREADS=${TORCH_THREADS:-4}
+      - PI_WORKERS=${PI_WORKERS:-2}
       - PYTHONUNBUFFERED=1
     depends_on:
       mock-llm:
+        condition: service_healthy
+    <<: *service
+
+  # Load balancer przed replikami. Dziedziczy nazwe `semantic-service`, wiec brama, panel,
+  # testy i skrypty dalej mowia do `semantic-service:8001` - zmiana jest po naszej stronie.
+  semantic-lb:
+    image: nginx:alpine
+    container_name: noorpointer-semantic-lb
+    ports:
+      - "8001:8001" # HTTP: skany, /metrics, /readyz
+      - "50051:50051" # gRPC dla bramy
+    volumes:
+      - ./telemetry/nginx-lb/nginx.conf:/etc/nginx/nginx.conf:ro,z
+      - ./telemetry/nginx-lb/conf.d:/etc/nginx/conf.d:ro,z
+      - ./telemetry/nginx-lb/stream.d:/etc/nginx/stream.d:ro,z
+    networks:
+      noorpointer-net:
+        aliases:
+          - semantic-service
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8001/lb-healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    depends_on:
+      semantic-app:
         condition: service_healthy
     <<: *service
 
@@ -112,7 +143,7 @@ services:
     depends_on:
       controlplane:
         condition: service_healthy
-      semantic-service:
+      semantic-app:
         condition: service_started
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:3000/"]
@@ -255,6 +286,32 @@ services:
   # Testy modulu Java. Uruchamiamy je w obrazie uzywanym do budowy control plane (etap `build` ma juz
   # pobrane zaleznosci Mavena, wiec nie trzeba instalowac Javy na hoscie). Baza testowa pochodzi
   # z `make postgres-test-up`: postgres-test-up tworzy ja, ten serwis tylko sie do niej podlacza.
+  # Testy modulu semantycznego (117 przypadkow). Obraz jest produkcyjny, bez zaleznosci deweloperskich,
+  # wiec dokladamy grupe "dev" (pytest) i montujemy katalog testow z repozytorium - testujemy dokladnie
+  # ten kod, ktory jest w repo. Testy z markerem "models" sa domyslnie pomijane (wymagaja pobrania modeli).
+  semantic-tests:
+    build:
+      context: ./semantic-service
+      dockerfile: Dockerfile
+    working_dir: /app
+    volumes:
+      - ./semantic-service/tests:/app/tests:ro,z
+    environment:
+      - MODELS_OFFLINE=1
+      - OLLAMA_URL=http://mock-llm:11434
+      - GUARD_MODEL=llama-guard3:1b
+      - PYTHONUNBUFFERED=1
+    command:
+      - sh
+      - -c
+      - uv sync --frozen --dev --no-install-project && python -m pytest tests -q --tb=no
+    depends_on:
+      mock-llm:
+        condition: service_healthy
+    profiles:
+      - semantic
+    networks: [noorpointer-net]
+
   controlplane-tests:
     build:
       context: .

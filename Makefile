@@ -13,6 +13,7 @@
 
 # --- narzedzia i zmienne wspolne -------------------------------------------------------------------
 COMPOSE         ?= docker compose
+SEMANTIC_REPLICAS ?= 1  # liczba replik uslugi semantycznej (make up); zmien: make scale REPLIKI=3
 COMPOSE_ALL      = $(COMPOSE) --profile tests --profile bench
 OLLAMA_COMPOSE   = $(COMPOSE) -f docker-compose.yaml -f docker-compose.ollama.yaml
 
@@ -23,23 +24,66 @@ K6        = $(COMPOSE) run --rm -e GATEWAY_JWT="$$jwt" benchmarks run
 
 .PHONY: help \
         up dev-infra down restart build clean logs status wait \
-        seed test test-unit test-local test-rebuild bench bench-flood bench-budget traffic \
+        seed test test-unit test-local test-rebuild bench bench-flood bench-budget bench-semantic traffic \
         smoke verify verify-strict offline-check report deck checkpoint \
         demo demo-full demo-strict \
         keys mint-build token token-file reload-policy new-signature db-tidy doctor urls \
+        jury scan policy-edit policy-apply signature evidence stop scale scale-check \
         ollama-up ollama-down \
-        postgres-up postgres-test-up controlplane-run controlplane-test controlplane-build dashboard-dev
+        postgres-up postgres-test-up controlplane-run controlplane-test controlplane-build dashboard-dev dashboard-test
 
 # --- pomoc -----------------------------------------------------------------------------------------
 help: ## Lista komend pogrupowana w sekcje
 	@awk 'BEGIN {FS = ":.*## "} /^##@/ {printf "\n\033[1m%s\033[0m\n", substr($$0, 5)} /^[a-zA-Z_-]+:.*## / {printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
+##@ Zacznij tutaj (dla osob oceniajacych)
+
+jury: ## JEDNO polecenie: srodowisko, start stosu, wszystkie testy, ruch na panele i dowody
+	./scripts/jury.sh
+
+scan: ## Sprawdz dowolny tekst kontrolami AI: make scan TEXT="twoj tekst" [CHECKS=...]
+	./scripts/scan.sh
+
+policy-edit: ## Zapisz aktualne zasady bezpieczenstwa do policy.local.json (do edycji)
+	./scripts/policy-edit.sh
+
+policy-apply: ## Opublikuj edytowane zasady i przeladuj gateway bez restartu
+	./scripts/policy-apply.sh
+
+signature: ## Dodaj wlasna regule ataku: make signature PATTERN='...' NAME='...'
+	@$(MAKE) --no-print-directory new-signature PATTERN="$(PATTERN)" NAME="$(NAME)" ACTION="$(ACTION)"
+
+evidence: ## Zbiera dowody do katalogu dowody/ (widoczne na GitHubie bez uruchamiania)
+	./scripts/evidence.sh
+
+stop: ## Zatrzymuje stos (dane i wolumeny zostaja, wracasz przez: make up)
+	@$(MAKE) --no-print-directory down
+
+scale: ## Ustaw liczbe replik: sudo make scale REPLIKI=3 (FORCE=1 odtwarza, TORCH_THREADS=N zmienia watki)
+	@$(COMPOSE) run --rm --no-deps --entrypoint nginx semantic-lb -t >/dev/null 2>&1 || { echo "scale: blad w konfiguracji load balancera - uruchom: $(COMPOSE) run --rm --no-deps --entrypoint nginx semantic-lb -t"; exit 1; }
+	@echo "  konfiguracja load balancera poprawna"
+	@$(COMPOSE) up -d --scale semantic-app=$(or $(REPLIKI),3) $(if $(FORCE),--force-recreate semantic-app,--no-recreate) --remove-orphans 2>&1 | tail -4
+	@./scripts/wait-ready.sh
+	@$(COMPOSE) ps --format '  {{.Name}}  {{.Status}}' | grep semantic || true
+
+scale-check: ## Sprawdza, czy ruch rozklada sie na repliki (mierzy licznik w kazdym kontenerze)
+	./scripts/check-balance.sh
+
 ##@ Stos
 
-up: ## Pelny stos + seed danych demo; czeka na gotowosc (semantic laduje modele ~2 min)
+up: ## Pelny stos + seed danych demo; czeka na gotowosc (VERBOSE=1 pokazuje budowanie)
 	@test -f gateway/keys/jwt.pub || $(MAKE) --no-print-directory keys
-	$(COMPOSE) up -d --build --remove-orphans
+	@mkdir -p reports
+	@if [ -n "$(VERBOSE)" ]; then \
+	  $(COMPOSE) up -d --build --remove-orphans --scale semantic-app=$(SEMANTIC_REPLICAS); \
+	else \
+	  if ! $(COMPOSE) up -d --build --remove-orphans > reports/log-up.txt 2>&1; then \
+	    echo "BLAD: nie udalo sie zbudowac lub uruchomic stosu. Ostatnie linie:"; tail -25 reports/log-up.txt; exit 1; \
+	  fi; \
+	  echo "  zbudowano i uruchomiono stos (pelny log: reports/log-up.txt)"; \
+	fi
 	@./scripts/wait-ready.sh
+	@printf '  uslugi dzialajace: %s\n' "$$($(COMPOSE) ps --services --filter status=running 2>/dev/null | wc -l)"
 	-@./scripts/seed.sh
 
 wait: ## Czeka, az wszystkie uslugi odpowiedza (WAIT_TIMEOUT=sekundy, domyslnie 180)
@@ -70,8 +114,8 @@ seed: ## Wypelnia baze audytu danymi demo (potrzebne dla eksportu CEF)
 
 ##@ Testy i dowody
 
-test: seed ## e2e (seed + raport HTML); --build, bo obraz testow wpieka kod testow
-	@$(JWT_GUARD); $(COMPOSE) run --rm --build -e GATEWAY_JWT="$$jwt" tests; rc=$$?; \
+test: seed ## e2e (seed + raport HTML); --tb=no ukrywa tracebacki, pelne sa w raporcie
+	@$(JWT_GUARD); $(COMPOSE) run --rm --build -e GATEWAY_JWT="$$jwt" -e PYTEST_ADDOPTS="$${PYTEST_ADDOPTS:---tb=no}" tests; rc=$$?; \
 	chown -R "$$(stat -c '%u:%g' .)" reports 2>/dev/null || true; exit $$rc
 
 test-unit: ## Testy jednostkowe modulow (Go teraz; nie wymagaja dzialajacego stosu)
@@ -98,6 +142,9 @@ bench: ## k6: baseline (narzut p95)
 
 bench-flood: ## k6: zalew zlosliwych promptow
 	@$(JWT_GUARD); $(K6) /benchmarks/benchmark_malicious_flood.js
+
+bench-semantic: ## Przepustowosc kontroli semantycznych (RUNDY=10 ROZMIAR=10, sam Python)
+	python3 benchmarks/semantic_throughput.py --rounds $(or $(RUNDY),10) --concurrency $(or $(ROZMIAR),10)
 
 bench-budget: ## k6: rownolegle zapytania jednego agenta (atomowosc budzetu)
 	@$(JWT_GUARD); $(K6) /benchmarks/benchmark_budget_concurrency.js
@@ -233,11 +280,23 @@ postgres-test-up: postgres-up ## Osobna baza PostgreSQL dla testow Javy
 controlplane-run: postgres-up ## Uruchamia Jave (REST/panel) na :8082
 	cd controlplane && ./mvnw spring-boot:run
 
-controlplane-test: postgres-test-up ## Testy modulu Java w kontenerze (bez Javy na hoscie)
-	$(COMPOSE) --profile java run --rm --build controlplane-tests
+test-semantic: ## Testy modulu semantycznego (117 przypadkow) w kontenerze z pytest
+	@mkdir -p reports
+	@$(COMPOSE) --profile semantic run --rm semantic-tests > reports/log-semantic-test.txt 2>&1; rc=$$?; \
+	grep -E "[0-9]+ (passed|failed)|^(FAILED|ERROR)|error" reports/log-semantic-test.txt | tail -18; \
+	[ $$rc -eq 0 ] || echo "  szczegoly: reports/log-semantic-test.txt"; exit $$rc
+
+controlplane-test: postgres-test-up ## Testy modulu Java w kontenerze (pelny log: reports/log-java-test.txt)
+	@mkdir -p reports
+	@$(COMPOSE) --profile java run --rm --build controlplane-tests > reports/log-java-test.txt 2>&1; rc=$$?; \
+	grep -E "Tests run:|BUILD (SUCCESS|FAILURE)|^\[ERROR\]" reports/log-java-test.txt || true; \
+	[ $$rc -eq 0 ] || echo "  szczegoly bledu: reports/log-java-test.txt"; exit $$rc
 
 controlplane-build: postgres-test-up ## Weryfikacja Javy + budowa JAR (w kontenerze)
 	$(COMPOSE) --profile java run --rm --build controlplane-tests mvn -B -ntp -f controlplane/pom.xml verify -Dfrontend.skip=true
 
 dashboard-dev: ## React z hot reload na :5173 (API Javy musi dzialac na :8082)
 	cd dashboard && npm ci --no-audit --no-fund && npm run dev
+
+dashboard-test: ## Testy React i klientow API (bez uruchamiania backendow, Node.js 22.12+)
+	cd dashboard && npm ci --no-audit --no-fund && npm test

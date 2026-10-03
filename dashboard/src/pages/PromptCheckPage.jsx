@@ -150,10 +150,12 @@ export default function PromptCheckPage({ active, notify }) {
   const available = Object.keys(checks).filter((key) => checks[key].directions.includes(direction));
   const enabled = selected.filter((key) => available.includes(key));
   const lit = scan !== null;
-  const results = Object.fromEntries((scan?.response.results || []).map((r) => [r.check, r]));
-  const flaggedCount = scan?.response.results.filter((r) => r.flagged).length || 0;
+  const scanResults = scan?.response.results || [];
+  const results = Object.fromEntries(scanResults.map((r) => [r.check, r]));
+  const flaggedCount = scanResults.filter((r) => r.status === 'ok' && r.flagged).length;
+  const incompleteCount = enabled.filter((key) => results[key]?.status !== 'ok').length;
   const entities = results.pii_ner?.details.entities || [];
-  const notes = passageNotes(scan?.response.results || []);
+  const notes = passageNotes(scanResults);
 
   function toggle(key) {
     setSelected((list) => (list.includes(key) ? list.filter((k) => k !== key) : [...list, key]));
@@ -179,16 +181,23 @@ export default function PromptCheckPage({ active, notify }) {
 
   let verdict = { className: 'idle', text: 'Paste the text you want to check.' };
   if (pending) verdict = { className: 'idle', text: 'Checking…' };
-  else if (lit)
-    verdict = flaggedCount
-      ? {
-          className: 'stopped',
-          text: `${flaggedCount} of ${scan.response.results.length} checks found something`,
-        }
-      : {
-          className: 'clear',
-          text: `Nothing found by ${scan.response.results.length} ${scan.response.results.length === 1 ? 'check' : 'checks'}`,
-        };
+  else if (lit) {
+    if (flaggedCount)
+      verdict = {
+        className: 'stopped',
+        text: `${flaggedCount} of ${scanResults.length} checks found something${incompleteCount ? '. Some checks did not complete.' : ''}`,
+      };
+    else if (!scanResults.length || incompleteCount)
+      verdict = {
+        className: 'trouble',
+        text: 'Some checks did not complete. Review the results below.',
+      };
+    else
+      verdict = {
+        className: 'clear',
+        text: `Nothing found by ${scanResults.length} ${scanResults.length === 1 ? 'check' : 'checks'}`,
+      };
+  }
 
   return (
     <div className="bench">
@@ -269,9 +278,7 @@ export default function PromptCheckPage({ active, notify }) {
 
         <div className="specimen-foot">
           {lit ? (
-            <span className="examples">
-              Checked in {Math.round(scan.response.latency_ms)} ms. Nothing was sent to a model.
-            </span>
+            <span className="examples">Checked in {Math.round(scan.response.latency_ms)} ms.</span>
           ) : (
             <span className="examples">
               Try

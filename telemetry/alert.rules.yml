@@ -14,14 +14,24 @@ groups:
           description: "Prometheus nie moze pobrac metryk z gateway:9090/metrics (endpoint nie istnieje lub proces nie dziala)."
 
       - alert: SemanticDown
+        # Usluga dziala w replikach, wiec ten alert opisuje calkowita awarie: zadna replika nie odpowiada.
         # Prog dluzszy niz dla pozostalych uslug: kontener wczytuje modele okolo 2 minut, wiec krotsze
         # okno zglaszaloby "brak odpowiedzi" przy kazdym starcie, choc usluga jest w trakcie uruchamiania.
-        expr: up{job="noorpointer-semantic"} == 0
+        expr: max(up{job="noorpointer-semantic"}) == 0
         for: 2m
         labels: { severity: critical }
         annotations:
-          summary: "Brak odpowiedzi z uslugi semantycznej"
-          description: "Prometheus nie moze pobrac metryk z semantic-service:8001/metrics od ponad 2 minut. Krotkie przerwy w czasie startu (wczytywanie modeli) sa normalne i nie wyzwalaja alertu."
+          summary: "Zadna replika uslugi semantycznej nie odpowiada"
+          description: "Prometheus nie moze pobrac metryk z zadnej repliki od ponad 2 minut. Krotkie przerwy w czasie startu (wczytywanie modeli) sa normalne i nie wyzwalaja alertu."
+
+      - alert: SemanticReplicaLost
+        # Czesciowa utrata: czesc replik odpowiada, czesc nie. Ruch nadal idzie, ale zapas sie zmniejszyl.
+        expr: min(up{job="noorpointer-semantic"}) == 0 and max(up{job="noorpointer-semantic"}) == 1
+        for: 2m
+        labels: { severity: warning }
+        annotations:
+          summary: "Czesc replik uslugi semantycznej nie odpowiada"
+          description: "Przynajmniej jedna replika dziala, a przynajmniej jedna nie odpowiada. Prometheus pokazuje kazda replike jako osobny cel."
 
       - alert: ControlPlaneDown
         expr: up{job="noorpointer-controlplane"} == 0
