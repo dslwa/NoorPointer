@@ -1,0 +1,107 @@
+syntax = "proto3";
+
+package noorpointer.semantic.v1;
+
+option go_package = "github.com/dslwa/NoorPointer/gateway/gen/semanticv1;semanticv1";
+
+// SemanticService runs AI-based checks. It only scores; the gateway decides
+// block/redact/allow using thresholds from the policy file.
+service SemanticService {
+  rpc Analyze(AnalyzeRequest) returns (AnalyzeResponse);
+  rpc ScanArtifact(ScanArtifactRequest) returns (ScanArtifactResponse);
+}
+
+enum Check {
+  CHECK_UNSPECIFIED = 0;
+  CHECK_PROMPT_INJECTION = 1;   // DeBERTa classifier, score = P(injection)
+  CHECK_CONTENT_SAFETY = 2;     // Llama Guard, score 0/1 + categories
+  CHECK_PII_NER = 3;            // Presidio, spans
+  CHECK_SYSTEM_PROMPT_LEAK = 4; // OUTPUT only, compares against role=system messages
+}
+
+enum Direction {
+  DIRECTION_UNSPECIFIED = 0;
+  DIRECTION_INPUT = 1;  // agent -> model / tool
+  DIRECTION_OUTPUT = 2; // model / tool -> agent
+}
+
+enum Status {
+  STATUS_UNSPECIFIED = 0;
+  STATUS_OK = 1;
+  STATUS_TIMEOUT = 2; // gateway applies on_semantic_timeout (fail_open / fail_closed)
+  STATUS_ERROR = 3;
+}
+
+message Message {
+  string id = 1;      // sha256 of role+content, set by gateway (cache key, log correlation)
+  string role = 2;    // system | user | assistant | tool
+  string content = 3;
+}
+
+message CheckSpec {
+  Check check = 1;
+  uint32 timeout_ms = 2; // per-check budget from policy
+}
+
+message AnalyzeRequest {
+  string request_id = 1;
+  string agent_id = 2;
+  Direction direction = 3;
+  // INPUT: only messages not already in gateway cache.
+  // OUTPUT: the model/tool output as role=assistant|tool, plus original role=system messages.
+  repeated Message messages = 4;
+  repeated CheckSpec checks = 5;
+}
+
+message Span {
+  string message_id = 1;
+  uint32 start = 2;  // UTF-8 byte offset, inclusive
+  uint32 end = 3;    // UTF-8 byte offset, exclusive
+  string entity = 4; // EMAIL_ADDRESS, PERSON, IBAN_CODE, ...
+  float score = 5;
+}
+
+message CheckResult {
+  Check check = 1;
+  Status status = 2;
+  string message_id = 3;          // empty = verdict for the whole request
+  float score = 4;                // 0..1
+  repeated string categories = 5; // Llama Guard "S1".."S14"
+  repeated Span spans = 6;
+  uint32 latency_ms = 7;
+  string error = 8;
+}
+
+message AnalyzeResponse {
+  repeated CheckResult results = 1;
+}
+
+message ScanArtifactRequest {
+  string request_id = 1;
+  oneof source {
+    string url = 2;  // e.g. huggingface.co/.../pytorch_model.bin (from tool args)
+    string path = 3; // shared volume
+  }
+  uint64 max_bytes = 4; // refuse bigger downloads
+}
+
+enum Verdict {
+  VERDICT_UNSPECIFIED = 0;
+  VERDICT_SAFE = 1;       // safetensors / gguf, or pickle with only allowlisted globals
+  VERDICT_SUSPICIOUS = 2; // unknown globals (not on allowlist, not on denylist)
+  VERDICT_MALICIOUS = 3;  // denylisted globals: os.system, builtins.exec, ...
+}
+
+message ArtifactFinding {
+  string module = 1; // e.g. "posix"
+  string name = 2;   // e.g. "system"
+  Verdict verdict = 3;
+}
+
+message ScanArtifactResponse {
+  Verdict verdict = 1;
+  string format = 2; // pickle | pytorch_zip | safetensors | gguf | unknown
+  string sha256 = 3;
+  repeated ArtifactFinding findings = 4;
+  uint32 latency_ms = 5;
+}
