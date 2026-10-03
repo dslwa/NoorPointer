@@ -1,6 +1,8 @@
+import re
 import time
 
 from app.detectors.base import COST_MARGIN_S, CostModel, Detector, Rejected
+from app.language import guess_language, sentences
 from app.schemas import CheckResult, ScanRequest
 from app.workers import BoundedWorkers
 
@@ -8,6 +10,24 @@ MAX_TOKENS = 512
 WINDOW_BODY = MAX_TOKENS - 2  # room for [CLS] and [SEP]
 STRIDE = 128  # tokens shared by neighbouring windows, so an injection on a window boundary is seen whole
 BATCH = 16
+# A run of digits, possibly grouped by spaces, dashes, dots or slashes: PESEL, card and account numbers, dates.
+DIGIT_RUN = re.compile(r"\d(?:[\d \-./]*\d)?")
+MIN_MASKED_DIGITS = 4
+
+
+def mask_numbers(text: str) -> str:
+    """Replace each run of 4+ digits in English sentences with "N" before classification.
+
+    The classifier reads long digit runs as an attack: "My identification number is PESEL 95081212345." scored
+    0.97, so a prompt that should only be redacted was blocked. With "N" it scores 0.02, and every attack we
+    measured kept its 1.0 (the instruction is in the words, not the numbers). Polish sentences are left alone:
+    there the mask made things worse (a PESEL and phone number went from 0.23 to 0.98). "N" rather than a
+    placeholder like "<NUMBER>", which the model reads as template injection (0.99)."""
+    def mask(match: re.Match) -> str:
+        digits = sum(ch.isdigit() for ch in match.group())
+        return "N" if digits >= MIN_MASKED_DIGITS else match.group()
+
+    return "".join(DIGIT_RUN.sub(mask, s) if guess_language(s) == "en" else s for s in sentences(text))
 
 
 def token_windows(ids: list[int], body: int = WINDOW_BODY, overlap: int = STRIDE) -> list[list[int]]:
@@ -58,7 +78,7 @@ class PromptInjectionDetector(Detector):
 
     def _score(self, text: str, deadline: float | None, budget_s: float | None) -> tuple[float, int, int]:
         had_time = deadline is None or time.monotonic() < deadline
-        enc = self._encode(text)
+        enc = self._encode(mask_numbers(text))
         windows, seq_len = enc["input_ids"].shape
         what = f"prompt-injection scan of {windows} windows"
         if deadline is not None and had_time and windows > 1 and time.monotonic() >= deadline - COST_MARGIN_S:

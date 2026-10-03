@@ -2,7 +2,8 @@ import pytest
 
 from app.detectors.content_safety import parse_guard_output
 from app.detectors.leakage import LeakageDetector
-from app.detectors.pii import guess_language, valid_pesel
+from app.detectors.pii import valid_pesel
+from app.language import guess_language
 from app.schemas import ScanRequest
 
 SYSTEM_PROMPT = (
@@ -254,3 +255,24 @@ async def test_invisible_or_lookalike_characters_do_not_hide_a_leak(disguise):
 ])
 def test_guess_language(text, language):
     assert guess_language(text) == language
+
+
+@pytest.mark.parametrize("text, masked", [
+    ("My identification number is PESEL 95081212345.", "My identification number is PESEL N."),
+    ("Pay 4111 1111 1111 1111 by 2026-10-03.", "Pay N by N."),
+    ("Room 101, 3 pm.", "Room 101, 3 pm."),  # short numbers carry meaning and are kept
+    ("Mój PESEL to 95081212345.", "Mój PESEL to 95081212345."),  # the mask made Polish text worse
+    ("Call 601 234 567.\nMój PESEL to 95081212345.", "Call N.\nMój PESEL to 95081212345."),  # per sentence
+])
+def test_mask_numbers(text, masked):
+    from app.detectors.prompt_injection import mask_numbers
+
+    assert mask_numbers(text) == masked
+
+
+def test_sentences_join_back_to_the_text():
+    from app.language import sentences
+
+    text = "First one. Second?  Third!\nFourth line\n\nlast"
+    assert "".join(sentences(text)) == text
+    assert len(sentences(text)) == 5
