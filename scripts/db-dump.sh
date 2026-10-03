@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Kopia bazy audytu do backups/. Uruchamianie: make db-dump   (wymaga sudo - pg_dump w kontenerze)
-# Format custom, zeby dalo sie odtworzyc przez `make db-restore FILE=...`. OUT=sciezka zmienia miejsce.
+# Kopia bazy do katalogu backups/. Uruchamianie: make db-dump (wymaga sudo).
+# Odtworzenie: make db-restore FILE=backups/....dump
+
 set -euo pipefail
 cd "$(dirname "$0")/.."
 

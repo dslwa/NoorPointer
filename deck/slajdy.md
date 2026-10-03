@@ -100,12 +100,12 @@
 
 # Testy (20% oceny)
 
-- Dla każdej kontroli sprawdzamy dwie rzeczy: **dobra treść ma przejść, zła ma zostać zablokowana**. Razem 16 przypadków.
-- Testy pojedynczych części: brama w Go (4 zestawy) i zasady w Javie (3 zestawy). Testy Javy uruchamiamy w kontenerze, na osobnej bazie, żeby nie ruszyć danych z pokazu.
+- Dla każdej kontroli sprawdzamy dwie rzeczy: **dobra treść ma przejść, zła ma zostać zablokowana**. Razem 25 przypadków.
+- Testy pojedynczych części: brama w Go (5 pakietów z testami) i zasady w Javie (4 klasy testowe). Testy Javy uruchamiamy w kontenerze, na osobnej bazie, żeby nie ruszyć danych z pokazu.
 - Testy obciążeniowe: 3 scenariusze — zwykły ruch, atak oraz równoległe pytania jednego agenta (sprawdzamy, czy budżet liczy się poprawnie).
-- Dodatkowe sprawdzenia: 16 kontroli spójności systemu, 12 kontroli przed startem i sprawdzenie, czy w czasie działania nic nie ściągamy z internetu.
+- Dodatkowe sprawdzenia: 16 sprawdzeń spójności stosu, 14 kontroli przed startem i sprawdzenie, czy w czasie działania nic nie ściągamy z internetu.
 - Jedno polecenie dla osoby oceniającej: `sudo make jury` — sprawdza środowisko, uruchamia system, wszystkie testy, wysyła ruch na wykresy i zbiera dowody do katalogu `dowody/`.
-- Uczciwie: przechodzi **10 z 16** testów. Pozostałe 6 to kontrole, których brama jeszcze nie wykonuje. Odróżniamy dwie sytuacje: „kontroli jeszcze nie ma” (PENDING) i „kontrola jest, ale nie działa” (FAIL) — to nie to samo.
+- Uczciwie: część przypadków dotyczy kontroli, których brama jeszcze nie egzekwuje (sygnatury ataków, budżety, ogranicznik pętli, narzędzia MCP) — w raporcie są oznaczone jako „kontroli jeszcze nie ma” (PENDING), a nie udawane jako PASS. Odróżniamy też „kontrola jest, ale nie działa” (FAIL) — to nie to samo.
 
 ---
 
@@ -125,7 +125,7 @@
 # Stan i plan
 
 - **Działa dziś**: sprawdzanie przepustki (tokenu), zasady zmieniane od razu, lista sygnatur z panelem, cztery kontrole treści, sprawdzanie plików modeli, dziennik zdarzeń z eksportem, panel, wykresy z alertami, testy pojedynczych części.
-- **W toku**: brama jeszcze nie wykonuje zasad — zostało dokończyć 6 kontroli, dodać własne pomiary i wysyłanie zdarzeń z bramy do dziennika.
+- **W toku**: brama egzekwuje już allowlistę modeli, sekrety, redakcję PII i kontrole semantyczne; zostało dołączyć sygnatury ataków, budżety, ogranicznik pętli i listę narzędzi MCP oraz wysyłanie zdarzeń z bramy do dziennika i `GET /metrics`.
 - **Dlaczego to prawie gotowe**: zasady, sygnatury, budżety i format zdarzeń są już zrobione i działają. Zostało podłączenie ich do bramy.
 - **Plan**: dokończyć kontrole, zamrozić kod i wysłać zgłoszenie (termin: 4 października, godzina 23:00).
 - **Co może pójść nie tak i co z tym robimy**: brakujące pomiary → widoczny alert i opis w panelu; dane pokazowe → oznaczone jako demonstracyjne; niedokończone kontrole → pokazujemy je jako „jeszcze nie ma”, a nie udajemy, że działają.

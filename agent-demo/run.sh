@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# Pokazowy agent: wykonuje scenariusze przez brame i pokazuje, jak reaguje system.
+# Uzycie: ./agent-demo/run.sh [scenariusz]   (token podstawia make demo).
 set -e
 
 GATEWAY_URL="${GATEWAY_URL:-http://localhost:8080}"

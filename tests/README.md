@@ -60,11 +60,12 @@ docker compose run --rm -e GATEWAY_JWT="$(./scripts/token.sh)" tests
 
 ## Stan obecny
 
-Przechodzi **10 z 16** testów. Czerwone i ich przyczyny:
+Pakiet ma **25 przypadków** w parach dozwolone/blokowane. Brama egzekwuje już allowlistę modeli,
+sekrety, redakcję danych osobowych oraz kontrole semantyczne (prompt injection, content safety).
+Po stronie bramy otwarte pozostają jeszcze: sygnatury ataków, budżety, ogranicznik pętli i lista
+narzędzi MCP — przypadki ich dotyczące są w raporcie jako `PENDING` lub `FAIL`.
 
-| Testy | Przyczyna | Właściciel |
-| :--- | :--- | :--- |
-| `test_pii_pesel_redacted`, `test_secrets_api_key_blocked`, `test_prompt_injection_jailbreak_blocked`, `test_historical_exploit_shadowray_cve_blocked`, `test_budget_exceeded_rate_limited`, `test_loop_breaker_repeated_calls_terminated` | gateway nie egzekwuje jeszcze kontroli: sekrety, redakcja PII, prompt injection, sygnatury ataków, budżety, ogranicznik pętli | Go Developer |
+Aktualny wynik laufu: `reports/test_report.html` i `reports/INDEX.md` (polecenie: `sudo make test`).
 
 Testy wymagają tokenu w zmiennej `GATEWAY_JWT`. `make test` i `make test-local` wstrzykują go same,
 a jego brak przerywa pakiet czytelnym komunikatem zamiast serii odpowiedzi 401.

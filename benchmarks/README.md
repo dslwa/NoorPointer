@@ -63,6 +63,6 @@ podnoszeniem liczby klientów w teście.
   `mock-llm`. Po przełączeniu na prawdziwą Ollamę (`make ollama-up`) czasy rosną i progi trzeba
   podnieść — to ograniczenie sprzętowe, nie błąd gatewaya.
 - Parametry uruchomienia: `VUS` (liczba klientów), `DURATION` (czas obciążenia), `LATENCY_MS`
-  (budżet czasu na żądanie, domyślnie 1500 ms — zgodny z `semantic_timeout_ms` w polityce).
-- Budżet kontroli jest **danymi**: po pomiarach podnieśliśmy go z 300 ms do 1500 ms jedną rewizją
-  polityki, bez restartu i bez przebudowy obrazów.
+  (budżet czasu na żądanie, domyślnie 8000 ms — zgodny z `semantic_timeout_ms` w polityce).
+- Budżet kontroli jest **danymi**: podnieśliśmy go z 300 ms do 1500 ms, a potem do 8000 ms (bo zimny
+  start Llama Guarda trwa ok. 4 s) — samą zmianą rewizji polityki, bez restartu i przebudowy obrazów.

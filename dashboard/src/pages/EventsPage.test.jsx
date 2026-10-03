@@ -50,6 +50,10 @@ it('shows the gateway prompt check in Events and displays its persisted results 
   const dialog = await screen.findByRole('dialog');
   expect(within(dialog).getByText('Blocked')).toBeTruthy();
   expect(within(dialog).getByText('Policy version 12 · enforce mode')).toBeTruthy();
-  expect(within(dialog).getAllByText('Finding detected')).toHaveLength(2);
+  // the semantic score sits in its control's row, so the finding is listed once
+  expect(within(dialog).getAllByText('Finding detected')).toHaveLength(1);
+  expect(within(dialog).getByRole('progressbar', { name: 'Prompt injection score' }).value).toBe(
+    0.97,
+  );
   expect(request).toHaveBeenCalledWith('/audit-events/prompt-check-1');
 });

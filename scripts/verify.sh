@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
-# Zero-prep verification of the running stack: smoke + offline-check + demo scenarios.
-# Usage: ./scripts/verify.sh [--strict]
-#   --strict   treat PENDING scenarios (controls the gateway does not implement yet) as failures
-# Aggregates exit codes, so a failing smoke run is not masked by a passing last command.
+# Sprawdza dzialajacy system bez przygotowan: smoke + offline-check + scenariusze demo.
+# Uzycie: make verify   (--strict: scenariusze jeszcze nieobslugiwane licza sie jako blad).
+
 set -uo pipefail
 cd "$(dirname "$0")/.."
 mkdir -p reports

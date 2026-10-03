@@ -1,13 +1,8 @@
 #!/usr/bin/env bash
-# Dodaje nowa sygnature do feedu (regex), zeby pokazac aktualizacje regul bez restartu kontenera.
-#
-# Uzycie:
-#   ./signatures-feed/push_new_signature.sh
-#   PATTERN='(/etc/passwd|\.\./\.\./)' NAME='Path traversal' ./signatures-feed/push_new_signature.sh
-#   make new-signature PATTERN='...' NAME='...' ACTION=block
-#
-# Zmienne: PATTERN, NAME, ACTION (block|monitor), CATEGORY, TARGET_COMPONENT, CVE, DESCRIPTION, NEW_ID.
-# Wzorzec jest sprawdzany jako wyrazenie regularne Pythona - literowka nie trafi do feedu.
+# Dodaje nowa sygnature ataku do feedu (regex). Sygnatura jest widoczna od razu, bez restartu.
+# Uzycie: make new-signature PATTERN='(/etc/passwd|\.\./)' NAME='Path traversal'
+# Zmienne: PATTERN, NAME, ACTION, CATEGORY, TARGET_COMPONENT, CVE, DESCRIPTION, NEW_ID.
+
 set -euo pipefail
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

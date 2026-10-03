@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
-# Zapisuje aktywna polityke bezpieczenstwa do pliku, zeby mozna ja bylo edytowac w dowolnym
-# edytorze. Nic nie zmienia w systemie - to tylko zrzut do pliku.
-#
-# Uzycie: make policy-edit     (plik wynikowy: policy.local.json)
+# Zapisuje aktualne zasady do pliku policy.local.json, zeby mozna je bylo edytowac w edytorze.
+# Nic nie zmienia w systemie. Uzycie: make policy-edit
+
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -43,7 +42,7 @@ Gateway pobiera polityke co sekunde, wiec zmiana dziala bez restartu i bez przeb
 Przyklady zmian, ktore od razu widac:
 
   "controls.pii_regex.action":  "redact"  ->  "block"
-  "defaults.semantic_timeout_ms": 300     ->  500
+  "defaults.semantic_timeout_ms": 8000    ->  10000
   "controls.attack_signatures": dopisz wlasna regule (wzor lub fraze)
 
 TEXT

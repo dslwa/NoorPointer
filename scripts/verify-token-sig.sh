@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Verify an RS256 JWT signature against gateway/keys/jwt.pub (no deps beyond openssl+python3).
-# Usage: verify-token-sig.sh <token>
+# Sprawdza podpis tokenu JWT kluczem gateway/keys/jwt.pub.
+# Uzycie: verify-token-sig.sh <token>
+
 set -euo pipefail
 tok="$1"
 pub="${2:-$(cd "$(dirname "$0")/.." && pwd)/gateway/keys/jwt.pub}"

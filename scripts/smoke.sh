@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
-# Zero-prep smoke check of the whole stack. Usage: make smoke
+# Szybkie sprawdzenie, czy caly system odpowiada. Uruchamianie: make smoke
+# Sprawdza zdrowie uslug, dzialanie bramy i przyjmowanie tokenu.
+
 set -uo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"; cd "$ROOT"
 
@@ -69,6 +71,9 @@ else
     echo "        HINT: gateway rejects the minted token. It reads jwt.pub only at startup, so a"
     echo "              regenerated keypair needs: sudo docker compose up -d --force-recreate gateway"
     [[ -n "$GATEWAY_JWT" ]] && ./scripts/verify-token-sig.sh "$GATEWAY_JWT" 2>&1 | sed 's/^/        /'
+  elif [[ "$gw_code" == "404" ]]; then
+    echo "        HINT: the upstream does not know the model 'mock-llm'. This check assumes the mock"
+    echo "              upstream; on real Ollama (make up-real / make ollama-up) run: make ollama-down"
   fi
 fi
 rm -f "$gw_out"

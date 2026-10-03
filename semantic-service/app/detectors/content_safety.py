@@ -52,6 +52,9 @@ def neutralize(text: str) -> str:
 # longer text is rejected (always blocked by the gateway, never failed open).
 MAX_CHUNKS = 24
 MAX_SPLIT_DEPTH = 2
+# Ollama unloads an idle model after 5 minutes; reloading llama-guard3:1b on CPU took 4.4 s, far past any check
+# budget. -1 keeps it loaded while Ollama runs (about 1.6 GB of memory).
+KEEP_ALIVE = -1
 OLLAMA_CONCURRENCY = 4  # Llama Guard calls in flight per service; more just queue inside Ollama
 
 
@@ -122,6 +125,10 @@ class ContentSafetyDetector(Detector):
         names = {m["name"] for m in tags.get("models", [])}
         if self.model not in names and f"{self.model}:latest" not in names:
             raise RuntimeError(f"model {self.model} not pulled in Ollama (run: ollama pull {self.model})")
+        # Load the model into Ollama now, so the first real check doesn't pay for it.
+        httpx.post(f"{self.url}/api/chat", timeout=120, json={
+            "model": self.model, "messages": [{"role": "user", "content": "warm up"}], "stream": False,
+            "keep_alive": KEEP_ALIVE, "options": {"temperature": 0, "num_ctx": NUM_CTX}}).raise_for_status()
 
     async def _classify(self, text: str, prompt: str | None) -> tuple[bool, list[str]]:
         if prompt is None:
@@ -133,7 +140,7 @@ class ContentSafetyDetector(Detector):
             call_started = time.monotonic()
             resp = await self.client.post(
                 f"{self.url}/api/chat",
-                json={"model": self.model, "messages": messages, "stream": False,
+                json={"model": self.model, "messages": messages, "stream": False, "keep_alive": KEEP_ALIVE,
                       "options": {"temperature": 0, "num_ctx": NUM_CTX}},
             )
             self.cost.observe(_size(text), time.monotonic() - call_started)

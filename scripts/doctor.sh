@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Sprawdzenie stanu srodowiska. Uruchamianie: make doctor
-# Weryfikuje narzedzia, klucze JWT, konfiguracje compose, wystawianie tokenu oraz to, czy dzialajacy
-# gateway odrzuca ruch bez tokenu i przyjmuje token poprawny. Nie zmienia stanu stosu.
+# Sprawdza, czy srodowisko jest gotowe: narzedzia, klucze, konfiguracja, token i to, czy
+# dzialajaca brama odrzuca ruch bez tokenu. Uruchamianie: make doctor. Nic nie zmienia w systemie.
+
 set -uo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"; cd "$ROOT"
 
@@ -111,6 +111,7 @@ else
     401|403) no "token przyjety przez gateway" "$acc - dzialajacy gateway ma inny klucz publiczny niz gateway/keys/jwt.pub; uruchom: sudo docker compose up -d --force-recreate gateway" ;;
     503)     wn "token przyjety przez gateway" "503 - polityka nie zostala wczytana z control plane" ;;
     000)     wn "token przyjety przez gateway" "gateway nieosiagalny" ;;
+    404)     wn "token przyjety przez gateway" "404 - upstream nie zna modelu 'mock-llm'; ten test zaklada mocka, a stos chodzi na prawdziwej Ollamie - wroc na mocka: make ollama-down" ;;
     *)       wn "token przyjety przez gateway" "nieoczekiwany kod $acc" ;;
   esac
 fi

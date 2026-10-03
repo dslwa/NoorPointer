@@ -1,20 +1,8 @@
 #!/usr/bin/env bash
-# Uzupelnia katalog sygnatur w control plane. NICZEGO nie kasuje: wpisy dodane z panelu, wpisy
-# domyslne aplikacji i wpisy z feedu wspolistnieja, a powtorne uruchomienie konczy sie na "juz bylo".
-#
-# Zrodla (w tej kolejnosci):
-#   1. controlplane/src/main/resources/signatures/defaults.json - wbudowane reguly startowe aplikacji
-#      (ten sam plik czyta migracja V2; importujemy je takze tutaj, zeby katalog byl spojny wtedy,
-#      gdy migracja juz przebiegla, a wpisy zostaly skasowane);
-#   2. signatures-feed/signatures.json - nasz feed dla gatewaya (wzorce regex).
-#
-# Uwaga na dwa formaty: gateway czyta plik z nginx (regex, pelne wzorce), a control plane ma wlasny
-# kontrakt (match.type = literal, pola source/category/target). Ten skrypt nie zastepuje jednego
-# formatu drugim - pokazuje ten sam zestaw sygnatur w panelu, biorac z kazdego wzorca pierwsza
-# alternatywe jako wartosc doslowna. Pelna unifikacja formatow jest osobnym zadaniem.
-#
-# Endpoint: POST /api/v1/signatures (pojedynczy wpis, 409 = taki ID juz istnieje).
-# Nie uzywamy PUT /api/v1/signature-feed, bo on podmienia CALY katalog i kasuje wpisy dodane z panelu.
+# Uzupelnia katalog sygnatur w control plane. Nic nie kasuje - powtorne uruchomienie konczy sie
+# komunikatem "juz bylo". Zrodla: wbudowane reguly aplikacji i nasz feed (signatures-feed/signatures.json).
+# Uwaga: feed uzywa regex, a control plane wlasnego formatu (literal) - szczegoly w README.
+
 set -euo pipefail
 cd "$(dirname "$0")/.."
 

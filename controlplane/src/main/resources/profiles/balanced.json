@@ -1,7 +1,7 @@
 {
   "defaults": {
     "mode": "enforce",
-    "semantic_timeout_ms": 300,
+    "semantic_timeout_ms": 8000,
     "on_semantic_timeout": "fail_closed"
   },
   "models": {
@@ -18,7 +18,8 @@
         "email",
         "pesel",
         "iban",
-        "card"
+        "card",
+        "phone"
       ]
     },
     "secrets": {

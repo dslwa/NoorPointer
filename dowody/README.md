@@ -1,6 +1,6 @@
 # Dowody z dzialania systemu
 
-Wygenerowane **2026-10-03 21:53** z wersji kodu **1474222** poleceniem `make evidence`.
+Wygenerowane **2026-10-03 23:07** z wersji kodu **94e7efb** poleceniem `make evidence`.
 To zrzut wynikow, a nie dokumentacja opisowa - dokumentacje znajdziesz w głównym `README.md`,
 a instrukcje uruchomienia w `START.md`.
 
@@ -21,8 +21,8 @@ make evidence       # samo zebranie dowodow z katalogu reports/
 
 ## Uczciwa uwaga
 
-Liczby pochodzą z maszyny zespolu (Arch Linux, 12 wątków CPU), a nie z chmury. Testy e2e
-raportują 10 z 16 przechodzących przypadków: pozostałe sześć to kontrole bezpieczeństwa w bramie,
-które są w trakcie implementacji. Pakiet testów odróżnia stan `PENDING` (kontrola jeszcze nie
-istnieje) od `FAIL` (kontrola jest, ale nie działa) właśnie po to, żeby brak pracy nie wyglądał
-jak awaria.
+Liczby pochodzą z maszyny zespolu (Arch Linux, 8 wątków CPU), a nie z chmury. Pakiet testów e2e
+ma 25 przypadków w parach dozwolone/blokowane; część z nich dotyczy kontroli, których brama jeszcze
+nie egzekwuje (sygnatury ataków, budżety, ogranicznik pętli). Pakiet odróżnia stan `PENDING`
+(kontrola jeszcze nie istnieje) od `FAIL` (kontrola jest, ale nie działa) właśnie po to, żeby brak
+pracy nie wyglądał jak awaria.

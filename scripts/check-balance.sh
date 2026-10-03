@@ -1,11 +1,8 @@
 #!/usr/bin/env bash
-# Sprawdza, czy load balancer NAPRAWDE rozklada ruch na repliki.
-#
-# Sposob dzialania: kazda replika uslugi semantycznej liczy wykonane kontrole. Zapisujemy licznik
-# z kazdej repliki, wysylamy zadana liczbe zadan przez load balancer (port 8001) i porownujemy
-# przyrosty. Jeden kontener z calym ruchem = load balancing nie dziala.
-#
-# Uruchamianie: sudo make scale-check        (albo ./scripts/check-balance.sh 60)
+# Sprawdza, czy load balancer naprawde rozklada ruch na kopie uslugi AI.
+# Robi tak: zapisuje licznik z kazdej kopii, wysyla zadania przez load balancer i porownuje przyrosty.
+# Uruchamianie: sudo make scale-check   (albo ./scripts/check-balance.sh 60)
+
 set -euo pipefail
 cd "$(dirname "$0")/.."
 

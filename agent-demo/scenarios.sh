@@ -1,17 +1,8 @@
 #!/usr/bin/env bash
-# Advanced demo scenarios promised by agent-demo/README.md but missing from run.sh:
-#   runaway-loop, unauthorized-tool, budget-exhaust.
-#
-# Each scenario is judged against the gateway response:
-#   PASS    - blocked/limited as expected (guardrails active)
-#   PENDING - request was proxied (gateway has no guardrails yet) -> turns into PASS on its own
-#   FAIL    - wrong response (e.g. 401 without a JWT, 5xx, or unreachable gateway)
-#
-# Usage:
-#   ./agent-demo/scenarios.sh                 # PENDING is allowed (pre-guardrails)
-#   ./agent-demo/scenarios.sh --strict        # PENDING counts as FAIL (after gateway lands)
-#   ./agent-demo/scenarios.sh runaway-loop    # single scenario
-# Env: GATEWAY_URL, GATEWAY_JWT, EXHAUST_BURST
+# Trzy scenariusze ataku: petla agenta, nieuprzywilejowane narzedzie i przekroczenie budzetu.
+# Wynik kazdego: PASS (zablokowane), PENDING (brama jeszcze tego nie sprawdza) lub FAIL (zla odpowiedz).
+# Uzycie: ./agent-demo/scenarios.sh [--strict] [nazwa scenariusza]
+
 set -uo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"; cd "$ROOT"
 
@@ -61,7 +52,7 @@ judge() { # judge <name> <ok_codes> <marker_regex>
   elif [[ "$CODE" == "401" || "$CODE" == "403" && ! "$codes" == *"403"* ]]; then
     printf '  => FAIL (HTTP %s: missing/invalid JWT - run make keys && make token)\n' "$CODE"; fail=$((fail+1))
   elif [[ "$CODE" == "200" ]]; then
-    printf '  => PENDING (gateway has no guardrails yet; expected %s + /%s/)\n' "$codes" "$regex"; pending=$((pending+1))
+    printf '  => PENDING (gateway does not enforce this control yet; expected %s + /%s/)\n' "$codes" "$regex"; pending=$((pending+1))
   else
     printf '  => FAIL (expected %s + /%s/)\n' "$codes" "$regex"; fail=$((fail+1))
   fi

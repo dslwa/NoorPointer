@@ -1,25 +1,16 @@
-# NoorPointer - infrastructure / DevOps entrypoint.
+# NoorPointer - wejscie do infrastruktury (DevOps). Pelna lista komend: make help
+# Na start: sudo make up (uruchamia system), potem sudo make checkpoint (testy + dowody).
 #
-# Najkrotsza droga do dzialajacego stosu i dowodow:
-#   sudo make up          pelny stos + seed danych demo (upstream: mock LLM, runtime offline)
-#   make doctor           pre-flight: narzedzia, klucze, compose, token, wymuszanie auth
-#   sudo make test        e2e (seed + raport HTML)
-#   make verify           zero-prep: smoke + offline-check + scenariusze demo
-#   sudo make checkpoint  wszystko powyzsze + reports/INDEX.md + lista adresow
-#
-# Konwencja: komendy Makefile, ktore wolaja docker, uruchamiaj przez `sudo make ...`
-# (docker.sock jest root:docker). Skrypty czyste (curl) dzialaja bez sudo.
-# Grupy widac w `make help` (sekcje ##@).
+# Komendy, ktore uzywaja Dockera, uruchamiaj przez `sudo make ...` (Docker nalezy do roota).
+# Skrypty, ktore tylko pytaja dzialajace uslugi (curl), dzialaja bez sudo.
 
-# --- narzedzia i zmienne wspolne -------------------------------------------------------------------
 COMPOSE         ?= docker compose
-SEMANTIC_REPLICAS ?= 1  # liczba replik uslugi semantycznej (make up); zmien: make scale REPLIKI=3
+SEMANTIC_REPLICAS ?= 1  # ile kopii uslugi AI stawia make up (zmien: make scale REPLIKI=3)
 COMPOSE_ALL      = $(COMPOSE) --profile tests --profile bench
 OLLAMA_COMPOSE   = $(COMPOSE) -f docker-compose.yaml -f docker-compose.ollama.yaml
 PROM_TOKEN_FILE  = telemetry/.prometheus-admin-token
 
-# Mintujemy JWT raz na recipe. Pusty token zamienia kazde wywolanie gatewaya w 401, a $(...)
-# w Makefile cicho zwraca pusty string - dlatego twardo przerywamy.
+# Pusty token = kazde pytanie do bramy odbite (401), wiec od razu przerywamy komende.
 JWT_GUARD = jwt="$$(./scripts/token.sh)"; [ -n "$$jwt" ] || { echo "BLAD: pusty JWT - uruchom: make keys && make mint-build"; exit 1; }
 K6        = $(COMPOSE) run --rm -e GATEWAY_JWT="$$jwt" benchmarks run
 
@@ -34,7 +25,6 @@ K6        = $(COMPOSE) run --rm -e GATEWAY_JWT="$$jwt" benchmarks run
         lint \
         postgres-up postgres-test-up controlplane-run controlplane-test controlplane-build dashboard-dev dashboard-test
 
-# --- pomoc -----------------------------------------------------------------------------------------
 help: ## Lista komend pogrupowana w sekcje
 	@awk 'BEGIN {FS = ":.*## "} /^##@/ {printf "\n\033[1m%s\033[0m\n", substr($$0, 5)} /^[a-zA-Z_-]+:.*## / {printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 

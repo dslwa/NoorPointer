@@ -31,7 +31,7 @@ do sprawdzenia reguł przed ich włączeniem.
 | Katalog sygnatur | działa | 7 reguł startowych z migracji `V2__Seed_default_signatures` + 5 wpisów z naszego feedu; dodawanie z panelu i przez `make new-signature PATTERN='...'` |
 | Metryki i alerty | częściowo | Prometheus zbiera `semantic-service` (scrape naprawiony: `metrics_path: /metrics/` + `Host $http_host` w LB) i `controlplane`; gateway nie wystawia jeszcze `/metrics` |
 | Testy e2e | `tests/test_guardrails.py` — **25 przypadków** | pary dozwolone/blokowane (PII, sekrety, prompt injection, sygnatury, budżety, pętle, skaner modeli, hot-reload, eksport SIEM, kontrole semantyczne); aktualny wynik i lista otwartych pozycji w `reports/INDEX.md` |
-| Testy modułów | działają | `make test-unit` (Go, 4 pakiety), `sudo make test-semantic` (**181 testów**, 27 pominiętych markerem `models`) i `sudo make controlplane-test` (Java, 3 klasy, osobna baza `noorpointer_test`) |
+| Testy modułów | działają | `make test-unit` (Go, 5 pakietów z testami), `sudo make test-semantic` (**181 testów**, 27 pominiętych markerem `models`) i `sudo make controlplane-test` (Java, 4 klasy, osobna baza `noorpointer_test`) |
 
 Wniosek dla osób oceniających: działa cała otoczka wokół polityki (uwierzytelnianie, dystrybucja polityki,
 przeładowanie, audyt, panel, telemetria, testy), a w samej ścieżce żądania brama egzekwuje już allowlistę
@@ -220,13 +220,18 @@ Gateway pobiera ją z `GET {CONTROLPLANE_URL}/api/gateway/policy` (nagłówek `A
 Prototypowy `config/policy.yaml` został usunięty z repozytorium: nie był czytany przez żaden komponent,
 a jego format różnił się od poniższego. Kształt dokumentu, który widzi gateway:
 
+<!-- DEVOPS-REVIEW (2026-10-03): typ "phone" w pii_regex dopisany przez DevOps, nie przez Java/Go.
+     Zmiana w trzech profilach w controlplane/src/main/resources/profiles/ i w tym przykładzie.
+     Kod Go juz obslugiwal telefon (gateway/scan/rules.go) - brakowalo go tylko w danych polityki.
+     Zmiana czeka na review wlasciciela control plane. -->
+
 ```json
 {
   "version": 4,
-  "defaults": {"mode": "enforce", "semantic_timeout_ms": 1500, "on_semantic_timeout": "fail_closed"},
+  "defaults": {"mode": "enforce", "semantic_timeout_ms": 8000, "on_semantic_timeout": "fail_closed"},
   "models": {"allowed": ["llama3.1:8b", "llama3.2:1b", "mock-llm", "qwen2.5:7b"]},
   "controls": {
-    "pii_regex": {"enabled": true, "action": "redact", "types": ["email", "pesel", "iban", "card"]},
+    "pii_regex": {"enabled": true, "action": "redact", "types": ["email", "pesel", "iban", "card", "phone"]},
     "secrets": {"enabled": true, "action": "block"},
     "prompt_injection": {"enabled": true, "action": "block", "threshold": 0.85},
     "content_safety": {"enabled": true, "action": "block", "categories": ["S1", "S2", "S9"]},
@@ -301,7 +306,7 @@ Domyślnie (`make up`) mockowane są tylko te modele, które idą przez Ollamę:
 (DeBERTa) i dane osobowe (spaCy en+pl) to prawdziwe modele wbudowane w obraz usługi semantycznej,
 więc działają od razu po `make up`. Testy e2e i benchmarki zakładają odpowiedzi echo z mocka — przed
 nimi wróć na `make ollama-down`. Uwaga wydajnościowa: prawdziwy Llama Guard na CPU odpowiada ok. 0,9 s,
-a kontrola ma budżet `defaults.semantic_timeout_ms` (1500 ms) — na jednej maszynie to blisko limitu.
+a kontrola ma budżet `defaults.semantic_timeout_ms` (8000 ms) — z zapasem na zimny start (pierwsze zapytanie do Llama Guarda trwa ok. 4 s).
 
 Konfiguracja `docker-compose.ollama.yaml` nie publikuje portu Ollamy na hoście, więc nie koliduje
 z `mock-llm`. Pierwsza odpowiedź trwa dłużej (ładowanie modelu na CPU), a nazwa modelu musi być wpisana
@@ -423,7 +428,7 @@ Wagi i nazwy kryteriów są przepisane z regulaminu konkursu.
 | Kontrole i odporność (30%) | Kontrole deterministyczne i semantyczne: 4 detektory AI, skaner plików modeli, 12 sygnatur ataków, zasady jako dane z przeładowaniem bez restartu. Kontrole działają w usłudze semantycznej i są testowane; brama egzekwuje już allowlistę modeli, sekrety, redakcję PII i kontrole semantyczne, a otwarte pozostają sygnatury, budżety i ogranicznik pętli — brakujące elementy są wypisane w `reports/INDEX.md`. |
 | Architektura i wydajność (20%) | Rozdzielone płaszczyzny: brama (Go), zasady i audyt (Java), kontrole AI (Python w replikach), panel i telemetria. Pomiary: `make bench` (k6, p95 2,28 ms przy 50 klientach) oraz `make bench-semantic` (przepustowość kontroli AI i efekt skalowania). |
 | Raportowanie bezpieczeństwa (20%) | Panel z incydentami, wersjami zasad, katalogiem sygnatur i budżetami; eksport CEF/JSON/CSV do SIEM z filtrami; 9 reguł alertów i tablice Grafany. Dziennik jest zasilany danymi demonstracyjnymi (oznaczonymi jako `synthetic`), bo brama nie wysyła jeszcze własnych zdarzeń. |
-| Kompletność pakietu testów (20%) | **181** testów usługi semantycznej (`make test-semantic`), 37 modułu Java, 31 testów panelu, 4 pakiety Go, **25 przypadków e2e**, 3 scenariusze obciążeniowe, 16 sprawdzeń stosu, 12 kontroli przed startem, 9 sprawdzeń trybu offline. Wszystko uruchamiane z `make`, a ścieżka dla osoby oceniającej jest jedną komendą: `sudo make jury`. |
+| Kompletność pakietu testów (20%) | **181** testów usługi semantycznej (`make test-semantic`), **25 przypadków e2e**, 3 scenariusze obciążeniowe, 16 sprawdzeń stosu, 14 kontroli przed startem, 9 sprawdzeń trybu offline, a do tego testy modułów Go, Java i panelu. Wszystko uruchamiane z `make`, a ścieżka dla osoby oceniającej jest jedną komendą: `sudo make jury`. |
 | Wdrożenie i skalowanie (10%) | Start całego stosu jedną komendą, brak pobierania czegokolwiek w czasie działania (`make offline-check`), podmiana modelu bez zmian w kodzie oraz skalowanie poziome usługi semantycznej z dowodem rozkładu ruchu (`make scale`, `make scale-check`). |
 
 ## Zasady pracy w zespole

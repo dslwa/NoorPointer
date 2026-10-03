@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
-# Wystawia token JWT dla gatewaya (RS256, iss=noorpointer-cp, aud=noorpointer-gateway). Wypisuje sam token.
-# Uruchamianie: ./scripts/token.sh   (zmienne: AGENT, TEAM, TTL, JWT_PRIVATE_KEY)
-#
-# Przy bledzie konczy sie niezerowym kodem i komunikatem. Pusty token powoduje odpowiedz 401 na kazdym
-# zadaniu do gatewaya, a w Makefile wynik $(...) wyglada wtedy jak poprawna, pusta wartosc.
+# Wystawia token JWT dla bramy i wypisuje sam token. Uruchamianie: ./scripts/token.sh
+# Zmienne: AGENT, TEAM, TTL, JWT_PRIVATE_KEY. Przy bledzie konczy sie bledem - pusty token
+# oznacza 401 na kazdym zadaniu, wiec nie wolno tego zignorowac.
+
 set -euo pipefail
 repo="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$repo/gateway"

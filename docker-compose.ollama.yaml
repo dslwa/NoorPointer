@@ -1,10 +1,9 @@
-# Optional real models. Use together with docker-compose.yaml.
-# Start ollama and pull llama3.2:1b (gateway upstream) and llama-guard3:1b (content safety) first: make ollama-up.
+# Dodatek do docker-compose.yaml: zamienia zastepczy model na prawdziwa Ollame.
+# Uruchomienie: make ollama-up (najpierw pobiera modele).
 services:
   ollama:
     image: ollama/ollama:0.35.1
-    # Limit pamieci: llama3.2:1b + llama-guard3:1b to ok. 3-4 GB, 10g zostawia zapas na
-    # kontekst, a chroni host, gdy model sie rozjedzie.
+    # Dwa modele zajmuja ok. 3-4 GB; 10g zostawia zapas i chroni komputer, gdy model sie rozjedzie.
     mem_limit: 10g
     environment:
       - OLLAMA_HOST=0.0.0.0:11434
@@ -17,7 +16,7 @@ services:
       retries: 5
       start_period: 10s
     restart: unless-stopped
-    # Ten plik nie uzywa kotwicy x-service z docker-compose.yaml, wiec rotacje logow ustawiamy osobno.
+    # Ten plik nie korzysta ze wspolnego bloku, wiec rotacje logow ustawiamy tutaj osobno.
     logging:
       driver: json-file
       options:
@@ -33,10 +32,8 @@ services:
       ollama:
         condition: service_healthy
 
-  # content_safety asks the real Llama Guard instead of the mock's keyword list.
-  # Nazwa musi byc `semantic-app` (serwis z docker-compose.yaml). `semantic-lb` dziedziczy
-  # dla ruchu alias `semantic-service`, ale nie jest serwisem, ktory mozna tu nadpisac -
-  # wpis `semantic-service` tworzyl serwis bez obrazu i psul `make ollama-up`.
+  # Nazwa musi byc "semantic-app" - tak nazywa sie usluga w docker-compose.yaml.
+  # Wpis "semantic-service" tworzyl nowa usluge bez obrazu i psul make ollama-up.
   semantic-app:
     environment:
       - OLLAMA_URL=http://ollama:11434
