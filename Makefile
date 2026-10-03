@@ -51,8 +51,9 @@ controlplane-test: postgres-test-up ## Uruchamia testy modułu Java na osobnej b
 controlplane-build: postgres-test-up ## Sprawdza Javę na PostgreSQL i buduje JAR z frontendem z dashboard/
 	cd controlplane && ./mvnw verify
 
-smoke: ## Sprawdza spięcie całego stosu (health + proxy + auth controlplane)
-	./scripts/smoke.sh
+smoke: ## Sprawdza spięcie całego stosu (health + proxy + auth controlplane), zapisuje reports/smoke.txt
+	@mkdir -p reports
+	./scripts/smoke.sh | tee reports/smoke.txt
 
 bench-flood: ## k6: zalew złośliwych promptów (fast-block)
 	docker compose run --rm benchmarks run /benchmarks/benchmark_malicious_flood.js
