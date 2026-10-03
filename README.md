@@ -54,6 +54,11 @@ make verify          # smoke + offline-check + scenariusze demo (bez przygotowan
 sudo make checkpoint # wszystko powyżej + reports/INDEX.md + lista adresów
 ```
 
+Limity pamięci kontenerów (`mem_limit`) są dobrane pod maszynę 31 GiB / 8 wątków: semantyka 4 GB,
+control plane 2 GB, reszta 128–1024 MB. To miękkie bezpieczniki chroniące host przed jednym rozbieganym
+procesem; na mniejszej maszynie obniż je w `docker-compose.yaml`. Logi kontenerów mają rotację
+(`max-size: 10m`, `max-file: 3`), żeby `json-file` nie rósł bez limitu na długo działającym stosie.
+
 `make help` wypisuje wszystkie polecenia z podziałem na sekcje. Polecenia uruchamiane pojedynczo:
 
 ```bash

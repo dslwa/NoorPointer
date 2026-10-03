@@ -1,4 +1,4 @@
-FROM node:24-alpine AS frontend
+FROM node:24.21-alpine AS frontend
 WORKDIR /dashboard
 COPY dashboard/package.json dashboard/package-lock.json ./
 RUN npm ci --no-audit --no-fund
