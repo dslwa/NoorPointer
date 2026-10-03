@@ -8,6 +8,7 @@ import pytest
 GATEWAY_URL = os.getenv("GATEWAY_URL", "http://localhost:8080")
 SEMANTIC_URL = os.getenv("SEMANTIC_URL", "http://localhost:8001")
 CONTROLPLANE_URL = os.getenv("CONTROLPLANE_URL", "http://localhost:8082")
+ADMIN_TOKEN = os.getenv("ADMIN_TOKEN", "local-dev-admin")
 
 def send_chat_completion(content: str, agent_id: str = "agent-test-01", headers: dict = None):
     url = f"{GATEWAY_URL}/v1/chat/completions"
@@ -146,6 +147,6 @@ def test_policy_hot_reload():
 
 def test_audit_logs_siem_cef_export():
     """Weryfikacja formatu CEF dla systemów SIEM (Splunk, Sentinel)"""
-    resp = requests.get(f"{CONTROLPLANE_URL}/api/v1/audit/export?format=cef", timeout=3)
+    resp = requests.get(f"{CONTROLPLANE_URL}/api/v1/audit/export?format=cef", headers={"Authorization": f"Bearer {ADMIN_TOKEN}"}, timeout=3)
     assert resp.status_code == 200
     assert "CEF:0|NoorPointer" in resp.text

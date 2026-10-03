@@ -1,0 +1,32 @@
+server:
+  address: ${SERVER_ADDRESS:127.0.0.1}
+  port: ${PORT:8082}
+  error:
+    include-message: never
+spring:
+  application:
+    name: noorpointer-control-plane
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/noorpointer?currentSchema=controlplane}
+    username: ${DATABASE_USER:noor}
+    password: ${DATABASE_PASSWORD:noorpass}
+    driver-class-name: org.postgresql.Driver
+  flyway:
+    schemas: controlplane
+    default-schema: controlplane
+  jackson:
+    property-naming-strategy: SNAKE_CASE
+    deserialization:
+      fail-on-unknown-properties: true
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus
+  endpoint:
+    health:
+      show-details: never
+control-plane:
+  admin-token: ${ADMIN_TOKEN:local-dev-admin}
+  gateway-token: ${GATEWAY_TOKEN:local-dev-gateway}
+  demo-enabled: ${DEMO_ENABLED:true}

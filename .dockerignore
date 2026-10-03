@@ -1,0 +1,11 @@
+.git
+.idea
+.cache
+**/target
+**/data
+**/__pycache__
+**/.venv
+reports
+.env
+**/node_modules
+**/dist

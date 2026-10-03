@@ -1,0 +1,78 @@
+{
+  "defaults": {
+    "mode": "enforce",
+    "semantic_timeout_ms": 300,
+    "on_semantic_timeout": "fail_closed"
+  },
+  "models": {
+    "allowed": [
+      "llama3.1:8b",
+      "qwen2.5:7b"
+    ]
+  },
+  "controls": {
+    "pii_regex": {
+      "enabled": true,
+      "action": "redact",
+      "types": [
+        "email",
+        "pesel",
+        "iban",
+        "card"
+      ]
+    },
+    "secrets": {
+      "enabled": true,
+      "action": "block"
+    },
+    "prompt_injection": {
+      "enabled": true,
+      "action": "block",
+      "threshold": 0.85
+    },
+    "content_safety": {
+      "enabled": true,
+      "action": "block",
+      "categories": [
+        "S1",
+        "S2",
+        "S9"
+      ]
+    },
+    "attack_signatures": {
+      "enabled": true,
+      "action": "block",
+      "refresh_s": 60
+    },
+    "agent_loops": {
+      "enabled": true,
+      "action": "block",
+      "max_steps": 25,
+      "max_identical_tool_calls": 3
+    },
+    "mcp_tools": {
+      "enabled": true,
+      "action": "block",
+      "allowed": {
+        "demo-agent": [
+          "search",
+          "calculator"
+        ]
+      },
+      "pinned_hashes": {}
+    }
+  },
+  "budgets": [
+    {
+      "subject": "team:finance",
+      "monthly_usd": 50,
+      "daily_tokens": 200000,
+      "on_exceed": "block"
+    },
+    {
+      "subject": "model:local/*",
+      "gpu_seconds_per_hour": 600,
+      "on_exceed": "block"
+    }
+  ]
+}

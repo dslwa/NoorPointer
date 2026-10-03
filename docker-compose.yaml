@@ -17,11 +17,20 @@ services:
       - SEMANTIC_URL=http://semantic-service:8001
       - SEMANTIC_GRPC_URL=semantic-service:50051
       - CONTROLPLANE_URL=http://controlplane:8082
-      - UPSTREAM_LLM_URL=http://ollama:11434/v1
+      - GATEWAY_TOKEN=${GATEWAY_TOKEN:-local-dev-gateway}
+      - UPSTREAM_LLM_URL=http://mock-llm:11434
       - POLICY_FILE=/app/config/policy.yaml
       - SIGNATURES_FEED_URL=http://signatures-feed:8085/signatures.json
+      - JWT_PUBLIC_KEY=/etc/noorpointer/jwt.pub
     volumes:
       - ./config/policy.yaml:/app/config/policy.yaml:ro
+      - ./gateway/keys/jwt.pub:/etc/noorpointer/jwt.pub:ro
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:8080/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
     depends_on:
       redis:
         condition: service_healthy
@@ -29,6 +38,10 @@ services:
         condition: service_started
       signatures-feed:
         condition: service_started
+      controlplane:
+        condition: service_healthy
+      mock-llm:
+        condition: service_healthy
     restart: unless-stopped
     networks:
       - noorpointer-net
@@ -47,9 +60,13 @@ services:
     environment:
       - PORT=8001
       - GRPC_PORT=50051
-      - TIMEOUT_MS=200
+      - OLLAMA_URL=http://mock-llm:11434
+      - GUARD_MODEL=llama-guard3:1b
+      - TORCH_THREADS=4
       - PYTHONUNBUFFERED=1
-      - OLLAMA_URL=http://ollama:11434 # Llama Guard for content_safety (needs: ollama pull llama-guard3:1b)
+    depends_on:
+      mock-llm:
+        condition: service_healthy
     restart: unless-stopped
     networks:
       - noorpointer-net
@@ -59,16 +76,22 @@ services:
   # ========================================================
   controlplane:
     build:
-      context: ./controlplane
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: controlplane/Dockerfile
     container_name: noorpointer-controlplane
     ports:
       - "8082:8082" # REST API /api/v1
     environment:
       - PORT=8082
-      - DATABASE_URL=postgres://noor:noorpass@postgres:5432/noorpointer?sslmode=disable
-      - SIGNATURES_FEED_URL=http://signatures-feed:8085/signatures.json
-      - GATEWAY_RELOAD_URL=http://gateway:8080/admin/policy/reload
+      - SERVER_ADDRESS=0.0.0.0
+      - DATABASE_URL=jdbc:postgresql://postgres:5432/noorpointer?currentSchema=controlplane
+      - DATABASE_USER=noor
+      - DATABASE_PASSWORD=noorpass
+      - SPRING_FLYWAY_SCHEMAS=controlplane
+      - SPRING_FLYWAY_DEFAULT_SCHEMA=controlplane
+      - ADMIN_TOKEN=${ADMIN_TOKEN:-local-dev-admin}
+      - GATEWAY_TOKEN=${GATEWAY_TOKEN:-local-dev-gateway}
+      - DEMO_ENABLED=${DEMO_ENABLED:-true}
     depends_on:
       postgres:
         condition: service_healthy
@@ -79,7 +102,7 @@ services:
       - noorpointer-net
 
   # ========================================================
-  # MANAGEMENT & SECURITY DASHBOARD (React UI)
+  # MANAGEMENT & SECURITY DASHBOARD (React + Vite + Nginx API proxy)
   # ========================================================
   dashboard:
     build:
@@ -88,11 +111,15 @@ services:
     container_name: noorpointer-dashboard
     ports:
       - "3000:3000"
-    environment:
-      - VITE_CONTROLPLANE_API=http://localhost:8082/api/v1
-      - VITE_GRAFANA_URL=http://localhost:3001
     depends_on:
-      - controlplane
+      controlplane:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:3000/"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
     restart: unless-stopped
     networks:
       - noorpointer-net
@@ -151,15 +178,16 @@ services:
       - noorpointer-net
 
   # ========================================================
-  # UPSTREAM LOCAL LLM (Ollama llama3.2:1b)
+  # MOCK LLM UPSTREAM (OpenAI- + Ollama-compatible, zero deps)
+  # Swap for real Ollama/OpenAI later via UPSTREAM_LLM_URL / OLLAMA_URL.
   # ========================================================
-  ollama:
-    image: ollama/ollama:latest
-    container_name: noorpointer-ollama
+  mock-llm:
+    build:
+      context: ./mock-llm
+      dockerfile: Dockerfile
+    container_name: noorpointer-mock-llm
     ports:
-      - "11434:11434"
-    volumes:
-      - ollama-models:/root/.ollama
+      - "11434:11434" # drop-in for the old ollama port (curl debugging)
     restart: unless-stopped
     networks:
       - noorpointer-net
@@ -174,6 +202,7 @@ services:
       - "9091:9090" # Zewnętrzny 9091 (unikamy konfliktu z gateway:9090)
     volumes:
       - ./telemetry/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./telemetry/alert.rules.yml:/etc/prometheus/alert.rules.yml:ro
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
       - "--storage.tsdb.path=/prometheus"
@@ -212,6 +241,7 @@ services:
     environment:
       - GATEWAY_URL=http://gateway:8080
       - CONTROLPLANE_URL=http://controlplane:8082
+      - ADMIN_TOKEN=${ADMIN_TOKEN:-local-dev-admin}
       - SEMANTIC_URL=http://semantic-service:8001
     volumes:
       - ./reports:/app/reports
@@ -239,4 +269,3 @@ networks:
 
 volumes:
   postgres-data:
-  ollama-models:

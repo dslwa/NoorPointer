@@ -1,0 +1,334 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "NoorPointer gateway policy",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "defaults",
+    "models",
+    "controls"
+  ],
+  "properties": {
+    "version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "defaults": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode",
+        "semantic_timeout_ms",
+        "on_semantic_timeout"
+      ],
+      "properties": {
+        "mode": {
+          "enum": [
+            "enforce",
+            "monitor"
+          ]
+        },
+        "semantic_timeout_ms": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10000
+        },
+        "on_semantic_timeout": {
+          "enum": [
+            "fail_open",
+            "fail_closed"
+          ]
+        }
+      }
+    },
+    "models": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "allowed"
+      ],
+      "properties": {
+        "allowed": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 100,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          }
+        }
+      }
+    },
+    "controls": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "pii_regex": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "enabled",
+            "action",
+            "types"
+          ],
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "action": {
+              "enum": [
+                "block",
+                "redact",
+                "monitor"
+              ]
+            },
+            "types": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "enum": [
+                  "email",
+                  "pesel",
+                  "iban",
+                  "card",
+                  "phone"
+                ]
+              }
+            }
+          }
+        },
+        "secrets": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "enabled",
+            "action"
+          ],
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "action": {
+              "enum": [
+                "block",
+                "redact",
+                "monitor"
+              ]
+            }
+          }
+        },
+        "prompt_injection": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "enabled",
+            "action",
+            "threshold"
+          ],
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "action": {
+              "enum": [
+                "block",
+                "redact",
+                "monitor"
+              ]
+            },
+            "threshold": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          }
+        },
+        "content_safety": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "enabled",
+            "action",
+            "categories"
+          ],
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "action": {
+              "enum": [
+                "block",
+                "redact",
+                "monitor"
+              ]
+            },
+            "categories": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "pattern": "^S([1-9]|1[0-4])$"
+              }
+            }
+          }
+        },
+        "attack_signatures": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "enabled",
+            "action",
+            "refresh_s"
+          ],
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "action": {
+              "enum": [
+                "block",
+                "redact",
+                "monitor"
+              ]
+            },
+            "refresh_s": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 86400
+            }
+          }
+        },
+        "agent_loops": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "enabled",
+            "action",
+            "max_steps",
+            "max_identical_tool_calls"
+          ],
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "action": {
+              "enum": [
+                "block",
+                "redact",
+                "monitor"
+              ]
+            },
+            "max_steps": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "max_identical_tool_calls": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        },
+        "mcp_tools": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "enabled",
+            "action",
+            "allowed"
+          ],
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "action": {
+              "enum": [
+                "block",
+                "redact",
+                "monitor"
+              ]
+            },
+            "allowed": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "array",
+                "uniqueItems": true,
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 120
+                }
+              }
+            },
+            "pinned_hashes": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            }
+          }
+        }
+      }
+    },
+    "budgets": {
+      "type": "array",
+      "maxItems": 100,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "subject",
+          "on_exceed"
+        ],
+        "anyOf": [
+          {
+            "required": [
+              "monthly_usd"
+            ]
+          },
+          {
+            "required": [
+              "daily_tokens"
+            ]
+          },
+          {
+            "required": [
+              "gpu_seconds_per_hour"
+            ]
+          }
+        ],
+        "properties": {
+          "subject": {
+            "type": "string",
+            "pattern": "^(agent|team|model):[^\\s]+$",
+            "maxLength": 120
+          },
+          "monthly_usd": {
+            "type": "number",
+            "minimum": 0
+          },
+          "daily_tokens": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "gpu_seconds_per_hour": {
+            "type": "number",
+            "minimum": 0
+          },
+          "on_exceed": {
+            "enum": [
+              "block",
+              "downgrade_model",
+              "alert"
+            ]
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,5 +1,16 @@
 # 🧠 Semantic Service (AI Guardrails & Exploit Scanner)
 
+## Aktualna implementacja
+
+Serwis uruchamia się przez `uvicorn app.main:app --host 0.0.0.0 --port 8001 --loop asyncio` (Python 3.12, zależności w `pyproject.toml` i `uv.lock`). Dockerfile buduje tę wersję.
+
+- HTTP: `POST /v1/scan`, `POST /v1/scan/model`, `POST /v1/scan/model/hf`, `GET /healthz`, `GET /readyz`.
+- gRPC: port `50051`, kontrakt w `../proto/semantic/v1/semantic.proto`.
+- Kontrole: DeBERTa prompt injection, Presidio/spaCy PII, Llama Guard przez Ollamę, leakage i picklescan. Compose ustawia `OLLAMA_URL=http://mock-llm:11434` (mock odpowiada werdyktem Llama Guard); z prawdziwą Ollamą trzeba wskazać jej adres i zrobić `ollama pull llama-guard3:1b`.
+- Testy jednostkowe i gRPC: `uv run pytest`; testy z rzeczywistymi modelami: `uv run pytest -m models`.
+
+Prototypowe `server.py`, `requirements.txt` i `guardrails.proto` zostały usunięte; poniższy zakres zespołu częściowo opisuje pierwotny plan.
+
 ## 👤 Właściciel (Owner)
 **Python Developer**
 

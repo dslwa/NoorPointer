@@ -1,0 +1,48 @@
+groups:
+  - name: noorpointer
+    rules:
+      # --- availability ----------------------------------------------------------------------------------
+      - alert: GatewayDown
+        expr: up{job="noorpointer-gateway"} == 0
+        for: 30s
+        labels: { severity: critical }
+        annotations:
+          summary: "Gateway metrics endpoint down"
+          description: "Prometheus cannot scrape gateway:9090/metrics (missing or crashed)."
+
+      - alert: SemanticDown
+        expr: up{job="noorpointer-semantic"} == 0
+        for: 30s
+        labels: { severity: critical }
+        annotations:
+          summary: "Semantic service down"
+
+      - alert: ControlPlaneDown
+        expr: up{job="noorpointer-controlplane"} == 0
+        for: 30s
+        labels: { severity: critical }
+        annotations:
+          summary: "Control plane down (or metrics auth broke)"
+
+      # --- semantic guardrails (SLA 200 ms, fail-closed) ---------------------------------------------------
+      - alert: SemanticSlow
+        expr: histogram_quantile(0.95, sum(rate(semantic_check_latency_seconds_bucket[1m])) by (le)) > 0.2
+        for: 1m
+        labels: { severity: warning }
+        annotations:
+          summary: "Semantic p95 above 200 ms SLA"
+
+      - alert: SemanticCheckFailing
+        expr: sum(rate(semantic_check_latency_seconds_count{status=~"error|timeout"}[1m])) > 0
+        for: 1m
+        labels: { severity: warning }
+        annotations:
+          summary: "Semantic checks erroring/timing out (gateway falls back per on_timeout policy)"
+
+      # --- data plane (comes alive once the gateway exposes /metrics) --------------------------------------
+      - alert: GatewayBlockSpike
+        expr: sum(rate(gateway_requests_total{action="blocked"}[1m])) > 5
+        for: 1m
+        labels: { severity: info }
+        annotations:
+          summary: "Blocked requests spike (>5/s)"
