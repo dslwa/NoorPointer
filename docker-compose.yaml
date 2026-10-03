@@ -1,5 +1,5 @@
 # Wspolne ustawienia serwisow dlugotrwalych (restart + siec). Serwisy jednorazowe
-# (tests, benchmarks) ustawiaja tylko siec - bez restart policy.
+# (tests, benchmarks, semantic-tests, controlplane-tests) ustawiaja tylko siec - bez restart policy.
 x-service: &service
   restart: unless-stopped
   networks: [noorpointer-net]
@@ -335,7 +335,7 @@ services:
   # Testy modulu Java. Uruchamiamy je w obrazie uzywanym do budowy control plane (etap `build` ma juz
   # pobrane zaleznosci Mavena, wiec nie trzeba instalowac Javy na hoscie). Baza testowa pochodzi
   # z `make postgres-test-up`: postgres-test-up tworzy ja, ten serwis tylko sie do niej podlacza.
-  # Testy modulu semantycznego (117 przypadkow). Obraz jest produkcyjny, bez zaleznosci deweloperskich,
+  # Testy modulu semantycznego (181 przypadkow, 27 pominietych markerem "models"). Obraz jest produkcyjny, bez zaleznosci deweloperskich,
   # wiec dokladamy grupe "dev" (pytest) i montujemy katalog testow z repozytorium - testujemy dokladnie
   # ten kod, ktory jest w repo. Testy z markerem "models" sa domyslnie pomijane (wymagaja pobrania modeli).
   semantic-tests:

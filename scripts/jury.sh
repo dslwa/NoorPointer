@@ -55,7 +55,7 @@ krok "3/8 Testy modulowe (Java, w kontenerze, na osobnej bazie)" reports/log-jav
 krok "4/8 Testy panelu operacyjnego (React, bez uruchamiania backendow)" reports/log-jury-dashboard.txt \
   "Test Files|Tests  |✓" $MAKE dashboard-test
 
-krok "5/8 Testy e2e (16 przypadkow: dobra tresc przechodzi, zla jest blokowana)" reports/log-jury-e2e.txt \
+krok "5/8 Testy e2e (25 przypadkow: dobra tresc przechodzi, zla jest blokowana)" reports/log-jury-e2e.txt \
   "PASSED|FAILED|[0-9]+ (failed|passed)" $MAKE test
 
 krok "6/8 Ruch na panele Grafany" reports/log-jury-traffic.txt \
@@ -74,14 +74,14 @@ panel="$(grep -oE "Tests  +[0-9]+ passed" reports/log-jury-dashboard.txt | tail 
 
 step "8/8 Podsumowanie"
 cat <<TEXT
-  stos            uslugi dzialajace: $uslugi z 10
-  testy Go        $go_status (4 pakiety)
+  stos            uslugi dzialajace: $uslugi z 11
+  testy Go        $go_status (5 pakietow z testami)
   testy Java      ${java:-brak wyniku}
   testy panelu    ${panel:-brak wyniku}
   testy e2e       ${e2e:-brak wyniku}
-  razem           68 testow modulowych (Java 37, panel 31) + 4 pakiety testow Go
-                  + 16 przypadkow e2e, 16 sprawdzen stosu, 12 kontroli przed startem, 9 sprawdzen offline
-                  (osobno: 117 testow modulu semantycznego - uruchom: make test-semantic)
+  razem           testy modulowe (Java, panel - wyniki wyzej) + 5 pakietow testow Go
+                  + 25 przypadkow e2e, 16 sprawdzen stosu, 14 kontroli przed startem, 9 sprawdzen offline
+                  (osobno: 181 testow modulu semantycznego - uruchom: make test-semantic)
   dowody          dowody/ (raport, sprawdzenia stosu, raport testow, prezentacja PDF)
 
   Adresy:
@@ -96,9 +96,10 @@ cat <<'TEXT'
     panel: http://localhost:3000 (token local-dev-admin)   wykresy: http://localhost:3001
     Prometheus: http://localhost:9091/targets oraz /alerts
 
-  Czego jeszcze nie ma: brama nie wykonuje jeszcze 6 kontroli (stad 6 z 16 testow e2e
-  jest niezrealizowanych) i nie wystawia /metrics (jeden panel Grafany jest pusty, a alert
-  GatewayMetricsMissing zniknie sam po dodaniu metryk). Szczegoly: START.md.
+  Czego jeszcze nie ma: brama nie egzekwuje jeszcze sygnatur atakow, budzetow, ogranicznika petli
+  i listy narzedzi MCP, nie wystawia /metrics (jeden panel Grafany jest pusty, a alert
+  GatewayMetricsMissing zniknie sam po dodaniu metryki) i nie wysyla zdarzen audytowych.
+  Szczegoly: START.md oraz reports/INDEX.md.
 
   Zatrzymanie stosu: sudo make stop
 TEXT

@@ -31,7 +31,7 @@ do sprawdzenia reguł przed ich włączeniem.
 | Katalog sygnatur | działa | 7 reguł startowych z migracji `V2__Seed_default_signatures` + 5 wpisów z naszego feedu; dodawanie z panelu i przez `make new-signature PATTERN='...'` |
 | Metryki i alerty | częściowo | Prometheus zbiera `semantic-service` (scrape naprawiony: `metrics_path: /metrics/` + `Host $http_host` w LB) i `controlplane`; gateway nie wystawia jeszcze `/metrics` |
 | Testy e2e | `tests/test_guardrails.py` — **25 przypadków** | pary dozwolone/blokowane (PII, sekrety, prompt injection, sygnatury, budżety, pętle, skaner modeli, hot-reload, eksport SIEM, kontrole semantyczne); aktualny wynik i lista otwartych pozycji w `reports/INDEX.md` |
-| Testy modułów | działają | `make test-unit` (Go, 4 pakiety), `sudo make test-semantic` (**181 testów**, 27 pominiętych markerem `models`) i `sudo make controlplane-test` (Java, 3 klasy, osobna baza `noorpointer_test`) |
+| Testy modułów | działają | `make test-unit` (Go, 5 pakietów z testami), `sudo make test-semantic` (**181 testów**, 27 pominiętych markerem `models`) i `sudo make controlplane-test` (Java, 4 klasy, osobna baza `noorpointer_test`) |
 
 Wniosek dla osób oceniających: działa cała otoczka wokół polityki (uwierzytelnianie, dystrybucja polityki,
 przeładowanie, audyt, panel, telemetria, testy), a w samej ścieżce żądania brama egzekwuje już allowlistę
@@ -423,7 +423,7 @@ Wagi i nazwy kryteriów są przepisane z regulaminu konkursu.
 | Kontrole i odporność (30%) | Kontrole deterministyczne i semantyczne: 4 detektory AI, skaner plików modeli, 12 sygnatur ataków, zasady jako dane z przeładowaniem bez restartu. Kontrole działają w usłudze semantycznej i są testowane; brama egzekwuje już allowlistę modeli, sekrety, redakcję PII i kontrole semantyczne, a otwarte pozostają sygnatury, budżety i ogranicznik pętli — brakujące elementy są wypisane w `reports/INDEX.md`. |
 | Architektura i wydajność (20%) | Rozdzielone płaszczyzny: brama (Go), zasady i audyt (Java), kontrole AI (Python w replikach), panel i telemetria. Pomiary: `make bench` (k6, p95 2,28 ms przy 50 klientach) oraz `make bench-semantic` (przepustowość kontroli AI i efekt skalowania). |
 | Raportowanie bezpieczeństwa (20%) | Panel z incydentami, wersjami zasad, katalogiem sygnatur i budżetami; eksport CEF/JSON/CSV do SIEM z filtrami; 9 reguł alertów i tablice Grafany. Dziennik jest zasilany danymi demonstracyjnymi (oznaczonymi jako `synthetic`), bo brama nie wysyła jeszcze własnych zdarzeń. |
-| Kompletność pakietu testów (20%) | **181** testów usługi semantycznej (`make test-semantic`), 37 modułu Java, 31 testów panelu, 4 pakiety Go, **25 przypadków e2e**, 3 scenariusze obciążeniowe, 16 sprawdzeń stosu, 12 kontroli przed startem, 9 sprawdzeń trybu offline. Wszystko uruchamiane z `make`, a ścieżka dla osoby oceniającej jest jedną komendą: `sudo make jury`. |
+| Kompletność pakietu testów (20%) | **181** testów usługi semantycznej (`make test-semantic`), **25 przypadków e2e**, 3 scenariusze obciążeniowe, 16 sprawdzeń stosu, 14 kontroli przed startem, 9 sprawdzeń trybu offline, a do tego testy modułów Go, Java i panelu. Wszystko uruchamiane z `make`, a ścieżka dla osoby oceniającej jest jedną komendą: `sudo make jury`. |
 | Wdrożenie i skalowanie (10%) | Start całego stosu jedną komendą, brak pobierania czegokolwiek w czasie działania (`make offline-check`), podmiana modelu bez zmian w kodzie oraz skalowanie poziome usługi semantycznej z dowodem rozkładu ruchu (`make scale`, `make scale-check`). |
 
 ## Zasady pracy w zespole
