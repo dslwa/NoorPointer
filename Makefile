@@ -26,13 +26,13 @@ status: ## Pokazuje stan kontenerów i ich porty
 	docker compose ps
 
 test: ## Uruchamia automatyczny pakiet testów e2e (z generowaniem raportu HTML)
-	docker compose run --rm tests
+	docker compose run --rm -e GATEWAY_JWT="$$(./scripts/token.sh)" tests
 
 bench: ## Uruchamia benchmarki wydajnościowe k6 (narzut p95)
 	docker compose run --rm -e GATEWAY_JWT="$$(./scripts/token.sh)" benchmarks run /benchmarks/benchmark_baseline.js
 
 demo: ## Uruchamia scenariusze demonstracyjne agenta
-	./agent-demo/run.sh all
+	GATEWAY_JWT="$$(./scripts/token.sh)" ./agent-demo/run.sh all
 
 clean: ## Czyści wolumeny i nieużywane obrazy Dockera
 	docker compose down -v --remove-orphans
@@ -69,11 +69,11 @@ report: ## Zbiera dowody dla jury do reports/INDEX.md
 	./scripts/report.sh
 
 demo-full: ## Pełne demo: run.sh (5 scenariuszy) + scenariusze zaawansowane (PENDING dozwolone)
-	./agent-demo/run.sh all
+	GATEWAY_JWT="$$(./scripts/token.sh)" ./agent-demo/run.sh all
 	./agent-demo/scenarios.sh
 
 demo-strict: ## Jak demo-full, ale PENDING (gateway bez guardraili) liczy się jako FAIL
-	./agent-demo/run.sh all
+	GATEWAY_JWT="$$(./scripts/token.sh)" ./agent-demo/run.sh all
 	./agent-demo/scenarios.sh --strict
 
 verify: ## Zero-prep: smoke + offline-check + scenariusze demo (PENDING dozwolone)
