@@ -24,7 +24,7 @@ Co się dzieje po kolei (i ile to trwa):
 | 7 | zbiera dowody do katalogu `dowody/` | kilka sekund |
 
 Dodatkowo dostępne są pełne pakiety testów modułów, których nie ma w przebiegu podstawowym:
-`make test-semantic` (testy usługi semantycznej) i `make dashboard-test` (31 testów panelu).
+`sudo make test-semantic` (181 testów usługi semantycznej) i `make dashboard-test` (31 testów panelu).
 
 Konsola pokazuje **wyniki, a nie pracę**: budowanie obrazów, logi Mavena i Springa oraz pełne wyjście
 testów trafiają do plików w `reports/`. Na końcu widzisz podsumowanie: ile usług działa, wyniki testów

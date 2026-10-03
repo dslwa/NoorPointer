@@ -313,20 +313,24 @@ postgres-test-up: postgres-up ## Osobna baza PostgreSQL dla testow Javy
 controlplane-run: postgres-up ## Uruchamia Jave (REST/panel) na :8082
 	cd controlplane && ./mvnw spring-boot:run
 
-test-semantic: ## Testy modulu semantycznego w kontenerze z pytest (--build: kod z repo, nie stary obraz)
+test-semantic: ## Testy modulu semantycznego w kontenerze z pytest (sudo; --build bierze kod z repo)
 	@mkdir -p reports 2>/dev/null || true
 	@log=reports/log-semantic-test.txt; \
-	: > "$$log" 2>/dev/null || { log="$${TMPDIR:-/tmp}/noorpointer-log-semantic-test.txt"; echo "uwaga: nie moge pisac do reports/ (wlasciciel root?) - log: $$log"; echo "  napraw: sudo chown -R \"$$(id -u):$$(id -g)\" reports"; }; \
+	: > "$$log" 2>/dev/null || { log="$${TMPDIR:-/tmp}/noorpointer-log-semantic-test.txt"; echo "uwaga: nie moge pisac do reports/ - log: $$log"; }; \
 	$(COMPOSE) --profile semantic run --rm --build semantic-tests > "$$log" 2>&1; rc=$$?; \
 	grep -E "[0-9]+ (passed|failed)|^(FAILED|ERROR)|error" "$$log" | tail -18; \
+	if grep -qiE 'permission denied.*docker|docker.*permission denied' "$$log"; then echo "  BLAD: brak dostepu do Dockera (docker.sock jest root:docker, a Ty nie jestes w grupie docker) - uruchom: sudo make test-semantic"; fi; \
+	chown -R "$$(stat -c '%u:%g' .)" reports 2>/dev/null || true; \
 	[ $$rc -eq 0 ] || echo "  szczegoly: $$log"; exit $$rc
 
-controlplane-test: postgres-test-up ## Testy modulu Java w kontenerze (pelny log: reports/log-java-test.txt)
+controlplane-test: postgres-test-up ## Testy modulu Java w kontenerze (sudo; pelny log: reports/log-java-test.txt)
 	@mkdir -p reports 2>/dev/null || true
 	@log=reports/log-java-test.txt; \
-	: > "$$log" 2>/dev/null || { log="$${TMPDIR:-/tmp}/noorpointer-log-java-test.txt"; echo "uwaga: nie moge pisac do reports/ (wlasciciel root?) - log: $$log"; echo "  napraw: sudo chown -R \"$$(id -u):$$(id -g)\" reports"; }; \
+	: > "$$log" 2>/dev/null || { log="$${TMPDIR:-/tmp}/noorpointer-log-java-test.txt"; echo "uwaga: nie moge pisac do reports/ - log: $$log"; }; \
 	$(COMPOSE) --profile java run --rm --build controlplane-tests > "$$log" 2>&1; rc=$$?; \
 	grep -E "Tests run:|BUILD (SUCCESS|FAILURE)|^\[ERROR\]" "$$log" || true; \
+	if grep -qiE 'permission denied.*docker|docker.*permission denied' "$$log"; then echo "  BLAD: brak dostepu do Dockera (docker.sock jest root:docker) - uruchom: sudo make controlplane-test"; fi; \
+	chown -R "$$(stat -c '%u:%g' .)" reports 2>/dev/null || true; \
 	[ $$rc -eq 0 ] || echo "  szczegoly bledu: $$log"; exit $$rc
 
 controlplane-build: postgres-test-up ## Weryfikacja Javy + budowa JAR (w kontenerze)
