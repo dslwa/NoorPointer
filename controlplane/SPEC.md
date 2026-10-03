@@ -12,13 +12,16 @@ Mózg zarządzający i rejestrujący całego systemu (Management Plane). Odpowia
 
 ## Stan obecny
 
-Działa: publikowanie i historia rewizji polityki, katalog sygnatur (`GET`/`PUT`), przyjmowanie zdarzeń
-audytowych (`POST /api/v1/audit-events`), lista zdarzeń dla panelu, eksport CEF/JSON/CSV, API panelu,
-dane demonstracyjne (`POST /api/v1/demo-batches`) oraz metryki dla Prometheusa.
+Działa: publikowanie i historia rewizji polityki, walidacja szkiców polityki, katalog sygnatur
+(7 reguł startowych z migracji `V2__Seed_default_signatures` + wpisy dodawane pojedynczo przez API
+i panel), przyjmowanie zdarzeń audytowych (`POST /api/v1/audit-events`), lista i szczegóły zdarzeń,
+eksport CEF/JSON/CSV z filtrami (szczegóły w `SIEM.md`), API panelu, dane demonstracyjne
+(`POST /api/v1/demo-batches`) oraz metryki dla Prometheusa.
 
-Jeszcze nie działa: gateway nie wysyła zdarzeń audytowych ani nie pobiera sygnatur, więc wpisy w panelu
-pochodzą z `make seed`, a katalog sygnatur z `scripts/import-signatures.sh`. Automatyczny import feedu
-regex wymaga adaptera (patrz `signatures-feed/README.md`).
+Jeszcze nie działa: gateway nie egzekwuje kontroli, nie wysyła zdarzeń audytowych i nie pobiera
+sygnatur, więc wpisy w panelu pochodzą z `make seed`, a katalog sygnatur jest uzupełniany przez
+`scripts/import-signatures.sh`. Automatyczny import feedu regex wymaga adaptera
+(patrz `signatures-feed/README.md`).
 
 ---
 
@@ -58,9 +61,13 @@ regex wymaga adaptera (patrz `signatures-feed/README.md`).
   - `GET /api/v1/policy-revisions`, `GET /api/v1/policy-revisions/{version}` – historia rewizji
   - `POST /api/v1/policy-revisions` – utworzenie rewizji (szkic: `name`, `description`, `document` jako string z JSON-em)
   - `GET /api/v1/signature-feed`, `PUT /api/v1/signature-feed` – katalog sygnatur (podmieniana jest całość)
+  - `POST /api/v1/signatures` – dodanie pojedynczej sygnatury (`application/json` albo wklejony dokument jako `text/plain`/YAML); `409`, gdy ID już istnieje
+  - `GET /api/v1/signatures/{id}` – pojedyncza sygnatura
+  - `POST /api/v1/policy-validations` – walidacja szkicu dokumentu polityki
+  - `GET /api/v1/policy-profiles/{name}` – wbudowany profil (`permissive`, `balanced`, `strict`)
   - `POST /api/v1/audit-events` – przyjęcie zdarzenia audytowego z gatewaya (rola `ADMIN` lub `GATEWAY`)
-  - `GET /api/v1/audit-events` – lista zdarzeń do panelu
-  - `GET /api/v1/audit/export?format=cef|json|csv` – eksport audytowy
+  - `GET /api/v1/audit-events`, `GET /api/v1/audit-events/{id}` – lista i pojedyncze zdarzenie do panelu
+  - `GET /api/v1/audit-events/export?format=cef|json|csv` (alias: `/api/v1/audit/export`) – eksport audytowy; limity i filtry opisuje `SIEM.md`
   - `GET /api/v1/dashboard` – zagregowane metryki dla panelu
   - `POST /api/v1/demo-batches` – dane demonstracyjne do panelu (używa ich `make seed`)
   - `GET /api/gateway/policy`, `GET /api/gateway/signatures`, `POST /api/gateway/events` – trasy dla gatewaya
