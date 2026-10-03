@@ -2,9 +2,9 @@
 
 **Tytuł projektu:** NoorPointer — warstwa kontroli dla systemów agentowych (AI Control Layer)
 
-**Nazwa zespołu:** <NAZWA ZESPOŁU>
+**Nazwa zespołu:** NoorPointer
 
-**Członkowie zespołu (1–6):** <IMIONA I NAZWISKA>
+**Członkowie zespołu (1–6):** Kacper Bołdak (Go/gateway), Daniel Salawa (Python/semantyka), Robert Kania (Java/panel), Dawid Żarnecki (DevOps/infrastruktura)
 
 **Repozytorium:** github.com/dslwa/NoorPointer
 

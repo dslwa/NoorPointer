@@ -1,8 +1,8 @@
 # NoorPointer — warstwa kontroli dla systemów agentowych
 ## AI Control Layer · zgłoszenie na HackYeah 2026
 
-- **Zespół:** <NAZWA ZESPOŁU>
-- **Członkowie (1–6):** <IMIONA I NAZWISKA>
+- **Zespół:** NoorPointer
+- **Członkowie (1–6):** Kacper Bołdak (Go/gateway), Daniel Salawa (Python/semantyka), Robert Kania (Java/panel), Dawid Żarnecki (DevOps/infrastruktura)
 - **Zgłoszenie:** 4 października 2026, HackTribe
 - **Repozytorium:** github.com/dslwa/NoorPointer
 
@@ -91,7 +91,7 @@
 # Architektura i wydajność (20%)
 
 - **Jeden start**: 10 usług (`docker compose up`), obrazy przygotowane offline, brak pobierania czegokolwiek w czasie działania.
-- **Narzut ścieżki danych** (k6): p95 w granicach 0,1–0,8 ms po usunięciu problemu Nagle/delayed-ACK, który dawał wcześniej 41 ms na żądanie.
+- **Narzut ścieżki danych** (k6, 50 VU, 10 150 żądań): p95 **2,28 ms**, mediana 1,01 ms, 506 żądań/s, zero błędów; próg p95 < 10 ms spełniony. W pierwszym przebiegu ten sam test dawał 41 ms — przyczyną był Nagle/delayed-ACK, nie logika gatewaya.
 - **Kontrole semantyczne na CPU** (12 wątków): krótki prompt 116 ms, a 78 ms przy `TORCH_THREADS=8`; pełne okno 512 tokenów odpowiednio 950 ms i 610 ms; p95 dla krótkich promptów ~150 ms.
 - **Izolacja zasobów**: osobne pule wątków dla każdej kontroli, kolejka FIFO, praca po timeoucie zwalnia slot, jedno żądanie nie zajmuje więcej niż połowę puli.
 - **Skalowanie**: gateway bezstanowy, liczniki budżetów w Redisie, audyt w Postgresie, usługa semantyczna skalowana poziomo za równoważeniem obciążenia.
@@ -124,5 +124,5 @@
 - **Działa dziś**: uwierzytelnianie RS256, dystrybucja i hot-reload polityki, katalog sygnatur z interfejsem, cztery detektory semantyczne, skaner artefaktów, audyt z eksportem SIEM, panel, telemetria z alertami, testy modułów i pakiet e2e.
 - **W toku (do zgłoszenia zostaje doba)**: egzekwowanie kontroli w gatewayu (sekrety, redakcja PII, prompt injection, sygnatury, budżety, ogranicznik pętli), `GET /metrics`, wysyłka zdarzeń audytu z gatewaya, wywołanie semantyki w ścieżce żądania.
 - **Dlaczego to podłączenie, a nie projekt**: polityka v4, katalog 12 sygnatur, wpis budżetowy dla przypadku testowego i wszystkie kontrakty są już wdrożone — pozostały kod ma wykonać decyzje, które już istnieją jako dane.
-- **Plan**: rano integracja i cel 16/16 w testach e2e, po południu świeże pomiary k6 i finalny PDF, wieczorem zamrożenie kodu i wysyłka zgłoszenia.
+- **Plan**: dokończenie kontroli w gatewayu i cel 16/16 w testach e2e, zamrożenie kodu i wysyłka zgłoszenia (deadline 4 października, 23:00).
 - **Ryzyka i mitygacja**: brak metryk gatewaya → alert `GatewayMetricsMissing` i jawny opis w panelu; dane audytu są demonstracyjne → oznaczone flagą `synthetic`; brak egzekwowania kontroli → scenariusze pokazują `PENDING`, nie udajemy sukcesu.

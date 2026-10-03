@@ -32,10 +32,8 @@ architekturę i wydajność (20%), pakiet testów (20%), wdrażalność (10%), s
 
 ## Do uzupełnienia przed wysłaniem
 
-1. **Nazwa zespołu i skład** — w `slajdy.md` i `opis-projektu.md` są znaczniki `<NAZWA ZESPOŁU>`
-   oraz `<IMIONA I NAZWISKA>`.
-2. **Zrzuty ekranu** (opcjonalnie, wzmacniają kryterium raportowania): panel incydentów, katalog
+1. **Zrzuty ekranu** (opcjonalnie, wzmacniają kryterium raportowania): panel incydentów, katalog
    sygnatur, Grafana. Wstaw je do slajdu 6 jako linię `![opis](img/plik.png)` — katalog `deck/img/`
    jest wersjonowany, a `build.py` obsługuje obrazy w linii.
-3. **Świeże liczby z k6** — slajd 7 podaje pomiar z tej maszyny; po `sudo make bench` warto podmienić
-   wartość na najnowszą.
+
+Nazwa zespołu, skład i liczby z k6 (p95 2,28 ms przy 506 żądaniach na sekundę) są już w treści.
