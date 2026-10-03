@@ -26,7 +26,7 @@ K6        = $(COMPOSE) run --rm -e GATEWAY_JWT="$$jwt" benchmarks run
         seed test test-unit test-rebuild bench bench-flood bench-budget \
         smoke verify verify-strict offline-check report checkpoint \
         demo demo-full demo-strict \
-        keys mint-build token reload-policy doctor urls \
+        keys mint-build token token-file reload-policy doctor urls \
         ollama-up ollama-down \
         postgres-up postgres-test-up controlplane-run controlplane-test controlplane-build dashboard-dev
 
@@ -137,8 +137,14 @@ mint-build: ## Buduje gateway/bin/mint raz (token bez 'go run', dziala tez pod s
 	cd gateway && go build -o bin/mint ./cmd/mint
 	@echo "zbudowano gateway/bin/mint"
 
-token: ## Wypisuje swiezy JWT dla gatewaya (AGENT=... TEAM=... TTL=...)
-	./scripts/token.sh
+token: ## Wypisuje swiezy JWT i tylko jego (bez tego nie nadaje sie do TOK=$(make token))
+	@./scripts/token.sh
+
+token-file: ## Zapisuje swiezy JWT do pliku (domyslnie /tmp/noorpointer-e2e.jwt) dla recznych curl-i
+	@f="$${TOKEN_FILE:-/tmp/noorpointer-e2e.jwt}"; ./scripts/token.sh > "$$f"; \
+	  echo "zapisano token do $$f"; \
+	  echo "uzycie:"; \
+	  echo "  curl -s localhost:8080/v1/chat/completions -H \"Authorization: Bearer \$$(cat $$f)\" -H \"Content-Type: application/json\" -d '{\"model\":\"llama3.2:1b\",\"messages\":[{\"role\":\"user\",\"content\":\"test\"}]}'"
 
 reload-policy: ## Wymusza natychmiastowy reload polityki w gatewayu (Bearer GATEWAY_TOKEN)
 	@body=$$(mktemp); code=$$(curl -s -o "$$body" -w '%{http_code}' -X POST http://localhost:8080/admin/policy/reload \
