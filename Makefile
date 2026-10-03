@@ -98,6 +98,8 @@ verify-strict: ## Jak verify, ale PENDING liczy się jako FAIL (po guardrailach 
 
 keys: ## Generuje lokalną parę kluczy JWT gatewaya (gateway/keys, gitignored)
 	cd gateway && make keys
+	@echo "UWAGA: gateway czyta jwt.pub tylko przy starcie. Po regeneracji kluczy zrob:"
+	@echo "  sudo docker compose up -d --force-recreate gateway"
 
 mint-build: ## Buduje gateway/bin/mint raz, zeby token nie wymagal 'go run' (dziala tez pod sudo)
 	cd gateway && go build -o bin/mint ./cmd/mint

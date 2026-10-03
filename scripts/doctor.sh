@@ -59,6 +59,24 @@ case "${code:-000}" in
   *)       wn "auth enforced (no token)" "unexpected $code" ;;
 esac
 
+# A valid token must be accepted. This is the check that catches a stale in-memory jwt.pub
+# (keys regenerated after the container started) - it used to look like "broken auth tests".
+tok="$(./scripts/token.sh 2>/dev/null || true)"
+if [[ -z "$tok" ]]; then
+  wn "token accepted by gateway" "skipped (could not mint a token)"
+else
+  acc="$(curl -s -o /dev/null -w '%{http_code}' -m 5 -X POST http://localhost:8080/v1/chat/completions \
+    -H 'Content-Type: application/json' -H "Authorization: Bearer $tok" \
+    -d '{"model":"mock-llm","messages":[{"role":"user","content":"doctor"}]}' 2>/dev/null)"
+  case "${acc:-000}" in
+    200)     ok "token accepted by gateway" "200" ;;
+    401|403) no "token accepted by gateway" "$acc - STALE jwt.pub in the running gateway: sudo docker compose up -d --force-recreate gateway" ;;
+    503)     wn "token accepted by gateway" "503 - policy not loaded from control plane" ;;
+    000)     wn "token accepted by gateway" "gateway not reachable" ;;
+    *)       wn "token accepted by gateway" "unexpected $acc" ;;
+  esac
+fi
+
 echo
 echo "doctor: $pass ok, $warn warn, $fail fail"
 [[ "$fail" -eq 0 ]]
