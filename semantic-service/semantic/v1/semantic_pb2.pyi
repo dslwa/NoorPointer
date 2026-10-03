@@ -27,6 +27,7 @@ class Status(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     STATUS_OK: _ClassVar[Status]
     STATUS_TIMEOUT: _ClassVar[Status]
     STATUS_ERROR: _ClassVar[Status]
+    STATUS_REJECTED: _ClassVar[Status]
 
 class Verdict(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -46,6 +47,7 @@ STATUS_UNSPECIFIED: Status
 STATUS_OK: Status
 STATUS_TIMEOUT: Status
 STATUS_ERROR: Status
+STATUS_REJECTED: Status
 VERDICT_UNSPECIFIED: Verdict
 VERDICT_SAFE: Verdict
 VERDICT_SUSPICIOUS: Verdict
@@ -70,18 +72,20 @@ class CheckSpec(_message.Message):
     def __init__(self, check: _Optional[_Union[Check, str]] = ..., timeout_ms: _Optional[int] = ...) -> None: ...
 
 class AnalyzeRequest(_message.Message):
-    __slots__ = ("request_id", "agent_id", "direction", "messages", "checks")
+    __slots__ = ("request_id", "agent_id", "direction", "messages", "checks", "canaries")
     REQUEST_ID_FIELD_NUMBER: _ClassVar[int]
     AGENT_ID_FIELD_NUMBER: _ClassVar[int]
     DIRECTION_FIELD_NUMBER: _ClassVar[int]
     MESSAGES_FIELD_NUMBER: _ClassVar[int]
     CHECKS_FIELD_NUMBER: _ClassVar[int]
+    CANARIES_FIELD_NUMBER: _ClassVar[int]
     request_id: str
     agent_id: str
     direction: Direction
     messages: _containers.RepeatedCompositeFieldContainer[Message]
     checks: _containers.RepeatedCompositeFieldContainer[CheckSpec]
-    def __init__(self, request_id: _Optional[str] = ..., agent_id: _Optional[str] = ..., direction: _Optional[_Union[Direction, str]] = ..., messages: _Optional[_Iterable[_Union[Message, _Mapping]]] = ..., checks: _Optional[_Iterable[_Union[CheckSpec, _Mapping]]] = ...) -> None: ...
+    canaries: _containers.RepeatedScalarFieldContainer[str]
+    def __init__(self, request_id: _Optional[str] = ..., agent_id: _Optional[str] = ..., direction: _Optional[_Union[Direction, str]] = ..., messages: _Optional[_Iterable[_Union[Message, _Mapping]]] = ..., checks: _Optional[_Iterable[_Union[CheckSpec, _Mapping]]] = ..., canaries: _Optional[_Iterable[str]] = ...) -> None: ...
 
 class Span(_message.Message):
     __slots__ = ("message_id", "start", "end", "entity", "score")
