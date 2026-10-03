@@ -1,6 +1,6 @@
 # Eksport audytu dla zespołu bezpieczeństwa
 
-Control plane eksportuje zapisane zdarzenia do **CEF 0**, **JSON** i CSV. W panelu React: **Events → CEF / JSON**. Eksport korzysta z tych samych filtrów co lista i obejmuje wszystkie pasujące zdarzenia, niezależnie od bieżącej strony tabeli. Maksymalnie 10 000 rekordów; po przekroczeniu limitu API zwraca `413` i należy zawęzić filtry czasu.
+Control plane eksportuje zapisane zdarzenia do **CEF 0**, **JSON** i CSV. W panelu React: **Events -> CEF / JSON**. Eksport korzysta z tych samych filtrów co lista i obejmuje wszystkie pasujące zdarzenia, niezależnie od bieżącej strony tabeli. Maksymalnie 10 000 rekordów; po przekroczeniu limitu API zwraca `413` i należy zawęzić filtry czasu.
 
 ## Pobieranie
 
