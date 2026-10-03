@@ -10,10 +10,22 @@ Mózg zarządzający i rejestrujący całego systemu (Management Plane). Odpowia
 
 ---
 
+## Stan obecny
+
+Działa: publikowanie i historia rewizji polityki, katalog sygnatur (`GET`/`PUT`), przyjmowanie zdarzeń
+audytowych (`POST /api/v1/audit-events`), lista zdarzeń dla panelu, eksport CEF/JSON/CSV, API panelu,
+dane demonstracyjne (`POST /api/v1/demo-batches`) oraz metryki dla Prometheusa.
+
+Jeszcze nie działa: gateway nie wysyła zdarzeń audytowych ani nie pobiera sygnatur, więc wpisy w panelu
+pochodzą z `make seed`, a katalog sygnatur z `scripts/import-signatures.sh`. Automatyczny import feedu
+regex wymaga adaptera (patrz `signatures-feed/README.md`).
+
+---
+
 ## Zakres odpowiedzialności
 
 1. **Centralny katalog kontroli (Policy Catalog & Management)**:
-   - Zarządzanie i walidacja schematu polityki bezpieczeństwa (`policy.yaml` / JSON Schema).
+   - Zarządzanie i walidacja schematu polityki bezpieczeństwa (JSON Schema w `src/main/resources/contracts/`; prototypowy `config/policy.yaml` został usunięty z repozytorium).
    - Obsługa profili rygorystyczności (np. `strict`, `balanced`, `permissive`).
    - Publikacja i propagowanie zmian reguł do Gatewaya.
 2. **Import feedu sygnatur historycznych ataków**:
@@ -40,13 +52,19 @@ Mózg zarządzający i rejestrujący całego systemu (Management Plane). Odpowia
 
 ## Interfejsy i komunikacja
 - **Port wejściowy:** `8082` (REST API)
-- **Kluczowe endpointy**:
-  - `GET /api/v1/policies` – aktualna polityka i reguły
-  - `POST /api/v1/policies/reload` – wymuszenie przeładowania
-  - `GET /api/v1/signatures/sync` – synchronizacja z feedem ataków
-  - `GET /api/v1/audit/logs` – lista zdarzeń (filtrowanie po dacie, agencie, akcji)
+- **Kluczowe endpointy** (stan obecny, sprawdzone na działającym serwisie):
+  - `GET /api/v1/active-policy` – aktywna rewizja; `PUT /api/v1/active-policy` z `{"version": N}` publikuje istniejącą rewizję
+  - `GET /api/v1/active-policy/document` – sam dokument polityki (nagłówki `ETag` i `If-None-Match`)
+  - `GET /api/v1/policy-revisions`, `GET /api/v1/policy-revisions/{version}` – historia rewizji
+  - `POST /api/v1/policy-revisions` – utworzenie rewizji (szkic: `name`, `description`, `document` jako string z JSON-em)
+  - `GET /api/v1/signature-feed`, `PUT /api/v1/signature-feed` – katalog sygnatur (podmieniana jest całość)
+  - `POST /api/v1/audit-events` – przyjęcie zdarzenia audytowego z gatewaya (rola `ADMIN` lub `GATEWAY`)
+  - `GET /api/v1/audit-events` – lista zdarzeń do panelu
   - `GET /api/v1/audit/export?format=cef|json|csv` – eksport audytowy
-  - `GET /api/v1/stats/posture` – zagregowane metryki do dashboardu
+  - `GET /api/v1/dashboard` – zagregowane metryki dla panelu
+  - `POST /api/v1/demo-batches` – dane demonstracyjne do panelu (używa ich `make seed`)
+  - `GET /api/gateway/policy`, `GET /api/gateway/signatures`, `POST /api/gateway/events` – trasy dla gatewaya
+  - `GET /actuator/health`, `GET /actuator/prometheus` – stan usługi i metryki dla Prometheusa
 - **Zależności:**
   - Baza danych: PostgreSQL (`postgres:5432`)
   - Źródło feedu: `signatures-feed:8085`

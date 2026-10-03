@@ -134,6 +134,8 @@ Elementy oznaczone `[w toku]` to zakres, który nie jest jeszcze włączony w ś
 | [`agent-demo/`](agent-demo/README.md) | DevOps + Devs | Scenariusze demonstracyjne agenta |
 | [`signatures-feed/`](signatures-feed/README.md) | DevOps + Python | Feed sygnatur znanych ataków |
 | [`scripts/`](scripts) | DevOps | Sprawdzenia, seed, raporty, obsługa tokenów |
+| [`mock-llm/`](mock-llm) | DevOps | Mock modelu (format OpenAI i Ollama), domyślny upstream gatewaya |
+| [`proto/`](proto) | Python + Go | Wspólny kontrakt gRPC `semantic.v1` |
 
 ## Kontrakty
 
@@ -243,8 +245,8 @@ błędach uwierzytelniania. Odpowiedź po redakcji pozostaje `200`, a informacj�
 zredagowane, niesie nagłówek `X-NoorPointer-Redactions` (np. `pii_ner`); nie zmienia to tego,
 czego oczekują testy.
 
-Podmiot budżetu rozstrzygamy od najbardziej szczegółowego: `agent:<agent_id>` z ciała żądania →
-`team:<team>` z tokenu JWT → `model:<model>` z ciała. Okna: `daily_tokens` resetują się o 00:00 UTC,
+Podmiot budżetu rozstrzygamy od najbardziej szczegółowego: `agent:<agent_id>` z ciała żądania ->
+`team:<team>` z tokenu JWT -> `model:<model>` z ciała. Okna: `daily_tokens` resetują się o 00:00 UTC,
 `monthly_usd` obowiązuje w miesiącu kalendarzowym, `gpu_seconds_per_hour` co godzinę. Liczniki
 trzymamy w Redisie pod kluczem `budget:<subject>:<okno>`, zwiększanym atomowo (`INCRBY` + `EXPIRE`).
 Przekroczenie daje `429` z nagłówkiem `Retry-After` w sekundach do końca okna. Gdy Redis nie
