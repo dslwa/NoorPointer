@@ -25,9 +25,11 @@ scrape_configs:
   - job_name: "noorpointer-controlplane"
     metrics_path: /actuator/prometheus
     # /actuator/prometheus is ADMIN-only (SecurityConfig), so send the admin bearer token.
+    # Hardcoded to the compose default on purpose: prom/prometheus:v2.54.1 has no
+    # --config.expand-env, so ${ADMIN_TOKEN} would be used literally. Keep in sync if you change it.
     authorization:
       type: Bearer
-      credentials: ${ADMIN_TOKEN}
+      credentials: local-dev-admin
     static_configs:
       - targets: ["controlplane:8082"]
         labels:
