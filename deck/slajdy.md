@@ -29,7 +29,7 @@
 - Brama mówi tym samym językiem co OpenAI, więc działa z tym, co zespół już ma.
 - Przy każdym pytaniu brama sprawdza przepustkę (token), sprawdza treść, liczy koszt i zapisuje zdarzenie.
 - Zasady są w jednym miejscu i wchodzą od razu — bez restartu i bez nowej wersji programu.
-- Sprawdzanie treści robi osobny serwis; brama czeka na niego 300 ms, a gdy nie zdąży, blokuje pytanie.
+- Sprawdzanie treści robi osobny serwis; brama czeka na niego 1,5 sekundy, a gdy nie zdąży, blokuje pytanie.
 
 ```
     agent / aplikacja
@@ -38,7 +38,7 @@
    +----------------+  kto pyta? czy tresc bezpieczna?
    |     BRAMA      |  ile to kosztuje? co sie stalo?
    +--------+-------+
-            |  "sprawdz te tresc" (czeka do 300 ms)
+            |  "sprawdz te tresc" (czeka do 1,5 s)
             v
    +----------------+     +---------------------+
    |  SPRAWDZANIE   |     |  PANEL Z ZASADAMI   |

@@ -55,7 +55,9 @@ sudo make checkpoint # wszystko powyżej + reports/INDEX.md + lista adresów
 `make help` wypisuje wszystkie polecenia z podziałem na sekcje. Polecenia uruchamiane pojedynczo:
 
 ```bash
-sudo make bench            # k6: narzut przy typowym ruchu
+sudo make bench            # k6: pełna ścieżka kontroli przy obciążeniu, które warstwa AI wyrabia (VUS=3)
+sudo make bench-stress     # k6: przeciążenie (VUS=50) — pokazuje, że brama blokuje, gdy AI nie wyrabia
+sudo make bench-semantic   # przepustowość samych kontroli AI (Python, bez k6) i efekt skalowania
 sudo make bench-flood      # k6: duży ruch z próbami ataku
 sudo make bench-budget     # k6: równoległe żądania jednego agenta
 sudo make controlplane-test  # testy modułu Java w kontenerze (nie wymaga Javy na hoście)
@@ -211,7 +213,7 @@ a jego format różnił się od poniższego. Kształt dokumentu, który widzi ga
 ```json
 {
   "version": 4,
-  "defaults": {"mode": "enforce", "semantic_timeout_ms": 300, "on_semantic_timeout": "fail_closed"},
+  "defaults": {"mode": "enforce", "semantic_timeout_ms": 1500, "on_semantic_timeout": "fail_closed"},
   "models": {"allowed": ["llama3.1:8b", "llama3.2:1b", "mock-llm", "qwen2.5:7b"]},
   "controls": {
     "pii_regex": {"enabled": true, "action": "redact", "types": ["email", "pesel", "iban", "card"]},

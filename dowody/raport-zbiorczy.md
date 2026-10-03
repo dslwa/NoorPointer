@@ -1,11 +1,11 @@
 # NoorPointer — dowody dla oceniających
 
-- wygenerowano: 2026-10-03T19:09:29Z
-- commit: `a624c3c`
+- wygenerowano: 2026-10-03T19:53:02Z
+- commit: `1474222`
 
 ## Pliki wynikowe
 
-- [`reports/test_report.html`](test_report.html) — zmieniony 2026-10-03T16:34:47Z
+- [`reports/test_report.html`](test_report.html) — zmieniony 2026-10-03T19:18:13Z
 - [`reports/smoke.txt`](smoke.txt) — zmieniony 2026-10-03T19:04:23Z
 
 ## Wynik sprawdzenia spójności (smoke)
@@ -14,7 +14,7 @@
 smoke: 16 passed, 0 failed
 ```
 
-## Znane luki (stan na 2026-10-03T19:09:29Z)
+## Znane luki (stan na 2026-10-03T19:53:02Z)
 
 - **Gateway (Go)**: kontrole w ścieżce żądania nie są jeszcze włączone (dane osobowe, sekrety,
   sygnatury ataków, ogranicznik pętli, budżety), brakuje `GET /metrics` oraz wysyłania zdarzeń
