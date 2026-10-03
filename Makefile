@@ -23,7 +23,7 @@ K6        = $(COMPOSE) run --rm -e GATEWAY_JWT="$$jwt" benchmarks run
 
 .PHONY: help \
         up dev-infra down restart build clean logs status \
-        seed test test-rebuild bench bench-flood bench-budget \
+        seed test test-unit test-rebuild bench bench-flood bench-budget \
         smoke verify verify-strict offline-check report checkpoint \
         demo demo-full demo-strict \
         keys mint-build token reload-policy doctor urls \
@@ -69,6 +69,9 @@ seed: ## Wypelnia baze audytu danymi demo (potrzebne dla eksportu CEF)
 test: seed ## e2e (seed + raport HTML); --build, bo obraz testow wpieka kod testow
 	@$(JWT_GUARD); $(COMPOSE) run --rm --build -e GATEWAY_JWT="$$jwt" tests
 
+test-unit: ## Testy jednostkowe modulow (Go teraz; nie wymagaja dzialajacego stosu)
+	cd gateway && go test ./...
+
 test-rebuild: ## Przebudowuje obraz testow (po zmianie requirements.txt)
 	$(COMPOSE) build --no-cache tests
 
@@ -100,6 +103,7 @@ report: ## Zbiera dowody dla jury do reports/INDEX.md
 checkpoint: ## Zero-prep dowod: doctor -> up -> test -> raport + adresy
 	-@./scripts/doctor.sh
 	$(MAKE) --no-print-directory up
+	-$(MAKE) --no-print-directory test-unit
 	-$(MAKE) --no-print-directory test
 	./scripts/report.sh
 	@echo ""
