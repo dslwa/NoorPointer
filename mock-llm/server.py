@@ -37,6 +37,10 @@ def log(level: str, msg: str) -> None:
 
 
 class Handler(BaseHTTPRequestHandler):
+    # HTTP/1.1 + Content-Length on every response keeps connections alive under load, so k6 VUs
+    # reuse sockets instead of opening a new one per request.
+    protocol_version = "HTTP/1.1"
+
     def log_message(self, fmt, *args) -> None:
         log("info", "%s - %s" % (self.address_string(), fmt % args))
 
@@ -94,10 +98,13 @@ class Handler(BaseHTTPRequestHandler):
         completion_tokens = estimate_tokens(content)
 
         if body.get("stream"):
+            # SSE is close-delimited (no Content-Length), so end the connection after the stream.
             self.send_response(200)
             self.send_header("Content-Type", "text/event-stream")
             self.send_header("Cache-Control", "no-cache")
+            self.send_header("Connection", "close")
             self.end_headers()
+            self.close_connection = True
 
             def chunk(delta: dict, finish=None) -> None:
                 payload = {"id": cid, "object": "chat.completion.chunk", "created": created, "model": model,
@@ -119,7 +126,16 @@ class Handler(BaseHTTPRequestHandler):
                       "total_tokens": prompt_tokens + completion_tokens}})
 
 
+class Server(ThreadingHTTPServer):
+    """ThreadingHTTPServer with a listen backlog big enough for k6 ramps (default is 5, so bursts of
+    new connections overflowed the accept queue and retried ~1s later - the benchmark tail)."""
+
+    daemon_threads = True
+    allow_reuse_address = True
+    request_queue_size = 256
+
+
 if __name__ == "__main__":
     port = int(os.getenv("PORT", "11434"))
     log("info", f"mock LLM listening on :{port} (model={MODEL_DEFAULT}, guard={GUARD_MODEL})")
-    ThreadingHTTPServer(("0.0.0.0", port), Handler).serve_forever()
+    Server(("0.0.0.0", port), Handler).serve_forever()
