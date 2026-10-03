@@ -29,7 +29,7 @@ K6        = $(COMPOSE) run --rm -e GATEWAY_JWT="$$jwt" benchmarks run
         demo demo-ready demo-full demo-strict \
         keys mint-build token token-file reload-policy new-signature db-tidy doctor urls \
         jury scan policy-edit policy-apply signature evidence stop scale scale-check \
-        ollama-up ollama-down \
+        ollama-up ollama-down up-real \
         postgres-up postgres-test-up controlplane-run controlplane-test controlplane-build dashboard-dev dashboard-test
 
 # --- pomoc -----------------------------------------------------------------------------------------
@@ -265,12 +265,35 @@ ollama-up: ## Prawdziwa Llama + Llama Guard przez Ollame, gateway i serwis seman
 	$(OLLAMA_COMPOSE) up -d --wait ollama
 	$(OLLAMA_COMPOSE) exec ollama ollama pull llama3.2:1b
 	$(OLLAMA_COMPOSE) exec ollama ollama pull llama-guard3:1b
-	$(OLLAMA_COMPOSE) up -d gateway semantic-service
+	$(OLLAMA_COMPOSE) up -d gateway semantic-app
 	@echo "gateway i content_safety -> realna Ollama. Testy/bench wymagajace echo: make ollama-down"
 
 ollama-down: ## Powrot gatewaya i content_safety na mock-llm (deterministyczne testy i bench)
-	$(COMPOSE) up -d --no-deps gateway semantic-service
+	$(COMPOSE) up -d --no-deps gateway semantic-app
 	@echo "gateway i content_safety -> mock-llm"
+
+up-real: ## Demo dla jury: pelny stos + prawdziwe modele (pyta przed pobraniem ~2,9 GB)
+	@$(MAKE) --no-print-directory up
+	@$(OLLAMA_COMPOSE) up -d --wait ollama
+	@have="$$($(OLLAMA_COMPOSE) exec -T ollama ollama list 2>/dev/null | awk 'NR>1{print $$1}')"; \
+	missing=""; \
+	for m in llama3.2:1b llama-guard3:1b; do \
+	  printf '%s\n' "$$have" | grep -qxF "$$m" || missing="$$missing $$m"; \
+	done; \
+	if [ -n "$$missing" ]; then \
+	  echo "up-real: brak modeli:$$missing"; \
+	  echo "  do pobrania ok. 2,9 GB (przy 0,7 MB/s to ponad godzina)."; \
+	  if [ -z "$(ALLOW_DOWNLOAD)" ]; then \
+	    echo "  swiadomie pobierz: make up-real ALLOW_DOWNLOAD=1"; \
+	    echo "  (albo zostan na mocku: make up)"; \
+	    exit 1; \
+	  fi; \
+	  echo "  ALLOW_DOWNLOAD=1 - pobieram brakujace modele."; \
+	fi
+	@$(MAKE) --no-print-directory ollama-up
+	@echo ""
+	@echo "up-real: stos na prawdziwych modelach (tryb demo)."
+	@echo "  Testy e2e i bench zakladaja echo z mocka - przed nimi: make ollama-down"
 
 ##@ Praca nad modulami (dev, bez kontenera dla danego modulu)
 

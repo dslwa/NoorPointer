@@ -275,9 +275,23 @@ testowym: limit 0 oznacza budżet przekroczony od pierwszego żądania, dzięki 
 ### 6. Opcjonalny prawdziwy model (Ollama)
 
 ```bash
-sudo make ollama-up     # start Ollamy, pobranie llama3.2:1b, przełączenie gatewaya na nią
+sudo make up-real      # pelny stos + prawdziwe modele jednym poleceniem (pyta przed pobraniem ~2,9 GB)
+sudo make ollama-up    # tylko przelaczenie na Ollame, gdy stos juz dziala
 sudo make ollama-down   # powrót na mock-llm (potrzebny do testów oczekujących odpowiedzi echo)
 ```
+
+`make up-real` uruchamia `make up`, a następnie przełącza gateway i `content_safety` na prawdziwe modele
+przez `make ollama-up`. Zanim cokolwiek pobierze, sprawdza w wolumenie `ollama-data`, czy `llama3.2:1b`
+i `llama-guard3:1b` są obecne. Gdy ich nie ma, zatrzymuje się z komunikatem — pobranie ok. 2,9 GB przy
+0,7 MB/s trwa ponad godzinę, więc wymaga świadomej zgody: `sudo make up-real ALLOW_DOWNLOAD=1`.
+Modele zostają w wolumenie, więc pobierają się tylko raz.
+
+Domyślnie (`make up`) mockowane są tylko te modele, które idą przez Ollamę: odpowiedzi czatu
+(`mock-llm` odsyła echo) oraz `content_safety` (mock reaguje na słowa kluczowe). Prompt injection
+(DeBERTa) i dane osobowe (spaCy en+pl) to prawdziwe modele wbudowane w obraz usługi semantycznej,
+więc działają od razu po `make up`. Testy e2e i benchmarki zakładają odpowiedzi echo z mocka — przed
+nimi wróć na `make ollama-down`. Uwaga wydajnościowa: prawdziwy Llama Guard na CPU odpowiada ok. 0,9 s,
+a kontrola ma budżet `defaults.semantic_timeout_ms` (1500 ms) — na jednej maszynie to blisko limitu.
 
 Konfiguracja `docker-compose.ollama.yaml` nie publikuje portu Ollamy na hoście, więc nie koliduje
 z `mock-llm`. Pierwsza odpowiedź trwa dłużej (ładowanie modelu na CPU), a nazwa modelu musi być wpisana
