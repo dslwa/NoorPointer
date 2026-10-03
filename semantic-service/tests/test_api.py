@@ -146,3 +146,100 @@ def test_hf_scan_pins_commit_and_enforces_real_size(small_limit_client, monkeypa
     assert requested == [f"https://huggingface.co/org/model/resolve/{sha}/pytorch_model.bin"]
     assert body["revision"] == sha
     assert body["verdict"] == "unknown" and "limit" in body["files"][0]["note"]
+
+
+# --- review round 2 ----------------------------------------------------------------------------------------
+
+def test_scan_json_body_is_limited(small_limit_client):
+    client, _ = small_limit_client
+    resp = client.post("/v1/scan", content=b"{" + b" " * (5 * 1024 * 1024) + b"}",
+                       headers={"content-type": "application/json"})
+    assert resp.status_code == 413
+
+
+def test_non_numeric_content_length_is_400(small_limit_client):
+    client, _ = small_limit_client
+    resp = client.post("/v1/scan", content=b"{}", headers={"content-type": "application/json",
+                                                           "content-length": "abc"})
+    assert resp.status_code == 400
+
+
+def hf_repo(monkeypatch, app, files: dict[str, bytes]):
+    import huggingface_hub
+    from types import SimpleNamespace
+
+    info = SimpleNamespace(sha="b" * 40, siblings=[SimpleNamespace(rfilename=n, size=len(c)) for n, c in files.items()])
+    monkeypatch.setattr(huggingface_hub.HfApi, "model_info", lambda self, *a, **kw: info)
+
+    def hub(request: httpx.Request) -> httpx.Response:
+        name = str(request.url).rsplit("/", 1)[-1]
+        return httpx.Response(200, content=files[name])
+
+    app.state.client = httpx.AsyncClient(transport=httpx.MockTransport(hub))
+
+
+def test_hf_repo_with_nothing_scannable_is_not_safe(small_limit_client, monkeypatch):
+    client, app = small_limit_client
+    hf_repo(monkeypatch, app, {"config.json": b"{}", "README.md": b"hi"})
+    body = client.post("/v1/scan/model/hf", json={"repo_id": "org/model"}).json()
+    assert body["verdict"] == "unknown" and body["safe"] is False
+
+
+def test_hf_uppercase_suffix_and_unscannable_formats_are_reported(small_limit_client, monkeypatch):
+    class Exploit:
+        def __reduce__(self):
+            return (os.system, ("id",))
+
+    client, app = small_limit_client
+    hf_repo(monkeypatch, app, {"pytorch_model.BIN": pickle.dumps(Exploit()), "tf_model.h5": b"\x89HDF",
+                               "config.json": b"{}"})
+    body = client.post("/v1/scan/model/hf", json={"repo_id": "org/model"}).json()
+    verdicts = {f["name"]: f["verdict"] for f in body["files"]}
+    assert verdicts == {"pytorch_model.BIN": "dangerous", "tf_model.h5": "unknown"}
+
+
+@pytest.mark.parametrize("repo_id", ["../../etc", "org/model/../x", "..", "org/model?x=1", "a/b/c", ""])
+def test_hf_repo_id_is_validated(small_limit_client, repo_id):
+    client, _ = small_limit_client
+    assert client.post("/v1/scan/model/hf", json={"repo_id": repo_id}).status_code == 422
+
+
+def test_canonical_repo_ids_without_owner_are_accepted(small_limit_client, monkeypatch):
+    client, app = small_limit_client
+    hf_repo(monkeypatch, app, {"pytorch_model.bin": pickle.dumps({"w": [1.0]}), ".gitattributes": b"*.bin lfs",
+                               "config.json": b"{}"})
+    body = client.post("/v1/scan/model/hf", json={"repo_id": "gpt2"}).json()
+    assert body["verdict"] == "safe", body  # .gitattributes is benign, so a clean repo can be safe
+
+
+def test_upload_waits_then_503_when_scanner_stays_busy(monkeypatch):
+    from app import main as main_module
+
+    monkeypatch.setattr(main_module, "HTTP_SLOT_WAIT_S", 0.2)
+    app = create_app(Settings(grpc_port=0, scan_workers=1), {"leakage": LeakageDetector()})
+    import threading
+    import time
+
+    release = threading.Event()
+
+    async def hold_the_only_slot():
+        async with app.state.scan_workers.reserve() as reservation:
+            job = reservation.submit(release.wait, 5)
+        await job
+
+    with TestClient(app) as client:
+        holder = client.portal.start_task_soon(hold_the_only_slot)
+        time.sleep(0.1)
+        resp = client.post("/v1/scan/model", files={"file": ("a.pkl", pickle.dumps({"a": 1}))})
+        release.set()
+        holder.result(timeout=5)
+        assert resp.status_code == 503
+        assert client.post("/v1/scan/model", files={"file": ("a.pkl", pickle.dumps({"a": 1}))}).status_code == 200
+
+
+def test_app_survives_a_second_lifespan():
+    app = create_app(Settings(grpc_port=0), {"leakage": LeakageDetector()})
+    for _ in range(2):  # e.g. a reload: the second run must not inherit a shut-down pool
+        with TestClient(app) as client:
+            resp = client.post("/v1/scan/model", files={"file": ("a.pkl", pickle.dumps({"a": 1}))})
+            assert resp.status_code == 200
