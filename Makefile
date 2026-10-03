@@ -1,4 +1,4 @@
-.PHONY: help up dev-infra down restart logs status build test bench demo clean postgres-up postgres-test-up controlplane-run controlplane-test controlplane-build dashboard-dev smoke bench-flood bench-budget offline-check report demo-full demo-strict verify verify-strict keys token doctor seed urls checkpoint ollama-up ollama-down
+.PHONY: help up dev-infra down restart logs status build test bench demo clean postgres-up postgres-test-up controlplane-run controlplane-test controlplane-build dashboard-dev smoke bench-flood bench-budget offline-check report demo-full demo-strict verify verify-strict keys token doctor seed urls checkpoint ollama-up ollama-down mint-build
 
 help: ## Pokazuje dostępne komendy
 	@echo "🛡️ NoorPointer Hackathon Commands:"
@@ -30,14 +30,14 @@ seed: ## Wypełnia bazę audytu danymi demo (wymagane dla eksportu CEF)
 	./scripts/seed.sh
 
 test: seed ## Uruchamia automatyczny pakiet testów e2e (seed + raport HTML)
-	docker compose run --rm -e GATEWAY_JWT="$$(./scripts/token.sh)" tests
+	./scripts/run-with-jwt.sh docker compose run --rm -e GATEWAY_JWT tests
 
 bench: ## Uruchamia benchmarki wydajnościowe k6 (narzut p95)
-	docker compose run --rm -e GATEWAY_JWT="$$(./scripts/token.sh)" benchmarks run /benchmarks/benchmark_baseline.js
+	./scripts/run-with-jwt.sh docker compose run --rm -e GATEWAY_JWT benchmarks run /benchmarks/benchmark_baseline.js
 
 demo: ## Uruchamia scenariusze demonstracyjne agenta (z seedem danych demo)
 	-@./scripts/seed.sh
-	GATEWAY_JWT="$$(./scripts/token.sh)" ./agent-demo/run.sh all
+	./scripts/run-with-jwt.sh ./agent-demo/run.sh all
 
 clean: ## Czyści wolumeny i nieużywane obrazy Dockera
 	docker compose down -v --remove-orphans
@@ -65,10 +65,10 @@ smoke: ## Sprawdza spięcie całego stosu (health + proxy + auth controlplane), 
 	./scripts/smoke.sh | tee reports/smoke.txt
 
 bench-flood: ## k6: zalew złośliwych promptów (fast-block)
-	docker compose run --rm -e GATEWAY_JWT="$$(./scripts/token.sh)" benchmarks run /benchmarks/benchmark_malicious_flood.js
+	./scripts/run-with-jwt.sh docker compose run --rm -e GATEWAY_JWT benchmarks run /benchmarks/benchmark_malicious_flood.js
 
 bench-budget: ## k6: równoległe zapytania jednego agenta (atomowość budżetu)
-	docker compose run --rm -e GATEWAY_JWT="$$(./scripts/token.sh)" benchmarks run /benchmarks/benchmark_budget_concurrency.js
+	./scripts/run-with-jwt.sh docker compose run --rm -e GATEWAY_JWT benchmarks run /benchmarks/benchmark_budget_concurrency.js
 
 offline-check: ## Lint: brak instalacji/pobierania w runtime (finalny stage obrazów)
 	./scripts/offline-check.sh
@@ -78,12 +78,12 @@ report: ## Zbiera dowody dla jury do reports/INDEX.md
 
 demo-full: ## Pełne demo: seed + run.sh (5 scenariuszy) + scenariusze zaawansowane (PENDING dozwolone)
 	-@./scripts/seed.sh
-	GATEWAY_JWT="$$(./scripts/token.sh)" ./agent-demo/run.sh all
+	./scripts/run-with-jwt.sh ./agent-demo/run.sh all
 	./agent-demo/scenarios.sh
 
 demo-strict: ## Jak demo-full, ale PENDING (gateway bez guardraili) liczy się jako FAIL
 	-@./scripts/seed.sh
-	GATEWAY_JWT="$$(./scripts/token.sh)" ./agent-demo/run.sh all
+	./scripts/run-with-jwt.sh ./agent-demo/run.sh all
 	./agent-demo/scenarios.sh --strict
 
 verify: ## Zero-prep: smoke + offline-check + scenariusze demo (PENDING dozwolone)
@@ -98,6 +98,10 @@ verify-strict: ## Jak verify, ale PENDING liczy się jako FAIL (po guardrailach 
 
 keys: ## Generuje lokalną parę kluczy JWT gatewaya (gateway/keys, gitignored)
 	cd gateway && make keys
+
+mint-build: ## Buduje gateway/bin/mint raz, zeby token nie wymagal 'go run' (dziala tez pod sudo)
+	cd gateway && go build -o bin/mint ./cmd/mint
+	@echo "zbudowano gateway/bin/mint"
 
 token: ## Wypisuje świeży JWT dla gatewaya (AGENT=... TEAM=... TTL=...)
 	./scripts/token.sh

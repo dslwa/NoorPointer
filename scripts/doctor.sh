@@ -23,6 +23,9 @@ for f in gateway/keys/jwt.key gateway/keys/jwt.pub; do
   fi
 done
 
+if [[ -x gateway/bin/mint ]]; then ok "gateway/bin/mint" "prebuilt (token minting works under sudo)"
+else wn "gateway/bin/mint" "missing - run: make mint-build (fallback: go run with /tmp caches)"; fi
+
 echo "== compose =="
 if docker compose config --quiet 2>/dev/null; then ok "docker compose config" "valid"; else no "docker compose config" "invalid - run: docker compose config"; fi
 
