@@ -45,6 +45,13 @@ if docker compose -f docker-compose.yaml -f docker-compose.ollama.yaml config --
 else
   no "docker compose config (ollama)" "niepoprawna - uruchom: docker compose -f docker-compose.yaml -f docker-compose.ollama.yaml config"
 fi
+# Prometheus czyta token control plane z pliku (credentials_file). Bez pliku bind mount utworzylby
+# katalog i kontener nie wstalby - dlatego ostrzegamy, a nie blokujemy (plik robi `make up`).
+if [[ -f telemetry/.prometheus-admin-token ]]; then
+  ok "token metryk (Prometheus)" "telemetry/.prometheus-admin-token obecny"
+else
+  wn "token metryk (Prometheus)" "brak pliku - uruchom: make prometheus-token (make up robi to samo)"
+fi
 
 sec "sekrety lokalne"
 if [[ -f .env ]]; then

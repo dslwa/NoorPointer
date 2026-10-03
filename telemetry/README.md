@@ -25,7 +25,7 @@ zamieniony na tekst wyjaśniający, że `GET /metrics` jeszcze nie istnieje.
 | Źródło | Endpoint | Stan |
 | :--- | :--- | :--- |
 | `semantic-service` | `:8001/metrics` | zbierane (opóźnienia i wyniki kontroli semantycznych) |
-| `controlplane` | `:8082/actuator/prometheus` | zbierane; endpoint jest dostępny tylko z tokenem administratora, dlatego w `prometheus.yml` jest wpisany nagłówek `Authorization` |
+| `controlplane` | `:8082/actuator/prometheus` | zbierane; endpoint jest dostępny tylko z tokenem administratora, dlatego Prometheus wysyła nagłówek `Authorization` z tokenem z pliku (`credentials_file`) |
 | `prometheus` | `localhost:9090` | zbierane (metryki własne, np. czas ostatniego przeładowania konfiguracji) |
 | `gateway` | `:9090/metrics` | **nie zbierane** — gateway nie wystawia jeszcze tego endpointu, więc zadanie w `prometheus.yml` jest zakomentowane z komentarzem dopisującym, co zrobić po jego dodaniu |
 
@@ -88,6 +88,8 @@ flagi uruchomienia, na przykład przy pierwszym włączeniu `--web.enable-lifecy
 - Scrape usługi semantycznej używa `metrics_path: /metrics/` (z ukośnikiem). Bez niego FastAPI zwraca
   307, a nginx przekazuje `Host` bez portu — Prometheus idzie za przekierowaniem na `:80` i cel jest
   `down` (fałszywy `SemanticDown`). W LB nagłówek to `$http_host`, żeby przekierowania zachowały port.
-- W `prom/prometheus:v2.54.1` nie ma flagi `--config.expand-env`, dlatego token administratora jest
-  wpisany w `prometheus.yml` na stałe. Przy zmianie `ADMIN_TOKEN` trzeba poprawić oba miejsca.
+- Token administratora dla `controlplane` nie jest wpisany w `prometheus.yml`: Prometheus czyta go z pliku
+  (`credentials_file: /etc/prometheus/admin_token`). Plik montuje compose, a generuje `make prometheus-token`
+  z `ADMIN_TOKEN` (z `.env`); `make up` i `make dev-infra` robią to automatycznie. Po zmianie `ADMIN_TOKEN`:
+  `make prometheus-token && sudo docker compose up -d prometheus`.
 - Metryki z k6 nie są wysyłane do Prometheusa; wyniki widać w konsoli po `make bench`.
