@@ -2,6 +2,9 @@ groups:
   - name: noorpointer
     rules:
       # --- availability ----------------------------------------------------------------------------------
+      # NOTE: the gateway scrape job in prometheus.yml is commented out until the gateway ships
+      # /metrics. With no target there is no up{} series, so this alert is inert instead of firing a
+      # red critical during the jury demo. Re-enable the job and this rule together.
       - alert: GatewayDown
         expr: up{job="noorpointer-gateway"} == 0
         for: 30s
