@@ -342,18 +342,33 @@ do jednego kontenera i skalowanie jest pozorne.
 
 ### Co pokazał pomiar i gdzie jest granica
 
-Zmierzone na tej maszynie (8 wątków CPU, Intel i7-1165G7), 100 żądań po 10 naraz, 2 kontrole na żądanie:
+Zmierzone na tej maszynie (8 wątków CPU, Intel i7-1165G7), 100 żądań po 10 naraz, 2 kontrole na żądanie,
+po rozgrzewce. Każdy wiersz to jeden przebieg `make bench-semantic`:
 
-| Układ | Przepustowość | Opóźnienie (mediana / p95) |
-| :--- | :--- | :--- |
-| 1 replika, `PI_WORKERS=2`, `TORCH_THREADS=4` | 13,4 żądań/s (26,8 kontroli/s) | 736 ms / 785 ms |
-| 3 repliki, `PI_WORKERS=2`, `TORCH_THREADS=4` | **5,4 żądań/s** (10,9 kontroli/s) | 1645 ms / 3123 ms |
+| Konfiguracja (repliki × wątki na analizę × równoległe analizy) | Wątków razem | Przepustowość | Mediana / p95 |
+| :--- | :--- | :--- | :--- |
+| 1 × 4 × 2 (domyślna) | 8 | **13,4 żądań/s** (26,8 kontroli/s) | 736 ms / 785 ms |
+| 1 × 2 × 1 | 2 | 3,7 żądań/s (7,4 kontroli/s) | 2842 ms / 3078 ms |
+| 3 × 2 × 1 (ta sama konfiguracja na replikę) | 6 | **4,7 żądań/s** (9,4 kontroli/s) | 1628 ms / 4060 ms |
+| 3 × 4 × 2 (domyślna na trzech replikach) | 24 | 5,4 żądań/s (10,9 kontroli/s) | 1645 ms / 3123 ms |
 
-Trzy repliki wypadły **gorzej** i to jest pouczające, a nie ukryte: procesor był już zajęty.
-Każda replika może prowadzić `PI_WORKERS` równoległych analiz, a każda z nich zajmuje `TORCH_THREADS`
-wątków, więc trzy repliki w konfiguracji domyślnej mogły zażądać 24 wątków na maszynie z ośmioma.
-Efekt to przeskakiwanie między wątkami i spadek wszystkiego — mechanizm rozkładu ruchu działał
-(`make scale-check` pokazał ruch we wszystkich replikach), ale **nie było czym skalować**.
+Co z tego wynika — trzy wnioski, wszystkie oparte na pomiarze:
+
+1. **Skalowanie poziome działa.** Przy identycznej konfiguracji każdej repliki trzy repliki dają
+   +27% przepustowości (3,7 → 4,7 żądań/s) i wyraźnie lepszą medianę (2842 → 1628 ms) niż jedna.
+   Rozkład ruchu potwierdza osobno `make scale-check`.
+2. **Największą dźwignią na tej maszynie jest liczba wątków na jedno wnioskowanie, nie liczba replik.**
+   Zejście z 4 wątków na 2 w jednej replice obniżyło przepustowość z 13,4 do 3,7 żądań/s — analiza
+   modelu jest po prostu ciężka i równoległa w środku.
+3. **Sufit wyznacza procesor.** Trzy repliki z domyślnymi ustawieniami proszą o 24 wątki na ośmiu,
+   więc dostają 5,4 żądań/s, czyli 2,5× mniej niż jedna replika używająca ośmiu wątków. Dokładanie
+   replik z tymi samymi ustawieniami nie mnoży mocy, dopóki nie dołożymy rdzeni (osobne maszyny, węzły).
+
+Zasada, którą stosujemy przy strojeniu, żeby nie wejść w ten trzeci przypadek:
+
+```
+repliki × PI_WORKERS × TORCH_THREADS  ≤  liczba wątków CPU
+```
 
 Zasada, którą stosujemy przy strojeniu:
 

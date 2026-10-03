@@ -92,7 +92,7 @@ services:
         aliases:
           - semantic-service
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:8001/readyz"]
+      test: ["CMD", "wget", "-qO-", "http://localhost:8001/lb-healthz"]
       interval: 10s
       timeout: 5s
       retries: 12

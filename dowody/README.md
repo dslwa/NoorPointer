@@ -1,6 +1,6 @@
 # Dowody z dzialania systemu
 
-Wygenerowane **2026-10-03 21:18** z wersji kodu **86efbeb** poleceniem `make evidence`.
+Wygenerowane **2026-10-03 21:46** z wersji kodu **d839c0f** poleceniem `make evidence`.
 To zrzut wynikow, a nie dokumentacja opisowa - dokumentacje znajdziesz w głównym `README.md`,
 a instrukcje uruchomienia w `START.md`.
 
