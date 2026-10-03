@@ -36,9 +36,9 @@ help: ## Lista komend pogrupowana w sekcje
 
 ##@ Stos
 
-up: ## Pelny stos w kontenerach + seed danych demo (klucze JWT generowane, jesli brak)
+up: ## Pelny stos + seed danych demo; --remove-orphans sprzata kontenery po usunietych serwisach
 	@test -f gateway/keys/jwt.pub || $(MAKE) --no-print-directory keys
-	$(COMPOSE) up -d --build
+	$(COMPOSE) up -d --build --remove-orphans
 	-@./scripts/seed.sh
 
 dev-infra: ## Tylko bazy i telemetria (Postgres, Redis, mock LLM, feed, Prometheus, Grafana)
