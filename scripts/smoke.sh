@@ -54,9 +54,24 @@ check_code "grafana health"       200 "$GRAFANA_URL/api/health"
 check_code "semantic /readyz"     "200,503" "$SEMANTIC_URL/readyz"
 
 echo "== proxy + guardrail wiring =="
-check_body "gateway -> mock-llm" "$GATEWAY_URL/v1/chat/completions" "choices" \
-  "${AUTH[@]+"${AUTH[@]}"}" -X POST -H 'Content-Type: application/json' \
-  -d '{"model":"mock-llm","agent_id":"smoke","messages":[{"role":"user","content":"smoke test"}]}'
+# Authenticated proxy call. A 401 here means the gateway rejects a token we believe is valid -
+# almost always a stale in-memory jwt.pub (the gateway reads the key only at startup).
+gw_out="$(mktemp)"
+gw_code=$(curl -s -o "$gw_out" -w '%{http_code}' --max-time 6 "${AUTH[@]+"${AUTH[@]}"}" \
+  -X POST -H 'Content-Type: application/json' \
+  -d '{"model":"mock-llm","agent_id":"smoke","messages":[{"role":"user","content":"smoke test"}]}' \
+  "$GATEWAY_URL/v1/chat/completions" 2>/dev/null)
+if [[ "$gw_code" == "200" ]] && grep -q choices "$gw_out"; then
+  ok "gateway -> mock-llm" "contains 'choices'"
+else
+  bad "gateway -> mock-llm" "got=${gw_code:-000}"
+  if [[ "$gw_code" == "401" || "$gw_code" == "403" ]]; then
+    echo "        HINT: gateway rejects the minted token. It reads jwt.pub only at startup, so a"
+    echo "              regenerated keypair needs: sudo docker compose up -d --force-recreate gateway"
+    [[ -n "$GATEWAY_JWT" ]] && ./scripts/verify-token-sig.sh "$GATEWAY_JWT" 2>&1 | sed 's/^/        /'
+  fi
+fi
+rm -f "$gw_out"
 # 200 = JWT not enforced yet, 401/403 = auth active (both are healthy outcomes here)
 check_code "gateway auth enforced?" "200,401,403" "$GATEWAY_URL/v1/chat/completions" \
   -X POST -H 'Content-Type: application/json' \

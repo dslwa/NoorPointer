@@ -1,3 +1,9 @@
+# Wspolne ustawienia serwisow dlugotrwalych (restart + siec). Serwisy jednorazowe
+# (tests, benchmarks) ustawiaja tylko siec - bez restart policy.
+x-service: &service
+  restart: unless-stopped
+  networks: [noorpointer-net]
+
 services:
   # ========================================================
   # DATA PLANE & PROXY (Go Gateway)
@@ -19,12 +25,10 @@ services:
       - CONTROLPLANE_URL=http://controlplane:8082
       - GATEWAY_TOKEN=${GATEWAY_TOKEN:-local-dev-gateway}
       - UPSTREAM_LLM_URL=http://mock-llm:11434
-      - POLICY_FILE=/app/config/policy.yaml
       - SIGNATURES_FEED_URL=http://signatures-feed:8085/signatures.json
-      - JWT_PUBLIC_KEY=/etc/noorpointer/jwt.pub
+      - JWT_PUBLIC_KEY=/app/keys/jwt.pub
     volumes:
-      - ./config/policy.yaml:/app/config/policy.yaml:ro
-      - ./gateway/keys/jwt.pub:/etc/noorpointer/jwt.pub:ro
+      - ./gateway/keys/jwt.pub:/app/keys/jwt.pub:ro,z
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:8080/healthz"]
       interval: 10s
@@ -42,12 +46,10 @@ services:
         condition: service_healthy
       mock-llm:
         condition: service_healthy
-    restart: unless-stopped
-    networks:
-      - noorpointer-net
+    <<: *service
 
   # ========================================================
-  # AI GUARDRAILS (Python DeBERTa v3, GLiNER Zero-Shot NER, Picklescan RCE via gRPC :50051)
+  # AI GUARDRAILS (Python DeBERTa v3, Presidio NER, Llama Guard, Picklescan RCE via gRPC :50051)
   # ========================================================
   semantic-service:
     build:
@@ -56,7 +58,7 @@ services:
     container_name: noorpointer-semantic
     ports:
       - "8001:8001" # FastAPI HTTP API & /metrics
-      - "50051:50051" # gRPC GuardrailService (Protobuf v3)
+      - "50051:50051" # gRPC noorpointer.semantic.v1.SemanticService
     environment:
       - PORT=8001
       - GRPC_PORT=50051
@@ -67,9 +69,7 @@ services:
     depends_on:
       mock-llm:
         condition: service_healthy
-    restart: unless-stopped
-    networks:
-      - noorpointer-net
+    <<: *service
 
   # ========================================================
   # CONTROL PLANE (Policy Catalog, PostgreSQL Audit, SIEM CEF Export & Dashboard API)
@@ -97,9 +97,7 @@ services:
         condition: service_healthy
       signatures-feed:
         condition: service_started
-    restart: unless-stopped
-    networks:
-      - noorpointer-net
+    <<: *service
 
   # ========================================================
   # MANAGEMENT & SECURITY DASHBOARD (React + Vite + Nginx API proxy)
@@ -115,14 +113,12 @@ services:
       controlplane:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:3000/"]
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:3000/"]
       interval: 10s
       timeout: 3s
       retries: 5
       start_period: 5s
-    restart: unless-stopped
-    networks:
-      - noorpointer-net
+    <<: *service
 
   # ========================================================
   # THREAT INTELLIGENCE FEED (External CVEs / Signatures)
@@ -133,11 +129,9 @@ services:
     ports:
       - "8085:8085"
     volumes:
-      - ./singatures-feed:/usr/share/nginx/html:ro
-      - ./singatures-feed/nginx.conf:/etc/nginx/conf.d/default.conf:ro
-    restart: unless-stopped
-    networks:
-      - noorpointer-net
+      - ./signatures-feed:/usr/share/nginx/html:ro,z
+      - ./signatures-feed/nginx.conf:/etc/nginx/conf.d/default.conf:ro,z
+    <<: *service
 
   # ========================================================
   # INFRASTRUCTURE STORAGE (PostgreSQL 16 JSONB & Redis 7 Token Bucket)
@@ -153,15 +147,12 @@ services:
       POSTGRES_DB: noorpointer
     volumes:
       - postgres-data:/var/lib/postgresql/data
-      - ./config/init-db.sql:/docker-entrypoint-initdb.d/init.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U noor -d noorpointer"]
       interval: 3s
       timeout: 3s
       retries: 5
-    restart: unless-stopped
-    networks:
-      - noorpointer-net
+    <<: *service
 
   redis:
     image: redis:7-alpine
@@ -173,9 +164,7 @@ services:
       interval: 3s
       timeout: 3s
       retries: 5
-    restart: unless-stopped
-    networks:
-      - noorpointer-net
+    <<: *service
 
   # ========================================================
   # MOCK LLM UPSTREAM (OpenAI- + Ollama-compatible, zero deps)
@@ -188,9 +177,7 @@ services:
     container_name: noorpointer-mock-llm
     ports:
       - "11434:11434" # drop-in for the old ollama port (curl debugging)
-    restart: unless-stopped
-    networks:
-      - noorpointer-net
+    <<: *service
 
   # ========================================================
   # TELEMETRY & OBSERVABILITY (Prometheus & Grafana)
@@ -201,14 +188,12 @@ services:
     ports:
       - "9091:9090" # Zewnętrzny 9091 (unikamy konfliktu z gateway:9090)
     volumes:
-      - ./telemetry/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - ./telemetry/alert.rules.yml:/etc/prometheus/alert.rules.yml:ro
+      - ./telemetry/prometheus.yml:/etc/prometheus/prometheus.yml:ro,z
+      - ./telemetry/alert.rules.yml:/etc/prometheus/alert.rules.yml:ro,z
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
       - "--storage.tsdb.path=/prometheus"
-    restart: unless-stopped
-    networks:
-      - noorpointer-net
+    <<: *service
 
   grafana:
     image: grafana/grafana:11.1.0
@@ -222,13 +207,11 @@ services:
       - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
       - GF_AUTH_DISABLE_LOGIN_FORM=true
     volumes:
-      - ./telemetry/grafana/provisioning:/etc/grafana/provisioning:ro
-      - ./telemetry/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - ./telemetry/grafana/provisioning:/etc/grafana/provisioning:ro,z
+      - ./telemetry/grafana/dashboards:/var/lib/grafana/dashboards:ro,z
     depends_on:
       - prometheus
-    restart: unless-stopped
-    networks:
-      - noorpointer-net
+    <<: *service
 
   # ========================================================
   # EVALUATION & AUTOMATION PROFILES (Tests & Benchmarks)
@@ -242,26 +225,28 @@ services:
       - GATEWAY_URL=http://gateway:8080
       - CONTROLPLANE_URL=http://controlplane:8082
       - ADMIN_TOKEN=${ADMIN_TOKEN:-local-dev-admin}
+      - GATEWAY_TOKEN=${GATEWAY_TOKEN:-local-dev-gateway}
       - SEMANTIC_URL=http://semantic-service:8001
     volumes:
-      - ./reports:/app/reports
+      # Kod testow jest montowany rownolegle do kopii w obrazie, zeby zmiany w pliku testow
+      # dzialaly bez przebudowy obrazu. Zmiany w requirements.txt nadal wymagaja: make test-rebuild.
+      - ./tests/test_guardrails.py:/app/test_guardrails.py:ro,z
+      - ./reports:/app/reports:z
     profiles:
       - tests
-    networks:
-      - noorpointer-net
+    networks: [noorpointer-net]
 
   benchmarks:
     image: grafana/k6:latest
     container_name: noorpointer-benchmarks
     volumes:
-      - ./benchmarks:/benchmarks
-      - ./reports:/reports
+      - ./benchmarks:/benchmarks:z
+      - ./reports:/reports:z
     environment:
       - TARGET_URL=http://gateway:8080
     profiles:
       - bench
-    networks:
-      - noorpointer-net
+    networks: [noorpointer-net]
 
 networks:
   noorpointer-net:

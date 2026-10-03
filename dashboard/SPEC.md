@@ -1,48 +1,52 @@
-# 📊 Dashboard (Security & Management UI)
+# Dashboard (Security & Management UI)
 
-## 👤 Właściciel (Owner)
+## Właściciel
 **Frontend Developer** / **Java / Fullstack Developer**
 
 ---
 
-## 🎯 Zakres (Scope)
-Interaktywny interfejs graficzny użytkownika (Dashboard UI). Stanowi **aż 20% łącznej oceny jury** (*Security Reporting*). 
-Odpowiada za wizualizację postury bezpieczeństwa, prezentację wykrytych incydentów w czasie rzeczywistym, kontrolę budżetów finansowych oraz umożliwia intuicyjny podgląd i edycję aktywnych guardraili dla dwóch grup odbiorców: kadry zarządzającej (Management) i oficerów bezpieczeństwa (Security Team).
+## Zakres
+Interaktywny interfejs graficzny użytkownika (Dashboard UI). Stanowi **20% łącznej oceny jury** (*Security Reporting*).
+Odpowiada za wizualizację postury bezpieczeństwa, prezentację wykrytych incydentów w czasie rzeczywistym, kontrolę budżetów finansowych oraz umożliwienie intuicyjnego podglądu i edycji aktywnych guardraili dla dwóch grup odbiorców: kadry zarządzającej (Management) i oficerów bezpieczeństwa (Security Team).
 
 ---
 
-## 🛠️ Czym się zajmuje (Kluczowe Odpowiedzialności)
+## Zakres odpowiedzialności
 
-1. **Widok dla Kadry Zarządzającej (Executive / Management View)**:
-   - **Wskaźnik Bezpieczeństwa (*Security Posture Score*)**: syntetyczny wskaźnik (0–100%) obrazujący aktualny poziom ochrony.
-   - **Wykresy Budżetowe i Kosztowe**:
-     - Wykorzystanie tokenów i kosztów w USD w czasie per zespół, agent i model.
+1. **Widok dla kadry zarządzającej (Executive / Management View)**:
+   - **Wskaźnik bezpieczeństwa (*Security Posture Score*)**: syntetyczny wskaźnik (0–100%) obrazujący aktualny poziom ochrony.
+   - **Wykresy budżetowe i kosztowe**:
+     - Wykorzystanie tokenów i kosztów w USD w czasie dla zespołu, agenta i modelu.
      - Ostrzeżenia o zbliżaniu się do limitów budżetowych.
-   - **Trendy Wolumenu Zapytań**: dozwolone vs zablokowane interakcje.
-2. **Widok dla Zespołu Bezpieczeństwa (Security Operations / SOC View)**:
-   - **Strumień Incydentów na Żywo (Threat Stream)**:
+   - **Trendy wolumenu zapytań**: dozwolone vs zablokowane interakcje.
+2. **Widok dla zespołu bezpieczeństwa (Security Operations / SOC View)**:
+   - **Strumień incydentów na żywo (Threat Stream)**:
      - Tabela zdarzeń z filtrowaniem po dacie, poziomie krytyczności, akcji (`BLOCKED`, `REDACTED`, `ALLOWED`).
-   - **Kategoryzacja wg OWASP**:
-     - Prezentacja zagrożeń pogrupowanych wg *OWASP Top 10 for LLMs* (np. LLM01: Prompt Injection, LLM06: Sensitive Information Disclosure) oraz *OWASP Agentic AI Threats*.
-   - **Szczegóły Incydentu (Forensics Modal)**:
+   - **Kategoryzacja według OWASP**:
+     - Prezentacja zagrożeń pogrupowanych według *OWASP Top 10 for LLMs* (np. LLM01: Prompt Injection, LLM06: Sensitive Information Disclosure) oraz *OWASP Agentic AI Threats*.
+   - **Szczegóły incydentu (Forensics Modal)**:
      - Podgląd promptu z zaznaczoną czerwoną flagą naruszenia (np. zanonimizowane PII, zablokowany exploit, dopasowana sygnatura CVE).
-3. **Katalog i Przełącznik Kontroli (Guardrails & Policy Control)**:
+3. **Katalog i przełącznik kontroli (Guardrails & Policy Control)**:
    - Wyświetlenie stanu guardraili (np. Regex PII, DeBERTa Prompt Injection, Loop Breaker, Skaner Modeli).
    - Możliwość przełączania profili bezpieczeństwa (`Strict`, `Balanced`, `Permissive`) lub ręcznego włączania/wyłączania kontroli na żywo podczas prezentacji dla jury.
-4. **Eksport Raportów**:
+4. **Eksport raportów**:
    - Przycisk pobrania raportu audytowego w formacie CSV / JSON / CEF wygenerowanego przez Control Plane.
 
 ---
 
-## 🔌 Interfejsy i Komunikacja
-- **Port aplikacji:** `3000` (React / Vite / Next.js)
-- **Komunikacja:** REST API z `controlplane:8082`
-- **Technologia:** React / TypeScript + Tailwind CSS / shadcn/ui lub gotowe komponenty wykresów (Recharts / Chart.js / Tremor).
+## Interfejsy i komunikacja
+- **Port aplikacji:** `3000` (React + Vite, serwowany przez Nginx)
+- **Komunikacja:** REST API z `controlplane:8082` przez proxy `/api` w Nginx
+- **Technologia:** React 19 + Vite (JSX), własne style CSS, bez frameworka UI i bez zewnętrznych bibliotek wykresów
+
+Dane w panelu pochodzą dziś z `make seed` (control plane), bo gateway nie wysyła jeszcze zdarzeń
+audytowych. Strony, które pokazujemy jurorom: incydenty i eksport, rewizje polityki, katalog sygnatur,
+zużycie budżetów.
 
 ---
 
-## 🏆 Definition of Done (Kryteria Sukcesu)
+## Kryteria ukończenia
 - [ ] Po wejściu pod `http://localhost:3000` jury widzi przejrzysty, nowoczesny dashboard bez błędów w konsoli.
 - [ ] Zablokowanie niebezpiecznego promptu w teście natychmiast pojawia się na wykresie i w tabeli incydentów.
 - [ ] Wykresy kosztów i tokenów poprawnie sumują zużycie zasobów.
-- [ ] Dostępny jest widok kategoryzacji zagrożeń wg taksonomii OWASP.
+- [ ] Dostępny jest widok kategoryzacji zagrożeń według taksonomii OWASP.

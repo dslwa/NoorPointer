@@ -1,96 +1,226 @@
-.PHONY: help up dev-infra down restart logs status build test bench demo clean postgres-up postgres-test-up controlplane-run controlplane-test controlplane-build dashboard-dev smoke bench-flood bench-budget offline-check report demo-full demo-strict verify verify-strict keys token
+# NoorPointer - infrastructure / DevOps entrypoint.
+#
+# Najkrotsza droga do dzialajacego stosu i dowodow:
+#   sudo make up          pelny stos + seed danych demo (upstream: mock LLM, runtime offline)
+#   make doctor           pre-flight: narzedzia, klucze, compose, token, wymuszanie auth
+#   sudo make test        e2e (seed + raport HTML)
+#   make verify           zero-prep: smoke + offline-check + scenariusze demo
+#   sudo make checkpoint  wszystko powyzsze + reports/INDEX.md + lista adresow
+#
+# Konwencja: komendy Makefile, ktore wolaja docker, uruchamiaj przez `sudo make ...`
+# (docker.sock jest root:docker). Skrypty czyste (curl) dzialaja bez sudo.
+# Grupy widac w `make help` (sekcje ##@).
 
-help: ## Pokazuje dostępne komendy
-	@echo "🛡️ NoorPointer Hackathon Commands:"
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2}'
+# --- narzedzia i zmienne wspolne -------------------------------------------------------------------
+COMPOSE         ?= docker compose
+COMPOSE_ALL      = $(COMPOSE) --profile tests --profile bench
+OLLAMA_COMPOSE   = $(COMPOSE) -f docker-compose.yaml -f docker-compose.ollama.yaml
 
-dev-infra: ## Uruchamia TYLKO bazy i telemetrię (Postgres, Redis, mock LLM, Threat Feed, Prometheus, Grafana) dla pracy lokalnej
-	docker compose up -d postgres redis mock-llm signatures-feed prometheus grafana
+# Mintujemy JWT raz na recipe. Pusty token zamienia kazde wywolanie gatewaya w 401, a $(...)
+# w Makefile cicho zwraca pusty string - dlatego twardo przerywamy.
+JWT_GUARD = jwt="$$(./scripts/token.sh)"; [ -n "$$jwt" ] || { echo "BLAD: pusty JWT - uruchom: make keys && make mint-build"; exit 1; }
+K6        = $(COMPOSE) run --rm -e GATEWAY_JWT="$$jwt" benchmarks run
 
-up: ## Uruchamia WSZYSTKIE serwisy w kontenerach (pełny stos demonstracyjny dla Jury)
-	@test -f gateway/keys/jwt.pub || $(MAKE) keys
-	docker compose up -d --build
+.PHONY: help \
+        up dev-infra down restart build clean logs status wait \
+        seed test test-unit test-local test-rebuild bench bench-flood bench-budget \
+        smoke verify verify-strict offline-check report checkpoint \
+        demo demo-full demo-strict \
+        keys mint-build token token-file reload-policy new-signature doctor urls \
+        ollama-up ollama-down \
+        postgres-up postgres-test-up controlplane-run controlplane-test controlplane-build dashboard-dev
 
-down: ## Zatrzymuje całe środowisko
-	docker compose down
+# --- pomoc -----------------------------------------------------------------------------------------
+help: ## Lista komend pogrupowana w sekcje
+	@awk 'BEGIN {FS = ":.*## "} /^##@/ {printf "\n\033[1m%s\033[0m\n", substr($$0, 5)} /^[a-zA-Z_-]+:.*## / {printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
-build: ## Buduje obrazy dla wszystkich serwisów
-	docker compose build
+##@ Stos
 
-restart: down up ## Restartuje całe środowisko
+up: ## Pelny stos + seed danych demo; czeka na gotowosc (semantic laduje modele ~2 min)
+	@test -f gateway/keys/jwt.pub || $(MAKE) --no-print-directory keys
+	$(COMPOSE) up -d --build --remove-orphans
+	@./scripts/wait-ready.sh
+	-@./scripts/seed.sh
 
-logs: ## Wyświetla zagregowane logi ze wszystkich kontenerów
-	docker compose logs -f
+wait: ## Czeka, az wszystkie uslugi odpowiedza (WAIT_TIMEOUT=sekundy, domyslnie 180)
+	./scripts/wait-ready.sh
 
-status: ## Pokazuje stan kontenerów i ich porty
-	docker compose ps
+dev-infra: ## Tylko bazy i telemetria (Postgres, Redis, mock LLM, feed, Prometheus, Grafana)
+	$(COMPOSE) up -d postgres redis mock-llm signatures-feed prometheus grafana
 
-test: ## Uruchamia automatyczny pakiet testów e2e (z generowaniem raportu HTML)
-	docker compose run --rm -e GATEWAY_JWT="$$(./scripts/token.sh)" tests
+down: ## Zatrzymuje srodowisko
+	$(COMPOSE) down
 
-bench: ## Uruchamia benchmarki wydajnościowe k6 (narzut p95)
-	docker compose run --rm -e GATEWAY_JWT="$$(./scripts/token.sh)" benchmarks run /benchmarks/benchmark_baseline.js
+restart: down up ## Restart calego srodowiska
 
-demo: ## Uruchamia scenariusze demonstracyjne agenta
-	GATEWAY_JWT="$$(./scripts/token.sh)" ./agent-demo/run.sh all
+build: ## Buduje obrazy wszystkich serwisow
+	$(COMPOSE) build
 
-clean: ## Czyści wolumeny i nieużywane obrazy Dockera
-	docker compose down -v --remove-orphans
+clean: ## Zatrzymuje i usuwa wolumeny (kasuje dane Postgresa - potem seed wroci z `make up`)
+	$(COMPOSE) down -v --remove-orphans
 
-postgres-up: ## Uruchamia PostgreSQL dla aplikacji i czeka na gotowość
-	docker compose up -d --wait postgres
+logs: ## Logi wszystkich kontenerow (follow)
+	$(COMPOSE) logs -f
 
-postgres-test-up: postgres-up ## Przygotowuje osobną bazę PostgreSQL dla testów Javy
-	docker compose exec -T postgres psql -U noor -d postgres -v ON_ERROR_STOP=1 < config/init-test-db.sql
+status: ## Stan kontenerow i porty
+	$(COMPOSE) ps
 
-controlplane-run: postgres-up ## Uruchamia PostgreSQL, buduje React i uruchamia Javę z panelem na :8082
-	cd controlplane && ./mvnw spring-boot:run
+seed: ## Wypelnia baze audytu danymi demo (potrzebne dla eksportu CEF)
+	./scripts/seed.sh
 
-controlplane-test: postgres-test-up ## Uruchamia testy modułu Java na osobnej bazie PostgreSQL
-	cd controlplane && ./mvnw test
+##@ Testy i dowody
 
-controlplane-build: postgres-test-up ## Sprawdza Javę na PostgreSQL i buduje JAR z panelem React
-	cd controlplane && ./mvnw verify
+test: seed ## e2e (seed + raport HTML); --build, bo obraz testow wpieka kod testow
+	@$(JWT_GUARD); $(COMPOSE) run --rm --build -e GATEWAY_JWT="$$jwt" tests; rc=$$?; \
+	chown -R "$$(stat -c '%u:%g' .)" reports 2>/dev/null || true; exit $$rc
 
-dashboard-dev: ## Uruchamia React z hot reload na :5173 (API Javy musi działać na :8082)
-	cd dashboard && npm ci --no-audit --no-fund && npm run dev
+test-unit: ## Testy jednostkowe modulow (Go teraz; nie wymagaja dzialajacego stosu)
+	cd gateway && go test ./...
 
-smoke: ## Sprawdza spięcie całego stosu (health + proxy + auth controlplane), zapisuje reports/smoke.txt
+test-local: ## e2e bez Dockera na opublikowanych portach (szybka petla: kilka sekund, nie minut)
+	@mkdir -p reports 2>/dev/null || true
+	@test -d .venv-tests || python3 -m venv .venv-tests
+	@.venv-tests/bin/pip -q install -r tests/requirements.txt
+	@$(JWT_GUARD); \
+	report=reports/test_report_local.html; \
+	if [ ! -w reports ]; then report="$${TMPDIR:-/tmp}/noorpointer-test_report_local.html"; \
+	  echo "uwaga: katalog reports/ nie jest zapisywalny - raport trafi do $$report"; \
+	fi; \
+	echo "raport: $$report"; \
+	GATEWAY_JWT="$$jwt" .venv-tests/bin/python -m pytest tests/test_guardrails.py -v \
+	  --html="$$report" --self-contained-html
+
+test-rebuild: ## Przebudowuje obraz testow (po zmianie requirements.txt)
+	$(COMPOSE) build --no-cache tests
+
+bench: ## k6: baseline (narzut p95)
+	@$(JWT_GUARD); $(K6) /benchmarks/benchmark_baseline.js
+
+bench-flood: ## k6: zalew zlosliwych promptow
+	@$(JWT_GUARD); $(K6) /benchmarks/benchmark_malicious_flood.js
+
+bench-budget: ## k6: rownolegle zapytania jednego agenta (atomowosc budzetu)
+	@$(JWT_GUARD); $(K6) /benchmarks/benchmark_budget_concurrency.js
+
+smoke: ## Spiecie calego stosu (health + proxy + auth), zapis do reports/smoke.txt
 	@mkdir -p reports
 	./scripts/smoke.sh | tee reports/smoke.txt
 
-bench-flood: ## k6: zalew złośliwych promptów (fast-block)
-	docker compose run --rm -e GATEWAY_JWT="$$(./scripts/token.sh)" benchmarks run /benchmarks/benchmark_malicious_flood.js
+verify: ## Zero-prep: smoke + offline-check + scenariusze demo (PENDING dozwolone)
+	./scripts/verify.sh
 
-bench-budget: ## k6: równoległe zapytania jednego agenta (atomowość budżetu)
-	docker compose run --rm -e GATEWAY_JWT="$$(./scripts/token.sh)" benchmarks run /benchmarks/benchmark_budget_concurrency.js
+verify-strict: ## Jak verify, ale PENDING liczy sie jako FAIL (po guardrailach gatewaya)
+	./scripts/verify.sh --strict
 
-offline-check: ## Lint: brak instalacji/pobierania w runtime (finalny stage obrazów)
+offline-check: ## Lint: brak pobierania/instalacji w runtime (finalny stage obrazow)
 	./scripts/offline-check.sh
 
 report: ## Zbiera dowody dla jury do reports/INDEX.md
 	./scripts/report.sh
 
-demo-full: ## Pełne demo: run.sh (5 scenariuszy) + scenariusze zaawansowane (PENDING dozwolone)
-	GATEWAY_JWT="$$(./scripts/token.sh)" ./agent-demo/run.sh all
+checkpoint: ## Zero-prep dowod: doctor -> up -> test -> raport + adresy
+	-@./scripts/doctor.sh
+	$(MAKE) --no-print-directory up
+	-$(MAKE) --no-print-directory test-unit
+	-$(MAKE) --no-print-directory test
+	./scripts/report.sh
+	@echo ""
+	@echo "== adresy =="
+	@$(MAKE) --no-print-directory urls
+
+##@ Demo agenta
+
+demo: ## Scenariusze demonstracyjne agenta (z seedem danych demo)
+	-@./scripts/seed.sh
+	@$(JWT_GUARD); GATEWAY_JWT="$$jwt" ./agent-demo/run.sh all
+
+demo-full: ## Demo + scenariusze zaawansowane (PENDING dozwolone)
+	-@./scripts/seed.sh
+	@$(JWT_GUARD); GATEWAY_JWT="$$jwt" ./agent-demo/run.sh all
 	./agent-demo/scenarios.sh
 
-demo-strict: ## Jak demo-full, ale PENDING (gateway bez guardraili) liczy się jako FAIL
-	GATEWAY_JWT="$$(./scripts/token.sh)" ./agent-demo/run.sh all
+demo-strict: ## Jak demo-full, ale PENDING liczy sie jako FAIL
+	-@./scripts/seed.sh
+	@$(JWT_GUARD); GATEWAY_JWT="$$jwt" ./agent-demo/run.sh all
 	./agent-demo/scenarios.sh --strict
 
-verify: ## Zero-prep: smoke + offline-check + scenariusze demo (PENDING dozwolone)
-	./scripts/smoke.sh
-	./scripts/offline-check.sh
-	./agent-demo/scenarios.sh
+##@ JWT i polityka
 
-verify-strict: ## Jak verify, ale PENDING liczy się jako FAIL (po guardrailach gatewaya)
-	./scripts/smoke.sh
-	./scripts/offline-check.sh
-	./agent-demo/scenarios.sh --strict
-
-keys: ## Generuje lokalną parę kluczy JWT gatewaya (gateway/keys, gitignored)
+keys: ## Generuje lokalna pare kluczy JWT gatewaya (gateway/keys, gitignored)
 	cd gateway && make keys
+	@echo "UWAGA: gateway czyta jwt.pub tylko przy starcie. Po regeneracji kluczy zrob:"
+	@echo "  sudo docker compose up -d --force-recreate gateway"
 
-token: ## Wypisuje świeży JWT dla gatewaya (AGENT=... TEAM=... TTL=...)
-	./scripts/token.sh
+mint-build: ## Buduje gateway/bin/mint raz (token bez 'go run', dziala tez pod sudo)
+	cd gateway && go build -o bin/mint ./cmd/mint
+	@echo "zbudowano gateway/bin/mint"
+
+token: ## Wypisuje swiezy JWT i tylko jego (bez tego nie nadaje sie do TOK=$(make token))
+	@./scripts/token.sh
+
+new-signature: ## Demo dla jury: dodaje sygnature do feedu i sprawdza, ze jest serwowana
+	./signatures-feed/push_new_signature.sh
+	@echo "--- kontrola feedu ---"
+	@curl -s -m 5 http://localhost:8085/signatures.json | python3 -c "import sys,json;d=json.load(sys.stdin);s=d['signatures'][-1];print('  sygnatur w feedzie:',len(d['signatures']),'| ostatnia:',s['id'],'/',s['pattern'])"
+	@$(JWT_GUARD); echo "--- proba uzycia wzorca z sygnatury ---"; \
+	code=$$(curl -s -o /dev/null -w '%{http_code}' -m 6 -X POST http://localhost:8080/v1/chat/completions \
+	  -H 'Content-Type: application/json' -H "Authorization: Bearer $$jwt" \
+	  -d '{"model":"llama3.2:1b","agent_id":"agent-zero-day","messages":[{"role":"user","content":"HACKATHON_ZERO_DAY_PAYLOAD_TEST"}]}'); \
+	echo "  HTTP $$code - gateway nie konsumuje jeszcze feedu, wiec 200 jest oczekiwane (403 po podlaczeniu sygnatur)"
+
+token-file: ## Zapisuje swiezy JWT do pliku 0600 (domyslnie /tmp/noorpointer-e2e.jwt); env GATEWAY_JWT jest preferowany
+	@f="$${TOKEN_FILE:-/tmp/noorpointer-e2e.jwt}"; umask 077; ./scripts/token.sh > "$$f"; \
+	  echo "zapisano token do $$f (uprawnienia 0600)"; \
+	  echo "preferowany sposob przekazania tokenu to zmienna srodowiskowa: TOK=\$$(make token)"; \
+	  echo "uzycie:"; \
+	  echo "  curl -s localhost:8080/v1/chat/completions -H \"Authorization: Bearer \$$(cat $$f)\" -H \"Content-Type: application/json\" -d '{\"model\":\"llama3.2:1b\",\"messages\":[{\"role\":\"user\",\"content\":\"test\"}]}'"
+
+reload-policy: ## Wymusza natychmiastowy reload polityki w gatewayu (Bearer GATEWAY_TOKEN)
+	@body=$$(mktemp); code=$$(curl -s -o "$$body" -w '%{http_code}' -X POST http://localhost:8080/admin/policy/reload \
+	  -H "Authorization: Bearer $${GATEWAY_TOKEN:-local-dev-gateway}"); \
+	echo "  HTTP $$code $$(cat "$$body")"; rm -f "$$body"; [ "$$code" = "200" ]
+
+doctor: ## Pre-flight: narzedzia, klucze JWT, compose, token, wymuszanie auth (bez zmian w stacku)
+	./scripts/doctor.sh
+
+urls: ## Adresy uslug i dane logowania
+	@echo "  dashboard     http://localhost:3000   (login: ADMIN_TOKEN = local-dev-admin)"
+	@echo "  grafana       http://localhost:3001   (admin/admin)"
+	@echo "  prometheus    http://localhost:9091/targets  oraz /alerts"
+	@echo "  controlplane  http://localhost:8082/actuator/health"
+	@echo "  semantic      http://localhost:8001/healthz , /readyz"
+	@echo "  gateway       http://localhost:8080/healthz (reszta tras wymaga JWT: make token)"
+	@echo "  feed sygnatur http://localhost:8085/signatures.json"
+	@echo "  mock LLM      http://localhost:11434/healthz"
+
+##@ Opcjonalny prawdziwy model (Ollama)
+
+ollama-up: ## Prawdziwa Llama przez Ollame + przelaczenie gatewaya na nia
+	$(OLLAMA_COMPOSE) up -d --wait ollama
+	$(OLLAMA_COMPOSE) exec ollama ollama pull llama3.2:1b
+	$(OLLAMA_COMPOSE) up -d gateway
+	@echo "gateway -> realna Ollama. Testy/bench wymagajace echo: make ollama-down"
+
+ollama-down: ## Powrot gatewaya na mock-llm (deterministyczne testy i bench)
+	$(COMPOSE) up -d --no-deps gateway
+	@echo "gateway -> mock-llm"
+
+##@ Praca nad modulami (dev, bez kontenera dla danego modulu)
+
+postgres-up: ## Postgres dla aplikacji i czeka na gotowosc
+	$(COMPOSE) up -d --wait postgres
+
+postgres-test-up: postgres-up ## Osobna baza PostgreSQL dla testow Javy
+	$(COMPOSE) exec -T postgres psql -U noor -d postgres -v ON_ERROR_STOP=1 < config/init-test-db.sql
+
+controlplane-run: postgres-up ## Uruchamia Jave (REST/panel) na :8082
+	cd controlplane && ./mvnw spring-boot:run
+
+controlplane-test: postgres-test-up ## Testy modulu Java na osobnej bazie
+	cd controlplane && ./mvnw test
+
+controlplane-build: postgres-test-up ## Weryfikacja Javy + budowa JAR
+	cd controlplane && ./mvnw verify
+
+dashboard-dev: ## React z hot reload na :5173 (API Javy musi dzialac na :8082)
+	cd dashboard && npm ci --no-audit --no-fund && npm run dev

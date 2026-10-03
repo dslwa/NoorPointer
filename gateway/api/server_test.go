@@ -3,11 +3,14 @@ package api
 import (
 	"crypto/rand"
 	"crypto/rsa"
+	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/dslwa/NoorPointer/gateway/config"
 	"github.com/dslwa/NoorPointer/gateway/types"
 	"github.com/golang-jwt/jwt/v5"
 )
@@ -55,10 +58,11 @@ func newTestServer(t *testing.T, pub *rsa.PublicKey) (http.Handler, *http.Reques
 	}))
 	t.Cleanup(upstream.Close)
 
-	s, err := NewServer(":0", upstream.URL, pub)
+	s, err := NewServer(":0", upstream.URL, pub, "http://unused", "test-token")
 	if err != nil {
 		t.Fatal(err)
 	}
+	s.policy.Store(&config.Policy{Version: 1})
 	return s.routes(), got
 }
 
@@ -74,7 +78,7 @@ func do(h http.Handler, method, path, auth string) *httptest.ResponseRecorder {
 
 func TestNewServerInvalidUpstream(t *testing.T) {
 	for _, u := range []string{"", "localhost:11434", "://bad", "http://"} {
-		if _, err := NewServer(":0", u, nil); err == nil {
+		if _, err := NewServer(":0", u, nil, "", "t"); err == nil {
 			t.Errorf("upstream %q: expected error", u)
 		}
 	}
@@ -144,5 +148,31 @@ func TestRejectedTokens(t *testing.T) {
 				t.Fatal("request reached upstream")
 			}
 		})
+	}
+}
+
+func TestNewServerEmptyGatewayToken(t *testing.T) {
+	if _, err := NewServer(":0", "http://upstream", nil, "http://cp", ""); err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestStartListenError(t *testing.T) {
+	s, err := NewServer(":-1", "http://upstream", nil, "http://127.0.0.1:1", "test-token")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Start(); err == nil {
+		t.Fatal("expected listen error")
+	}
+}
+
+func TestMakeHTTPHandleFuncError(t *testing.T) {
+	h := makeHTTPHandleFunc(func(http.ResponseWriter, *http.Request) error {
+		return errors.New("boom")
+	})
+	rec := do(h, http.MethodGet, "/", "")
+	if rec.Code != http.StatusBadRequest || !strings.Contains(rec.Body.String(), "boom") {
+		t.Fatalf("got %d %s", rec.Code, rec.Body)
 	}
 }

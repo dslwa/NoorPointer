@@ -10,9 +10,10 @@ from app.detectors.prompt_injection import PromptInjectionDetector
 
 def build_detectors(settings: Settings, client: httpx.AsyncClient) -> dict[str, Detector]:
     factories = {
-        "prompt_injection": lambda: PromptInjectionDetector(settings.pi_model, settings.torch_threads, settings.models_offline),
+        "prompt_injection": lambda: PromptInjectionDetector(settings.pi_model, settings.torch_threads, settings.models_offline,
+                                                     settings.pi_workers),
         "content_safety": lambda: ContentSafetyDetector(client, settings.ollama_url, settings.guard_model),
-        "pii_ner": lambda: PiiDetector(settings.spacy_model),
-        "leakage": LeakageDetector,
+        "pii_ner": lambda: PiiDetector(settings.spacy_model, settings.pii_workers),
+        "leakage": lambda: LeakageDetector(settings.leakage_workers),
     }
     return {name: factories[name]() for name in settings.enabled_checks if name in factories}

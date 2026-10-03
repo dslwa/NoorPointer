@@ -30,6 +30,9 @@ enum Status {
   STATUS_OK = 1;
   STATUS_TIMEOUT = 2; // gateway applies on_semantic_timeout (fail_open / fail_closed)
   STATUS_ERROR = 3;
+  // The input broke a hard limit (message too long, too many messages, request budget, too long for a
+  // check). Attackers can trigger this at will, so it is NOT subject to on_semantic_timeout: always block.
+  STATUS_REJECTED = 4;
 }
 
 message Message {
@@ -48,9 +51,14 @@ message AnalyzeRequest {
   string agent_id = 2;
   Direction direction = 3;
   // INPUT: only messages not already in gateway cache.
-  // OUTPUT: the model/tool output as role=assistant|tool, plus original role=system messages.
+  // OUTPUT: the model/tool output as role=assistant|tool, plus original role=system messages, plus the last
+  //         role=user message as context for content safety (not scanned again).
+  // Every (non-context message, check) pair gets exactly one CheckResult.
   repeated Message messages = 4;
   repeated CheckSpec checks = 5;
+  // Secret tokens planted in the system prompt; CHECK_SYSTEM_PROMPT_LEAK flags any output containing one
+  // (also base64-encoded). Max 100, each <= 256 chars.
+  repeated string canaries = 6;
 }
 
 message Span {

@@ -1,48 +1,74 @@
 groups:
   - name: noorpointer
     rules:
-      # --- availability ----------------------------------------------------------------------------------
+      # --- dostepnosc --------------------------------------------------------------------------------------
+      # Zadanie zbierajace metryki gatewaya w prometheus.yml jest zakomentowane do czasu, gdy gateway
+      # wystawi /metrics. Bez celu nie istnieje seria up{}, wiec alert nie moze sie wyzwolic.
+      # Po dodaniu metryk odkomentuj jednoczesnie zadanie w prometheus.yml i usun ten komentarz.
       - alert: GatewayDown
         expr: up{job="noorpointer-gateway"} == 0
         for: 30s
         labels: { severity: critical }
         annotations:
-          summary: "Gateway metrics endpoint down"
-          description: "Prometheus cannot scrape gateway:9090/metrics (missing or crashed)."
+          summary: "Brak odpowiedzi z gatewaya"
+          description: "Prometheus nie moze pobrac metryk z gateway:9090/metrics (endpoint nie istnieje lub proces nie dziala)."
 
       - alert: SemanticDown
         expr: up{job="noorpointer-semantic"} == 0
         for: 30s
         labels: { severity: critical }
         annotations:
-          summary: "Semantic service down"
+          summary: "Brak odpowiedzi z uslugi semantycznej"
 
       - alert: ControlPlaneDown
         expr: up{job="noorpointer-controlplane"} == 0
         for: 30s
         labels: { severity: critical }
         annotations:
-          summary: "Control plane down (or metrics auth broke)"
+          summary: "Brak odpowiedzi z control plane lub blad uwierzytelnienia metryk"
 
-      # --- semantic guardrails (SLA 200 ms, fail-closed) ---------------------------------------------------
+      # --- kontrole semantyczne (zalozony prog 200 ms) -----------------------------------------------------
       - alert: SemanticSlow
         expr: histogram_quantile(0.95, sum(rate(semantic_check_latency_seconds_bucket[1m])) by (le)) > 0.2
         for: 1m
         labels: { severity: warning }
         annotations:
-          summary: "Semantic p95 above 200 ms SLA"
+          summary: "p95 kontroli semantycznych powyzej 200 ms"
 
       - alert: SemanticCheckFailing
         expr: sum(rate(semantic_check_latency_seconds_count{status=~"error|timeout"}[1m])) > 0
         for: 1m
         labels: { severity: warning }
         annotations:
-          summary: "Semantic checks erroring/timing out (gateway falls back per on_timeout policy)"
+          summary: "Kontrole semantyczne konczace sie bledem lub przekroczeniem czasu"
 
-      # --- data plane (comes alive once the gateway exposes /metrics) --------------------------------------
+      # --- plaszczyzna danych (dziala po dodaniu /metrics w gatewayu) --------------------------------------
       - alert: GatewayBlockSpike
         expr: sum(rate(gateway_requests_total{action="blocked"}[1m])) > 5
         for: 1m
         labels: { severity: info }
         annotations:
-          summary: "Blocked requests spike (>5/s)"
+          summary: "Skok liczby zablokowanych zadan (powyzej 5 na sekunde)"
+
+      # --- brak danych (metryka nie istnieje albo nie ma ruchu) --------------------------------------------
+      # Alert oparty na rate() milczy zarowno wtedy, gdy wszystko dziala, jak i wtedy, gdy danych nie ma.
+      # Ponizsze reguly rozrozniaja te dwie sytuacje i nazywaja je wprost.
+      - alert: SemanticNoTraffic
+        # Licznik istnieje (eksportuje go prometheus_client), ale nic go nie zwiekszylo: usluga dziala,
+        # nie wykonano zadnej kontroli.
+        expr: sum(increase(semantic_check_latency_seconds_count[5m])) == 0
+        for: 10m
+        labels: { severity: info }
+        annotations:
+          summary: "Brak ruchu do uslugi semantycznej"
+          description: "Usluga odpowiada na zapytania metryk, ale nie wykonala zadnej kontroli w ciagu 5 minut."
+
+      - alert: GatewayMetricsMissing
+        # Warunek prawdziwy, bo metryka nie istnieje: gateway nie wystawia /metrics (znana luka).
+        # Alert wygasa sam, gdy pojawi sie gateway_requests_total.
+        expr: absent(gateway_requests_total)
+        for: 5m
+        labels: { severity: info }
+        annotations:
+          summary: "Gateway nie wystawia metryk"
+          description: "Brak serii gateway_requests_total. Po dodaniu /metrics odkomentuj zadanie zbierajace w prometheus.yml."

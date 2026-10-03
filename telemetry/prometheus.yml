@@ -6,13 +6,16 @@ rule_files:
   - /etc/prometheus/alert.rules.yml
 
 scrape_configs:
-  - job_name: "noorpointer-gateway"
-    metrics_path: /metrics
-    static_configs:
-      - targets: ["gateway:9090"]
-        labels:
-          component: "gateway"
-          tier: "data-plane"
+  # Zadanie dla gatewaya jest wylaczone, dopoki gateway nie wystawi GET /metrics na porcie 9090.
+  # Bez tego celu nie da sie zmierzyc narzutu, a alert GatewayDown nie ma danych.
+  # Po dodaniu endpointu odkomentuj ponizszy blok.
+  # - job_name: "noorpointer-gateway"
+  #   metrics_path: /metrics
+  #   static_configs:
+  #     - targets: ["gateway:9090"]
+  #       labels:
+  #         component: "gateway"
+  #         tier: "data-plane"
 
   - job_name: "noorpointer-semantic"
     metrics_path: /metrics
@@ -24,9 +27,9 @@ scrape_configs:
 
   - job_name: "noorpointer-controlplane"
     metrics_path: /actuator/prometheus
-    # /actuator/prometheus is ADMIN-only (SecurityConfig), so send the admin bearer token.
-    # Hardcoded to the compose default on purpose: prom/prometheus:v2.54.1 has no
-    # --config.expand-env, so ${ADMIN_TOKEN} would be used literally. Keep in sync if you change it.
+    # Endpoint /actuator/prometheus wymaga roli administratora, dlatego wysylamy token w naglowku.
+    # Wartosc jest wpisana na stale, bo prom/prometheus:v2.54.1 nie obsluguje flagi --config.expand-env
+    # i podstawienie ${ADMIN_TOKEN} zostaloby potraktowane doslownie. Przy zmianie ADMIN_TOKEN popraw oba miejsca.
     authorization:
       type: Bearer
       credentials: local-dev-admin

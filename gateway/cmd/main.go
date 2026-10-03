@@ -9,21 +9,25 @@ import (
 )
 
 func main() {
+	log.Fatal(run())
+}
+
+func run() error {
 	pem, err := os.ReadFile(env("JWT_PUBLIC_KEY", "keys/jwt.pub"))
 	if err != nil {
-		// env lets docker-compose configure the gateway, flags still win when passed.
-		log.Fatal(err)
+		return err
 	}
 	pubKey, err := jwt.ParseRSAPublicKeyFromPEM(pem)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 
-	server, err := api.NewServer(":"+env("PORT", "8080"), env("UPSTREAM_LLM_URL", "http://localhost:11434"), pubKey)
+	server, err := api.NewServer(":"+env("PORT", "8080"), env("UPSTREAM_LLM_URL", "http://localhost:11434"), pubKey,
+		env("CONTROLPLANE_URL", "http://localhost:8082"), env("GATEWAY_TOKEN", "local-dev-gateway"))
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
-	log.Fatal(server.Start())
+	return server.Start()
 }
 
 func env(key, fallback string) string {

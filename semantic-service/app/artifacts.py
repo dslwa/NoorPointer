@@ -35,6 +35,8 @@ def _host_allowed(host: str, allowed: list[str]) -> bool:
 
 
 def _check_url(url: str, allowed: list[str]) -> str:
+    if any(ord(ch) < 32 or ord(ch) == 127 for ch in url):  # httpx would raise InvalidURL, an unmapped error
+        raise InvalidSource("control characters in URL")
     if "://" not in url:
         url = "https://" + url
     parsed = urlparse(url)
@@ -51,14 +53,18 @@ async def download(client: httpx.AsyncClient, url: str, allowed: list[str], max_
     for _ in range(MAX_REDIRECTS + 1):
         async with client.stream("GET", url, follow_redirects=False) as resp:
             if resp.is_redirect:
-                url = _check_url(urljoin(url, resp.headers["location"]), allowed)
+                location = resp.headers.get("location")
+                if not location:
+                    raise FetchFailed(f"{url} redirected without a Location header")
+                url = _check_url(urljoin(url, location), allowed)
                 continue
             if resp.status_code == 404:
                 raise NotFound(f"{url} returned 404")
             if resp.status_code != 200:
                 raise FetchFailed(f"{url} returned HTTP {resp.status_code}")
-            if int(resp.headers.get("content-length") or 0) > max_bytes:
-                raise TooLarge(f"artifact is {resp.headers['content-length']} bytes, limit {max_bytes}")
+            declared = resp.headers.get("content-length", "")
+            if declared.isdigit() and int(declared) > max_bytes:  # early exit; the streaming cap below is the guard
+                raise TooLarge(f"artifact is {declared} bytes, limit {max_bytes}")
             chunks, size = [], 0
             async for chunk in resp.aiter_bytes():
                 size += len(chunk)
@@ -70,12 +76,19 @@ async def download(client: httpx.AsyncClient, url: str, allowed: list[str], max_
 
 
 def read_path(path: str, root: Path, max_bytes: int) -> tuple[str, bytes]:
+    if "\x00" in path:  # the OS call would raise ValueError, an unmapped error
+        raise InvalidSource("NUL byte in path")
     root = root.resolve()
     target = (root / path).resolve()
     if not target.is_relative_to(root):
         raise InvalidSource(f"path escapes the artifact volume {root}")
-    if not target.is_file():
-        raise NotFound(f"{path} not found in {root}")
-    if target.stat().st_size > max_bytes:
-        raise TooLarge(f"artifact is {target.stat().st_size} bytes, limit {max_bytes}")
-    return target.name, target.read_bytes()
+    try:
+        with target.open("rb") as f:  # one bounded read: the file may grow between a size check and the read
+            data = f.read(max_bytes + 1)
+    except (FileNotFoundError, IsADirectoryError, NotADirectoryError) as exc:
+        raise NotFound(f"{path} not found in {root}") from exc
+    except OSError as exc:
+        raise FetchFailed(f"cannot read {path}: {exc.strerror}") from exc
+    if len(data) > max_bytes:
+        raise TooLarge(f"artifact exceeds limit of {max_bytes} bytes")
+    return target.name, data

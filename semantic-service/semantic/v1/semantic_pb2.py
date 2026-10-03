@@ -24,7 +24,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x1asemantic/v1/semantic.proto\x12\x17noorpointer.semantic.v1\"4\n\x07Message\x12\n\n\x02id\x18\x01 \x01(\t\x12\x0c\n\x04role\x18\x02 \x01(\t\x12\x0f\n\x07\x63ontent\x18\x03 \x01(\t\"N\n\tCheckSpec\x12-\n\x05\x63heck\x18\x01 \x01(\x0e\x32\x1e.noorpointer.semantic.v1.Check\x12\x12\n\ntimeout_ms\x18\x02 \x01(\r\"\xd5\x01\n\x0e\x41nalyzeRequest\x12\x12\n\nrequest_id\x18\x01 \x01(\t\x12\x10\n\x08\x61gent_id\x18\x02 \x01(\t\x12\x35\n\tdirection\x18\x03 \x01(\x0e\x32\".noorpointer.semantic.v1.Direction\x12\x32\n\x08messages\x18\x04 \x03(\x0b\x32 .noorpointer.semantic.v1.Message\x12\x32\n\x06\x63hecks\x18\x05 \x03(\x0b\x32\".noorpointer.semantic.v1.CheckSpec\"U\n\x04Span\x12\x12\n\nmessage_id\x18\x01 \x01(\t\x12\r\n\x05start\x18\x02 \x01(\r\x12\x0b\n\x03\x65nd\x18\x03 \x01(\r\x12\x0e\n\x06\x65ntity\x18\x04 \x01(\t\x12\r\n\x05score\x18\x05 \x01(\x02\"\xf5\x01\n\x0b\x43heckResult\x12-\n\x05\x63heck\x18\x01 \x01(\x0e\x32\x1e.noorpointer.semantic.v1.Check\x12/\n\x06status\x18\x02 \x01(\x0e\x32\x1f.noorpointer.semantic.v1.Status\x12\x12\n\nmessage_id\x18\x03 \x01(\t\x12\r\n\x05score\x18\x04 \x01(\x02\x12\x12\n\ncategories\x18\x05 \x03(\t\x12,\n\x05spans\x18\x06 \x03(\x0b\x32\x1d.noorpointer.semantic.v1.Span\x12\x12\n\nlatency_ms\x18\x07 \x01(\r\x12\r\n\x05\x65rror\x18\x08 \x01(\t\"H\n\x0f\x41nalyzeResponse\x12\x35\n\x07results\x18\x01 \x03(\x0b\x32$.noorpointer.semantic.v1.CheckResult\"e\n\x13ScanArtifactRequest\x12\x12\n\nrequest_id\x18\x01 \x01(\t\x12\r\n\x03url\x18\x02 \x01(\tH\x00\x12\x0e\n\x04path\x18\x03 \x01(\tH\x00\x12\x11\n\tmax_bytes\x18\x04 \x01(\x04\x42\x08\n\x06source\"b\n\x0f\x41rtifactFinding\x12\x0e\n\x06module\x18\x01 \x01(\t\x12\x0c\n\x04name\x18\x02 \x01(\t\x12\x31\n\x07verdict\x18\x03 \x01(\x0e\x32 .noorpointer.semantic.v1.Verdict\"\xb9\x01\n\x14ScanArtifactResponse\x12\x31\n\x07verdict\x18\x01 \x01(\x0e\x32 .noorpointer.semantic.v1.Verdict\x12\x0e\n\x06\x66ormat\x18\x02 \x01(\t\x12\x0e\n\x06sha256\x18\x03 \x01(\t\x12:\n\x08\x66indings\x18\x04 \x03(\x0b\x32(.noorpointer.semantic.v1.ArtifactFinding\x12\x12\n\nlatency_ms\x18\x05 \x01(\r*\x85\x01\n\x05\x43heck\x12\x15\n\x11\x43HECK_UNSPECIFIED\x10\x00\x12\x1a\n\x16\x43HECK_PROMPT_INJECTION\x10\x01\x12\x18\n\x14\x43HECK_CONTENT_SAFETY\x10\x02\x12\x11\n\rCHECK_PII_NER\x10\x03\x12\x1c\n\x18\x43HECK_SYSTEM_PROMPT_LEAK\x10\x04*Q\n\tDirection\x12\x19\n\x15\x44IRECTION_UNSPECIFIED\x10\x00\x12\x13\n\x0f\x44IRECTION_INPUT\x10\x01\x12\x14\n\x10\x44IRECTION_OUTPUT\x10\x02*U\n\x06Status\x12\x16\n\x12STATUS_UNSPECIFIED\x10\x00\x12\r\n\tSTATUS_OK\x10\x01\x12\x12\n\x0eSTATUS_TIMEOUT\x10\x02\x12\x10\n\x0cSTATUS_ERROR\x10\x03*c\n\x07Verdict\x12\x17\n\x13VERDICT_UNSPECIFIED\x10\x00\x12\x10\n\x0cVERDICT_SAFE\x10\x01\x12\x16\n\x12VERDICT_SUSPICIOUS\x10\x02\x12\x15\n\x11VERDICT_MALICIOUS\x10\x03\x32\xdc\x01\n\x0fSemanticService\x12\\\n\x07\x41nalyze\x12\'.noorpointer.semantic.v1.AnalyzeRequest\x1a(.noorpointer.semantic.v1.AnalyzeResponse\x12k\n\x0cScanArtifact\x12,.noorpointer.semantic.v1.ScanArtifactRequest\x1a-.noorpointer.semantic.v1.ScanArtifactResponseB@Z>github.com/dslwa/NoorPointer/gateway/gen/semanticv1;semanticv1b\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x1asemantic/v1/semantic.proto\x12\x17noorpointer.semantic.v1\"4\n\x07Message\x12\n\n\x02id\x18\x01 \x01(\t\x12\x0c\n\x04role\x18\x02 \x01(\t\x12\x0f\n\x07\x63ontent\x18\x03 \x01(\t\"N\n\tCheckSpec\x12-\n\x05\x63heck\x18\x01 \x01(\x0e\x32\x1e.noorpointer.semantic.v1.Check\x12\x12\n\ntimeout_ms\x18\x02 \x01(\r\"\xe7\x01\n\x0e\x41nalyzeRequest\x12\x12\n\nrequest_id\x18\x01 \x01(\t\x12\x10\n\x08\x61gent_id\x18\x02 \x01(\t\x12\x35\n\tdirection\x18\x03 \x01(\x0e\x32\".noorpointer.semantic.v1.Direction\x12\x32\n\x08messages\x18\x04 \x03(\x0b\x32 .noorpointer.semantic.v1.Message\x12\x32\n\x06\x63hecks\x18\x05 \x03(\x0b\x32\".noorpointer.semantic.v1.CheckSpec\x12\x10\n\x08\x63\x61naries\x18\x06 \x03(\t\"U\n\x04Span\x12\x12\n\nmessage_id\x18\x01 \x01(\t\x12\r\n\x05start\x18\x02 \x01(\r\x12\x0b\n\x03\x65nd\x18\x03 \x01(\r\x12\x0e\n\x06\x65ntity\x18\x04 \x01(\t\x12\r\n\x05score\x18\x05 \x01(\x02\"\xf5\x01\n\x0b\x43heckResult\x12-\n\x05\x63heck\x18\x01 \x01(\x0e\x32\x1e.noorpointer.semantic.v1.Check\x12/\n\x06status\x18\x02 \x01(\x0e\x32\x1f.noorpointer.semantic.v1.Status\x12\x12\n\nmessage_id\x18\x03 \x01(\t\x12\r\n\x05score\x18\x04 \x01(\x02\x12\x12\n\ncategories\x18\x05 \x03(\t\x12,\n\x05spans\x18\x06 \x03(\x0b\x32\x1d.noorpointer.semantic.v1.Span\x12\x12\n\nlatency_ms\x18\x07 \x01(\r\x12\r\n\x05\x65rror\x18\x08 \x01(\t\"H\n\x0f\x41nalyzeResponse\x12\x35\n\x07results\x18\x01 \x03(\x0b\x32$.noorpointer.semantic.v1.CheckResult\"e\n\x13ScanArtifactRequest\x12\x12\n\nrequest_id\x18\x01 \x01(\t\x12\r\n\x03url\x18\x02 \x01(\tH\x00\x12\x0e\n\x04path\x18\x03 \x01(\tH\x00\x12\x11\n\tmax_bytes\x18\x04 \x01(\x04\x42\x08\n\x06source\"b\n\x0f\x41rtifactFinding\x12\x0e\n\x06module\x18\x01 \x01(\t\x12\x0c\n\x04name\x18\x02 \x01(\t\x12\x31\n\x07verdict\x18\x03 \x01(\x0e\x32 .noorpointer.semantic.v1.Verdict\"\xb9\x01\n\x14ScanArtifactResponse\x12\x31\n\x07verdict\x18\x01 \x01(\x0e\x32 .noorpointer.semantic.v1.Verdict\x12\x0e\n\x06\x66ormat\x18\x02 \x01(\t\x12\x0e\n\x06sha256\x18\x03 \x01(\t\x12:\n\x08\x66indings\x18\x04 \x03(\x0b\x32(.noorpointer.semantic.v1.ArtifactFinding\x12\x12\n\nlatency_ms\x18\x05 \x01(\r*\x85\x01\n\x05\x43heck\x12\x15\n\x11\x43HECK_UNSPECIFIED\x10\x00\x12\x1a\n\x16\x43HECK_PROMPT_INJECTION\x10\x01\x12\x18\n\x14\x43HECK_CONTENT_SAFETY\x10\x02\x12\x11\n\rCHECK_PII_NER\x10\x03\x12\x1c\n\x18\x43HECK_SYSTEM_PROMPT_LEAK\x10\x04*Q\n\tDirection\x12\x19\n\x15\x44IRECTION_UNSPECIFIED\x10\x00\x12\x13\n\x0f\x44IRECTION_INPUT\x10\x01\x12\x14\n\x10\x44IRECTION_OUTPUT\x10\x02*j\n\x06Status\x12\x16\n\x12STATUS_UNSPECIFIED\x10\x00\x12\r\n\tSTATUS_OK\x10\x01\x12\x12\n\x0eSTATUS_TIMEOUT\x10\x02\x12\x10\n\x0cSTATUS_ERROR\x10\x03\x12\x13\n\x0fSTATUS_REJECTED\x10\x04*c\n\x07Verdict\x12\x17\n\x13VERDICT_UNSPECIFIED\x10\x00\x12\x10\n\x0cVERDICT_SAFE\x10\x01\x12\x16\n\x12VERDICT_SUSPICIOUS\x10\x02\x12\x15\n\x11VERDICT_MALICIOUS\x10\x03\x32\xdc\x01\n\x0fSemanticService\x12\\\n\x07\x41nalyze\x12\'.noorpointer.semantic.v1.AnalyzeRequest\x1a(.noorpointer.semantic.v1.AnalyzeResponse\x12k\n\x0cScanArtifact\x12,.noorpointer.semantic.v1.ScanArtifactRequest\x1a-.noorpointer.semantic.v1.ScanArtifactResponseB@Z>github.com/dslwa/NoorPointer/gateway/gen/semanticv1;semanticv1b\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -32,32 +32,32 @@ _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'semantic.v1.semantic_pb2', 
 if not _descriptor._USE_C_DESCRIPTORS:
   _globals['DESCRIPTOR']._loaded_options = None
   _globals['DESCRIPTOR']._serialized_options = b'Z>github.com/dslwa/NoorPointer/gateway/gen/semanticv1;semanticv1'
-  _globals['_CHECK']._serialized_start=1206
-  _globals['_CHECK']._serialized_end=1339
-  _globals['_DIRECTION']._serialized_start=1341
-  _globals['_DIRECTION']._serialized_end=1422
-  _globals['_STATUS']._serialized_start=1424
-  _globals['_STATUS']._serialized_end=1509
-  _globals['_VERDICT']._serialized_start=1511
-  _globals['_VERDICT']._serialized_end=1610
+  _globals['_CHECK']._serialized_start=1224
+  _globals['_CHECK']._serialized_end=1357
+  _globals['_DIRECTION']._serialized_start=1359
+  _globals['_DIRECTION']._serialized_end=1440
+  _globals['_STATUS']._serialized_start=1442
+  _globals['_STATUS']._serialized_end=1548
+  _globals['_VERDICT']._serialized_start=1550
+  _globals['_VERDICT']._serialized_end=1649
   _globals['_MESSAGE']._serialized_start=55
   _globals['_MESSAGE']._serialized_end=107
   _globals['_CHECKSPEC']._serialized_start=109
   _globals['_CHECKSPEC']._serialized_end=187
   _globals['_ANALYZEREQUEST']._serialized_start=190
-  _globals['_ANALYZEREQUEST']._serialized_end=403
-  _globals['_SPAN']._serialized_start=405
-  _globals['_SPAN']._serialized_end=490
-  _globals['_CHECKRESULT']._serialized_start=493
-  _globals['_CHECKRESULT']._serialized_end=738
-  _globals['_ANALYZERESPONSE']._serialized_start=740
-  _globals['_ANALYZERESPONSE']._serialized_end=812
-  _globals['_SCANARTIFACTREQUEST']._serialized_start=814
-  _globals['_SCANARTIFACTREQUEST']._serialized_end=915
-  _globals['_ARTIFACTFINDING']._serialized_start=917
-  _globals['_ARTIFACTFINDING']._serialized_end=1015
-  _globals['_SCANARTIFACTRESPONSE']._serialized_start=1018
-  _globals['_SCANARTIFACTRESPONSE']._serialized_end=1203
-  _globals['_SEMANTICSERVICE']._serialized_start=1613
-  _globals['_SEMANTICSERVICE']._serialized_end=1833
+  _globals['_ANALYZEREQUEST']._serialized_end=421
+  _globals['_SPAN']._serialized_start=423
+  _globals['_SPAN']._serialized_end=508
+  _globals['_CHECKRESULT']._serialized_start=511
+  _globals['_CHECKRESULT']._serialized_end=756
+  _globals['_ANALYZERESPONSE']._serialized_start=758
+  _globals['_ANALYZERESPONSE']._serialized_end=830
+  _globals['_SCANARTIFACTREQUEST']._serialized_start=832
+  _globals['_SCANARTIFACTREQUEST']._serialized_end=933
+  _globals['_ARTIFACTFINDING']._serialized_start=935
+  _globals['_ARTIFACTFINDING']._serialized_end=1033
+  _globals['_SCANARTIFACTRESPONSE']._serialized_start=1036
+  _globals['_SCANARTIFACTRESPONSE']._serialized_end=1221
+  _globals['_SEMANTICSERVICE']._serialized_start=1652
+  _globals['_SEMANTICSERVICE']._serialized_end=1872
 # @@protoc_insertion_point(module_scope)

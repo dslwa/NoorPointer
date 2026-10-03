@@ -6,26 +6,33 @@ class _TooLarge(Exception):
 
 
 class BodySizeLimit:
-    """ASGI middleware enforcing a request-body limit while the body is received, so an oversized upload is
-    rejected up front (Content-Length) or cut off mid-stream (chunked), before multipart parsing spools it."""
+    """ASGI middleware enforcing a request-body limit while the body is received, so an oversized request
+    is rejected up front (Content-Length) or cut off mid-stream (chunked), before any parsing or spooling.
+    `limits` maps exact paths to their limit; every other path gets `default`."""
 
-    def __init__(self, app, limit: int, path_prefix: str) -> None:
+    def __init__(self, app, limits: dict[str, int], default: int) -> None:
         self.app = app
-        self.limit = limit
-        self.prefix = path_prefix
+        self.limits = limits
+        self.default = default
 
-    async def _reject(self, send) -> None:
-        body = json.dumps({"detail": f"request body larger than {self.limit} bytes"}).encode()
-        await send({"type": "http.response.start", "status": 413,
+    @staticmethod
+    async def _error(send, status: int, detail: str) -> None:
+        body = json.dumps({"detail": detail}).encode()
+        await send({"type": "http.response.start", "status": status,
                     "headers": [(b"content-type", b"application/json"), (b"content-length", str(len(body)).encode())]})
         await send({"type": "http.response.body", "body": body})
 
     async def __call__(self, scope, receive, send):
-        if scope["type"] != "http" or not scope["path"].startswith(self.prefix):
+        if scope["type"] != "http":
             return await self.app(scope, receive, send)
+        limit = self.limits.get(scope["path"].rstrip("/") or "/", self.default)
+        too_large = f"request body larger than {limit} bytes"
         length = dict(scope["headers"]).get(b"content-length")
-        if length is not None and int(length) > self.limit:
-            return await self._reject(send)
+        if length is not None:
+            if not length.isdigit():
+                return await self._error(send, 400, "invalid Content-Length")
+            if int(length) > limit:
+                return await self._error(send, 413, too_large)
 
         received = 0
         exceeded = False
@@ -35,7 +42,7 @@ class BodySizeLimit:
             message = await receive()
             if message["type"] == "http.request":
                 received += len(message.get("body", b""))
-                if received > self.limit:
+                if received > limit:
                     exceeded = True
                     raise _TooLarge()
             return message
@@ -47,7 +54,7 @@ class BodySizeLimit:
             if exceeded:  # the app turned our exception into its own error response: replace it with a 413
                 if not responded:
                     responded = True
-                    await self._reject(send)
+                    await self._error(send, 413, too_large)
                 return
             responded = True
             await send(message)
@@ -56,4 +63,4 @@ class BodySizeLimit:
             await self.app(scope, limited_receive, guarded_send)
         except _TooLarge:
             if not responded:
-                await self._reject(send)
+                await self._error(send, 413, too_large)

@@ -1,11 +1,32 @@
+import collections
 import os
+import pickle
+
 import requests
 import pytest
 
 GATEWAY_URL = os.getenv("GATEWAY_URL", "http://localhost:8080")
+GATEWAY_JWT = os.getenv("GATEWAY_JWT", "")
 SEMANTIC_URL = os.getenv("SEMANTIC_URL", "http://localhost:8001")
 CONTROLPLANE_URL = os.getenv("CONTROLPLANE_URL", "http://localhost:8082")
 ADMIN_TOKEN = os.getenv("ADMIN_TOKEN", "local-dev-admin")
+
+# Bez tokenu kazde zadanie do gatewaya zwroci 401, a komunikat testu nie powie dlaczego.
+# Uruchamiaj przez "make test" (wstrzykuje GATEWAY_JWT) albo ustaw recznie:
+# export GATEWAY_JWT="$(./scripts/token.sh)"
+if not GATEWAY_JWT:
+    raise RuntimeError(
+        "GATEWAY_JWT jest pusty - kazde zadanie do gatewaya zwroci 401. "
+        'Uruchom testy przez "make test" albo ustaw: export GATEWAY_JWT="$(./scripts/token.sh)"'
+    )
+
+def gw_headers(extra: dict | None = None) -> dict:
+    headers = {"Content-Type": "application/json"}
+    if GATEWAY_JWT:
+        headers["Authorization"] = f"Bearer {GATEWAY_JWT}"
+    if extra:
+        headers.update(extra)
+    return headers
 
 def send_chat_completion(content: str, agent_id: str = "agent-test-01", headers: dict = None):
     url = f"{GATEWAY_URL}/v1/chat/completions"
@@ -16,10 +37,7 @@ def send_chat_completion(content: str, agent_id: str = "agent-test-01", headers:
             {"role": "user", "content": content}
         ]
     }
-    req_headers = {"Content-Type": "application/json"}
-    if headers:
-        req_headers.update(headers)
-    return requests.post(url, json=payload, headers=req_headers, timeout=5)
+    return requests.post(url, json=payload, headers=gw_headers(headers), timeout=5)
 
 # ============================================================================
 # 1. PII Detection & Redaction (Pozytywny / Negatywny)
@@ -35,6 +53,8 @@ def test_pii_pesel_redacted():
     """Negatywny: prompt z numerem PESEL zostaje zredagowany w locie"""
     resp = send_chat_completion("My identification number is PESEL 95081212345.")
     assert resp.status_code == 200, f"Expected 200 OK (with redaction), got {resp.status_code}"
+    assert "95081212345" not in resp.text
+    assert "[REDACTED" in resp.text
 
 # ============================================================================
 # 2. Secrets Leakage (Pozytywny / Negatywny)
@@ -109,25 +129,36 @@ def test_loop_breaker_repeated_calls_terminated():
 # ============================================================================
 # 7. Skaner Modeli Pickle RCE (Supply Chain Security: Pozytywny / Negatywny)
 # ============================================================================
+class _RcePayload:
+    """Pickles to a call of os.system on load: the classic malicious-model payload. It is only pickled
+    (never unpickled) here; the scanner must flag it without executing it."""
+    def __reduce__(self):
+        return (os.system, ("echo pwned",))
+
+def _scan_model_file(filename: str, content: bytes):
+    return requests.post(f"{SEMANTIC_URL}/v1/scan/model", files={"file": (filename, content)}, timeout=30)
+
 def test_model_scanner_safe_weights():
-    """Pozytywny: bezpieczny plik modelu przechodzi audyt"""
-    resp = requests.post(f"{SEMANTIC_URL}/v1/scan/model", json={"file_path": "model_safe.bin"}, timeout=3)
+    """Pozytywny: bezpieczny plik modelu (prawdziwy pickle z wagami) przechodzi audyt"""
+    weights = pickle.dumps(collections.OrderedDict(layer1=[0.1, 0.2], layer2=[0.3]), protocol=4)
+    resp = _scan_model_file("model_safe.bin", weights)
     assert resp.status_code == 200
     assert resp.json().get("safe") is True
 
 def test_model_scanner_malicious_pickle_blocked():
     """Negatywny: plik modelu zawierający szkodliwy ładunek os.system / RCE jest wykrywany"""
-    resp = requests.post(f"{SEMANTIC_URL}/v1/scan/model", json={"file_path": "malicious_posix.system_model.bin"}, timeout=3)
+    resp = _scan_model_file("model.bin", pickle.dumps(_RcePayload(), protocol=2))
     assert resp.status_code == 200
     assert resp.json().get("safe") is False
-    assert len(resp.json().get("dangerous_opcodes")) > 0
+    assert resp.json().get("verdict") == "dangerous"
+    assert "posix.system" in resp.json().get("dangerous_imports")
 
 # ============================================================================
 # 8. Hot-Reload & SIEM Audit Export (Wymogi 1 & 5)
 # ============================================================================
 def test_policy_hot_reload():
     """Weryfikacja przeładowania konfiguracji bez restartu kontenera"""
-    resp = requests.post(f"{GATEWAY_URL}/admin/policy/reload", timeout=3)
+    resp = requests.post(f"{GATEWAY_URL}/admin/policy/reload", headers=gw_headers(), timeout=3)
     assert resp.status_code == 200
     assert resp.json().get("status") == "reloaded"
 
