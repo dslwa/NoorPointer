@@ -27,12 +27,36 @@ K6        = $(COMPOSE) run --rm -e GATEWAY_JWT="$$jwt" benchmarks run
         smoke verify verify-strict offline-check report deck checkpoint \
         demo demo-full demo-strict \
         keys mint-build token token-file reload-policy new-signature db-tidy doctor urls \
+        jury scan policy-edit policy-apply signature evidence stop \
         ollama-up ollama-down \
         postgres-up postgres-test-up controlplane-run controlplane-test controlplane-build dashboard-dev
 
 # --- pomoc -----------------------------------------------------------------------------------------
 help: ## Lista komend pogrupowana w sekcje
 	@awk 'BEGIN {FS = ":.*## "} /^##@/ {printf "\n\033[1m%s\033[0m\n", substr($$0, 5)} /^[a-zA-Z_-]+:.*## / {printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+
+##@ Zacznij tutaj (dla osob oceniajacych)
+
+jury: ## JEDNO polecenie: srodowisko, start stosu, wszystkie testy, ruch na panele i dowody
+	./scripts/jury.sh
+
+scan: ## Sprawdz dowolny tekst kontrolami AI: make scan TEXT="twoj tekst" [CHECKS=...]
+	./scripts/scan.sh
+
+policy-edit: ## Zapisz aktualne zasady bezpieczenstwa do policy.local.json (do edycji)
+	./scripts/policy-edit.sh
+
+policy-apply: ## Opublikuj edytowane zasady i przeladuj gateway bez restartu
+	./scripts/policy-apply.sh
+
+signature: ## Dodaj wlasna regule ataku: make signature PATTERN='...' NAME='...'
+	@$(MAKE) --no-print-directory new-signature PATTERN="$(PATTERN)" NAME="$(NAME)" ACTION="$(ACTION)"
+
+evidence: ## Zbiera dowody do katalogu dowody/ (widoczne na GitHubie bez uruchamiania)
+	./scripts/evidence.sh
+
+stop: ## Zatrzymuje stos (dane i wolumeny zostaja, wracasz przez: make up)
+	@$(MAKE) --no-print-directory down
 
 ##@ Stos
 
