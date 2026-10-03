@@ -20,9 +20,14 @@ func claimsFor(r *http.Request) *types.Claims {
 
 func (s *Server) withPolicy(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		p := s.policy.Load()
+		if p == nil {
+			WriteJSON(w, http.StatusServiceUnavailable, APIError{Error: "policy not loaded"})
+			return
+		}
 		claims := claimsFor(r)
 		// ponytail: logs identity only, policy checks land here next
-		log.Printf("request sub=%s team=%s %s %s", claims.Subject, claims.Team, r.Method, r.URL.Path)
+		log.Printf("request sub=%s team=%s policy=%d %s %s", claims.Subject, claims.Team, p.Version, r.Method, r.URL.Path)
 		next.ServeHTTP(w, r)
 	})
 }

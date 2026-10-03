@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dslwa/NoorPointer/gateway/config"
 	"github.com/dslwa/NoorPointer/gateway/types"
 	"github.com/golang-jwt/jwt/v5"
 )
@@ -55,10 +56,11 @@ func newTestServer(t *testing.T, pub *rsa.PublicKey) (http.Handler, *http.Reques
 	}))
 	t.Cleanup(upstream.Close)
 
-	s, err := NewServer(":0", upstream.URL, pub)
+	s, err := NewServer(":0", upstream.URL, pub, "http://unused", "test-token")
 	if err != nil {
 		t.Fatal(err)
 	}
+	s.policy.Store(&config.Policy{Version: 1})
 	return s.routes(), got
 }
 
@@ -74,7 +76,7 @@ func do(h http.Handler, method, path, auth string) *httptest.ResponseRecorder {
 
 func TestNewServerInvalidUpstream(t *testing.T) {
 	for _, u := range []string{"", "localhost:11434", "://bad", "http://"} {
-		if _, err := NewServer(":0", u, nil); err == nil {
+		if _, err := NewServer(":0", u, nil, "", "t"); err == nil {
 			t.Errorf("upstream %q: expected error", u)
 		}
 	}
