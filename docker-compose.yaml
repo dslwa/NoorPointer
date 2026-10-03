@@ -37,7 +37,8 @@ services:
     volumes:
       - ./gateway/keys/jwt.pub:/app/keys/jwt.pub:ro,z
     healthcheck:
-      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:8080/healthz"]
+      # 127.0.0.1, nie localhost - BusyBox wget potrafi wybrac ::1 (ta sama pulapka co w semantic-lb).
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/healthz"]
       interval: 10s
       timeout: 3s
       retries: 5
@@ -109,7 +110,9 @@ services:
         aliases:
           - semantic-service
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:8001/lb-healthz"]
+      # 127.0.0.1, nie localhost: BusyBox wget potrafi wybrac ::1, a nginx nasluchuje tylko IPv4
+      # (0.0.0.0:8001) - wtedy healthcheck jest wiecznie "unhealthy", choc LB dziala.
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8001/lb-healthz"]
       interval: 10s
       timeout: 5s
       retries: 12
