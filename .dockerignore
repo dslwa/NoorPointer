@@ -1,0 +1,9 @@
+.git
+.idea
+.cache
+**/target
+**/data
+**/__pycache__
+**/.venv
+reports
+.env

@@ -1,4 +1,4 @@
-.PHONY: help up dev-infra down restart logs status build test bench demo clean
+.PHONY: help up dev-infra down restart logs status build test bench demo clean postgres-up postgres-test-up controlplane-run controlplane-test controlplane-build
 
 help: ## Pokazuje dostępne komendy
 	@echo "🛡️ NoorPointer Hackathon Commands:"
@@ -35,3 +35,18 @@ demo: ## Uruchamia scenariusze demonstracyjne agenta
 
 clean: ## Czyści wolumeny i nieużywane obrazy Dockera
 	docker compose down -v --remove-orphans
+
+postgres-up: ## Uruchamia PostgreSQL dla aplikacji i czeka na gotowość
+	docker compose up -d --wait postgres
+
+postgres-test-up: postgres-up ## Przygotowuje osobną bazę PostgreSQL dla testów Javy
+	docker compose exec -T postgres psql -U noor -d postgres -v ON_ERROR_STOP=1 < config/init-test-db.sql
+
+controlplane-run: postgres-up ## Uruchamia PostgreSQL, a następnie Javę i dashboard lokalnie na :8082
+	cd controlplane && ./mvnw spring-boot:run
+
+controlplane-test: postgres-test-up ## Uruchamia testy modułu Java na osobnej bazie PostgreSQL
+	cd controlplane && ./mvnw test
+
+controlplane-build: postgres-test-up ## Sprawdza Javę na PostgreSQL i buduje JAR z frontendem z dashboard/
+	cd controlplane && ./mvnw verify

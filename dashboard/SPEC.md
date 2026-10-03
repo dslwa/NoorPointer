@@ -1,16 +1,5 @@
 # 📊 Dashboard (Security & Management UI)
 
-## Aktualna prosta implementacja
-
-Frontend HTML/CSS/JavaScript znajduje się w `index.html`, `app.js`, `styles.css` i `favicon.svg`. Nie wymaga Node ani Reacta. Pierwotną specyfikację zachowano w [SPEC.md](SPEC.md).
-
-- Lokalnie: z głównego katalogu repo uruchom `make controlplane-run` i otwórz **http://localhost:8082**. Ta komenda uruchamia także PostgreSQL w Dockerze, więc wymaga działającego Docker Desktop. Maven pakuje pliki z tego katalogu do JAR-a Javy.
-- W Compose: **http://localhost:3000**. Nginx serwuje te same pliki i przekazuje `/api/` do `controlplane:8082`. Przeglądarka wysyła API na ten sam origin, więc nie wymaga osobnej konfiguracji CORS ani zmiennych `VITE_*`.
-- Token lokalny: `local-dev-admin`. Wciśnij „Connect”, potem opcjonalnie „Load demo”. Dashboard jest po angielsku.
-- Widoki: statystyki i budżety, polityki, zdarzenia z eksportem, ręczny import sygnatur.
-
-Poniższe sekcje opisują docelowy zakres zespołu; zaawansowany score, React i pełne forensics nie są częścią bieżącego MVP.
-
 ## 👤 Właściciel (Owner)
 **Frontend Developer** / **Java / Fullstack Developer**
 

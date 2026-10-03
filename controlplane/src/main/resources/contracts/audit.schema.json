@@ -1,0 +1,115 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "NoorPointer audit event",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "occurred_at",
+    "kind",
+    "agent_id",
+    "action"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100
+    },
+    "occurred_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "kind": {
+      "enum": [
+        "decision",
+        "usage"
+      ]
+    },
+    "request_id": {
+      "type": "string",
+      "maxLength": 100
+    },
+    "agent_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 120
+    },
+    "team": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 120
+    },
+    "model": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 120
+    },
+    "session_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 120
+    },
+    "control": {
+      "type": "string",
+      "maxLength": 80
+    },
+    "action": {
+      "enum": [
+        "allow",
+        "block",
+        "redact",
+        "monitor",
+        "timeout"
+      ]
+    },
+    "severity": {
+      "enum": [
+        "info",
+        "low",
+        "medium",
+        "high",
+        "critical"
+      ]
+    },
+    "category": {
+      "type": "string",
+      "maxLength": 80
+    },
+    "signature_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 120
+    },
+    "policy_version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "tokens": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "cost_usd": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1000000
+    },
+    "gpu_seconds": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1000000
+    },
+    "latency_ms": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1000000
+    },
+    "message": {
+      "type": "string",
+      "maxLength": 2000
+    },
+    "context": {
+      "type": "object"
+    }
+  }
+}
