@@ -9,6 +9,7 @@ Listens on :11434 (drop-in for the ollama service it replaces).
 
 import json
 import os
+import socket
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -133,6 +134,14 @@ class Server(ThreadingHTTPServer):
     daemon_threads = True
     allow_reuse_address = True
     request_queue_size = 256
+
+    def get_request(self):
+        # Disable Nagle on accepted sockets: the handler writes headers and body as two segments and,
+        # with keep-alive, that triggers Linux delayed-ACK (a ~40 ms stall on every request after the
+        # first - it showed up as med=40.9ms in the k6 runs).
+        conn, addr = super().get_request()
+        conn.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+        return conn, addr
 
 
 if __name__ == "__main__":
