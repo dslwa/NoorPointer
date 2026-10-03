@@ -1,19 +1,18 @@
-# Multi-stage build for Go Gateway
-FROM golang:1.23-alpine AS builder
+FROM golang:1.26-alpine AS builder
 
 WORKDIR /app
-COPY go.mod ./
-COPY . ./
+COPY go.mod go.sum* ./
+RUN go mod download
 
-RUN CGO_ENABLED=0 GOOS=linux go build -o /app/gateway ./cmd/main.go
+COPY . .
+RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /gateway ./cmd
 
 FROM alpine:3.20
 
-RUN apk --no-cache add ca-certificates curl
+RUN apk --no-cache add ca-certificates
+COPY --from=builder /gateway /gateway
 
-WORKDIR /app
-COPY --from=builder /app/gateway /app/gateway
+USER 65534
+EXPOSE 8080
 
-EXPOSE 8080 9090
-
-ENTRYPOINT ["/app/gateway"]
+ENTRYPOINT ["/gateway"]
