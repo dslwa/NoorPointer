@@ -57,6 +57,8 @@ func TestParsePolicyRejects(t *testing.T) {
 		{"no models", `["mock-llm"]`, `[]`},
 		{"threshold above 1", `"threshold": 0.85`, `"threshold": 1.5`},
 		{"threshold below 0", `"threshold": 0.85`, `"threshold": -0.1`},
+		{"semantic redact", `"action": "block"`, `"action": "redact"`},
+		{"action typo", `"action": "block"`, `"action": "blok"`},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

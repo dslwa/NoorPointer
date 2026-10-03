@@ -35,6 +35,7 @@ func TestWithPolicy(t *testing.T) {
 		{"body too large", "enforce", http.MethodPost, "/v1/chat/completions", `{"model":"` + strings.Repeat("a", maxBodyBytes) + `"}`, 413, "", false},
 		{"get without body", "enforce", http.MethodGet, "/v1/models", "", 200, "", true},
 		{"native ollama api", "enforce", http.MethodPost, "/api/chat", `{"model":"mock-llm"}`, 404, "", false},
+		{"legacy completions skip semantic checks", "enforce", http.MethodPost, "/v1/completions", `{"model":"mock-llm","prompt":"x"}`, 404, "", false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

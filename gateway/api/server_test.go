@@ -6,6 +6,7 @@ import (
 	"crypto/rsa"
 	"errors"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -182,6 +183,61 @@ func TestStartListenError(t *testing.T) {
 	}
 	if err := s.Start(); err == nil {
 		t.Fatal("expected listen error")
+	}
+}
+
+func TestStartStopDrains(t *testing.T) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	addr := ln.Addr().String()
+	ln.Close()
+
+	reached, release := make(chan struct{}), make(chan struct{})
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		close(reached)
+		<-release
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer upstream.Close()
+	key := newKey(t)
+	s, err := NewServer(addr, upstream.URL, &key.PublicKey, "http://127.0.0.1:1", "test-token", "admin-token", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s.policy.Store(&config.Policy{Defaults: config.Defaults{Mode: "enforce"}})
+	started := make(chan error, 1)
+	go func() { started <- s.Start() }()
+
+	status := make(chan int, 1)
+	go func() {
+		req, _ := http.NewRequest(http.MethodGet, "http://"+addr+"/v1/models", nil)
+		req.Header.Set("Authorization", "Bearer "+sign(t, jwt.SigningMethodRS256, validClaims(), key))
+		for {
+			resp, err := http.DefaultClient.Do(req)
+			if err == nil {
+				resp.Body.Close()
+				status <- resp.StatusCode
+				return
+			}
+			time.Sleep(time.Millisecond) // listener not up yet
+		}
+	}()
+
+	<-reached
+	s.Stop()
+	select {
+	case err := <-started:
+		t.Fatalf("Start returned with a request in flight: %v", err)
+	case <-time.After(50 * time.Millisecond):
+	}
+	close(release)
+	if code := <-status; code != http.StatusOK {
+		t.Fatalf("in-flight request got %d, want 200", code)
+	}
+	if err := <-started; err != nil {
+		t.Fatalf("Start after Stop: %v", err)
 	}
 }
 

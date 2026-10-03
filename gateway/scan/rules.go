@@ -53,7 +53,7 @@ var rules = append(slices.Clone(secretRules),
 		pre: hasLongToken, valid: hidesSecret},
 	rule{control: "pii_regex", kind: "iban", find: findIBAN,
 		pre: hasDigits, valid: ibanOK, digitEdges: true},
-	// ponytail: only printed card layouts (contiguous, 4-4-4-4[-3], 4-6-5/4-6-4).
+	// Only printed card layouts (contiguous, 4-4-4-4[-3], 4-6-5/4-6-4).
 	// A free-form (?:\d[ .-]?){12,18}\d also takes "4 1 1 1 ..." but is retried
 	// from every digit of "1 1 1 ...", ~2 s per MB.
 	rule{control: "pii_regex", kind: "card", find: findCard,
@@ -64,7 +64,6 @@ var rules = append(slices.Clone(secretRules),
 		pre: hasObfuscatedAt},
 	// phone runs before pesel so "+48600123456" is not taken for a PESEL;
 	// a bare 11-digit run fails the phone's digit edges and falls through.
-	// ponytail: Polish numbers only, foreign ones go to Presidio over gRPC.
 	rule{control: "pii_regex", kind: "phone", find: findPhone,
 		pre: hasDigits, valid: phoneOK, digitEdges: true, context: []string{"tel", "phone", "komórk"}},
 	rule{control: "pii_regex", kind: "pesel", find: findPESEL,

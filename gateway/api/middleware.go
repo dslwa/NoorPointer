@@ -25,6 +25,8 @@ const maxBodyBytes = 1 << 20
 var blockCodes = map[string]string{
 	"secrets":   "SECRET_LEAKAGE_DETECTED",
 	"pii_regex": "PII_DETECTED",
+
+	"attack_signatures": "HISTORICAL_EXPLOIT_SIGNATURE_MATCHED",
 }
 
 type ctxKey struct{}
@@ -95,6 +97,7 @@ func decodeBody(w http.ResponseWriter, r *http.Request) (map[string]any, bool) {
 // doc is redacted in place: Python and the upstream see the masked text.
 func (s *Server) check(r *http.Request, agent string, p *config.Policy, doc map[string]any) (verdict, []scan.Finding, []*pb.CheckResult) {
 	var found []scan.Finding
+	s.matchSignatures(r, p, doc, &found)
 	walkStrings(doc, func(text string) string { return scan.Text(p, text, &found) })
 	for _, f := range found {
 		log.Printf("%s: %s %s detected", f.Action, f.Control, f.Kind)
