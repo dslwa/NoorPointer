@@ -34,7 +34,7 @@ services:
       - noorpointer-net
 
   # ========================================================
-  # AI GUARDRAILS (Python DeBERTa v3, GLiNER Zero-Shot NER, Picklescan RCE via gRPC :50051)
+  # AI GUARDRAILS (Python DeBERTa v3, Presidio NER, Llama Guard, Picklescan RCE via gRPC :50051)
   # ========================================================
   semantic-service:
     build:
@@ -43,12 +43,13 @@ services:
     container_name: noorpointer-semantic
     ports:
       - "8001:8001" # FastAPI HTTP API & /metrics
-      - "50051:50051" # gRPC GuardrailService (Protobuf v3)
+      - "50051:50051" # gRPC noorpointer.semantic.v1.SemanticService
     environment:
       - PORT=8001
       - GRPC_PORT=50051
       - TIMEOUT_MS=200
       - PYTHONUNBUFFERED=1
+      - OLLAMA_URL=http://ollama:11434 # Llama Guard for content_safety (needs: ollama pull llama-guard3:1b)
     restart: unless-stopped
     networks:
       - noorpointer-net
