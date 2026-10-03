@@ -23,6 +23,12 @@ services:
       - SIGNATURES_FEED_URL=http://signatures-feed:8085/signatures.json
     volumes:
       - ./config/policy.yaml:/app/config/policy.yaml:ro
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:8080/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
     depends_on:
       redis:
         condition: service_healthy
@@ -196,6 +202,7 @@ services:
       - ADMIN_TOKEN=${ADMIN_TOKEN:-local-dev-admin}
     volumes:
       - ./telemetry/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./telemetry/alert.rules.yml:/etc/prometheus/alert.rules.yml:ro
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
       - "--config.expand-env"
