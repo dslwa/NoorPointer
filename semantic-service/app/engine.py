@@ -4,7 +4,7 @@ import time
 
 from prometheus_client import Counter, Histogram
 
-from app.detectors.base import Detector
+from app.detectors.base import Detector, Rejected
 from app.schemas import CheckResult, ScanRequest, ScanResponse
 
 log = logging.getLogger(__name__)
@@ -27,6 +27,8 @@ async def run_check(name: str, detector: Detector | None, req: ScanRequest) -> C
     else:
         try:
             result = await asyncio.wait_for(detector.check(req), timeout=req.timeout_ms / 1000)
+        except Rejected as exc:
+            result = CheckResult(check=name, status="rejected", error=str(exc))
         except TimeoutError:
             result = CheckResult(check=name, status="timeout", error=f"exceeded {req.timeout_ms} ms")
         except Exception as exc:
