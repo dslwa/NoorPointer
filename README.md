@@ -40,7 +40,8 @@ implementacji po stronie gatewaya. `make verify` pokazuje ten stan bez ukrywania
 make doctor          # sprawdzenie narzędzi, kluczy, konfiguracji compose i działania uwierzytelniania
 sudo make up         # budowa i start wszystkich usług + dane demonstracyjne do dziennika
 make smoke           # 16 sprawdzeń spójności stosu (health, proxy, uwierzytelnianie)
-sudo make test       # testy e2e -> reports/test_report.html
+sudo make test       # testy e2e w kontenerze -> reports/test_report.html
+make test-local      # to samo bez Dockera, na opublikowanych portach (pętla kilkusekundowa)
 make verify          # smoke + offline-check + scenariusze demo (bez przygotowania)
 sudo make checkpoint # wszystko powyżej + reports/INDEX.md + lista adresów
 ```

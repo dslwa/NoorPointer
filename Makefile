@@ -23,7 +23,7 @@ K6        = $(COMPOSE) run --rm -e GATEWAY_JWT="$$jwt" benchmarks run
 
 .PHONY: help \
         up dev-infra down restart build clean logs status \
-        seed test test-unit test-rebuild bench bench-flood bench-budget \
+        seed test test-unit test-local test-rebuild bench bench-flood bench-budget \
         smoke verify verify-strict offline-check report checkpoint \
         demo demo-full demo-strict \
         keys mint-build token token-file reload-policy doctor urls \
@@ -71,6 +71,19 @@ test: seed ## e2e (seed + raport HTML); --build, bo obraz testow wpieka kod test
 
 test-unit: ## Testy jednostkowe modulow (Go teraz; nie wymagaja dzialajacego stosu)
 	cd gateway && go test ./...
+
+test-local: ## e2e bez Dockera na opublikowanych portach (szybka petla: kilka sekund, nie minut)
+	@mkdir -p reports 2>/dev/null || true
+	@test -d .venv-tests || python3 -m venv .venv-tests
+	@.venv-tests/bin/pip -q install -r tests/requirements.txt
+	@$(JWT_GUARD); \
+	report=reports/test_report_local.html; \
+	if [ ! -w reports ]; then report="$${TMPDIR:-/tmp}/noorpointer-test_report_local.html"; \
+	  echo "uwaga: katalog reports/ nie jest zapisywalny - raport trafi do $$report"; \
+	fi; \
+	echo "raport: $$report"; \
+	GATEWAY_JWT="$$jwt" .venv-tests/bin/python -m pytest tests/test_guardrails.py -v \
+	  --html="$$report" --self-contained-html
 
 test-rebuild: ## Przebudowuje obraz testow (po zmianie requirements.txt)
 	$(COMPOSE) build --no-cache tests

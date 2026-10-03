@@ -7,6 +7,7 @@
 **/__pycache__/
 **/.pytest_cache/
 **/.venv/
+.venv-tests/
 reports/
 **/node_modules/
 dashboard/dist/
