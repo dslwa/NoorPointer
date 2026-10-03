@@ -43,9 +43,18 @@ def main() -> int:
     parser.add_argument("--concurrency", type=int, default=10, help="ile zadan naraz")
     args = parser.parse_args()
 
-    plan = [SCENARIUSZE[i % len(SCENARIUSZE)] for i in range(args.rounds * args.concurrency)]
     print(f"  cel: {args.url}")
-    print(f"  plan: {len(plan)} zadan, {args.concurrency} naraz, {len(CHECKS)} sprawdzenia na zadanie")
+    # Rozgrzewka: pierwsze zadania po starcie kontenera sa wolniejsze (leniwe sciezki, cache modeli),
+    # a bez niej porownanie 1 repliki z 3 mierzyloby tez roznice w rozgrzaniu.
+    for _ in range(5):
+        try:
+            sprawdz(args.url, SCENARIUSZE[0][1])
+        except Exception as blad:  # noqa: BLE001
+            print(f"  BLAD rozgrzewki: {blad}")
+            return 1
+
+    plan = [SCENARIUSZE[i % len(SCENARIUSZE)] for i in range(args.rounds * args.concurrency)]
+    print(f"  plan: {len(plan)} zadan, {args.concurrency} naraz, {len(CHECKS)} sprawdzenia na zadanie (po rozgrzewce)")
 
     start = time.perf_counter()
     try:

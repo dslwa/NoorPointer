@@ -62,7 +62,7 @@ stop: ## Zatrzymuje stos (dane i wolumeny zostaja, wracasz przez: make up)
 scale: ## Ustaw liczbe replik: sudo make scale REPLIKI=3 (FORCE=1 odtwarza, TORCH_THREADS=N zmienia watki)
 	@$(COMPOSE) run --rm --no-deps --entrypoint nginx semantic-lb -t >/dev/null 2>&1 || { echo "scale: blad w konfiguracji load balancera - uruchom: $(COMPOSE) run --rm --no-deps --entrypoint nginx semantic-lb -t"; exit 1; }
 	@echo "  konfiguracja load balancera poprawna"
-	@$(COMPOSE) up -d --scale semantic-app=$(or $(REPLIKI),3) $(if $(FORCE),--force-recreate,) --no-recreate --remove-orphans 2>&1 | tail -4
+	@$(COMPOSE) up -d --scale semantic-app=$(or $(REPLIKI),3) $(if $(FORCE),--force-recreate semantic-app,--no-recreate) --remove-orphans 2>&1 | tail -4
 	@./scripts/wait-ready.sh
 	@$(COMPOSE) ps --format '  {{.Name}}  {{.Status}}' | grep semantic || true
 
