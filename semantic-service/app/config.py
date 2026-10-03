@@ -16,6 +16,7 @@ class Settings:
     enabled_checks: list[str] = field(default_factory=lambda: list(ALL_CHECKS))
     pi_model: str = "protectai/deberta-v3-base-prompt-injection-v2"
     spacy_model: str = "en_core_web_lg"
+    spacy_model_pl: str = "pl_core_news_lg"  # empty disables Polish NER
     ollama_url: str = "http://localhost:11434"
     guard_model: str = "llama-guard3:1b"
     torch_threads: int = 4
@@ -38,6 +39,7 @@ class Settings:
             enabled_checks=_env_list("ENABLED_CHECKS", list(ALL_CHECKS)),
             pi_model=os.getenv("PI_MODEL", cls.pi_model),
             spacy_model=os.getenv("SPACY_MODEL", cls.spacy_model),
+            spacy_model_pl=os.getenv("SPACY_MODEL_PL", cls.spacy_model_pl),
             ollama_url=os.getenv("OLLAMA_URL", cls.ollama_url).rstrip("/"),
             guard_model=os.getenv("GUARD_MODEL", cls.guard_model),
             torch_threads=int(os.getenv("TORCH_THREADS", cls.torch_threads)),

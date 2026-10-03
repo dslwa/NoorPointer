@@ -92,15 +92,37 @@ function passageNotes(results) {
           : 'Llama Guard rated this text unsafe.',
       });
     }
-    if (result.check === 'leakage')
-      notes.push({
-        key: result.check,
-        text: result.details.verbatim_run
-          ? 'Repeats a passage of the system prompt word for word.'
-          : `Overlaps the system prompt by ${Math.round(result.details.system_prompt_overlap * 100)}%.`,
-      });
+    if (result.check === 'leakage') {
+      const hits = result.details.canary_hits;
+      if (hits)
+        notes.push({
+          key: `${result.check}-canary`,
+          text: `Contains ${hits === 1 ? 'a secret token' : `${hits} secret tokens`} from the system prompt, written out or base64-encoded.`,
+        });
+      if (result.details.verbatim_run)
+        notes.push({
+          key: result.check,
+          text: 'Repeats a passage of the system prompt word for word.',
+        });
+      else if (result.details.system_prompt_overlap)
+        notes.push({
+          key: result.check,
+          text: `Overlaps the system prompt by ${Math.round(result.details.system_prompt_overlap * 100)}%.`,
+        });
+    }
   }
   return notes;
+}
+
+function leakContext(systemPrompt, canaries) {
+  const tokens = canaries
+    .split(',')
+    .map((token) => token.trim())
+    .filter(Boolean);
+  return {
+    ...(systemPrompt ? { system_prompt: systemPrompt } : {}),
+    ...(tokens.length ? { canaries: tokens } : {}),
+  };
 }
 
 export default function PromptCheckPage({ active, notify }) {
@@ -109,6 +131,7 @@ export default function PromptCheckPage({ active, notify }) {
   const [selected, setSelected] = useState(['prompt_injection', 'content_safety', 'pii_ner']);
   const [threshold, setThreshold] = useState(0.85);
   const [systemPrompt, setSystemPrompt] = useState('');
+  const [canaries, setCanaries] = useState('');
   const [timeoutMs, setTimeoutMs] = useState(5000);
   const [readiness, setReadiness] = useState(null);
   const [scan, setScan] = useState(null); // { text, response } of the last check
@@ -148,7 +171,7 @@ export default function PromptCheckPage({ active, notify }) {
         checks: enabled,
         timeout_ms: Number(timeoutMs),
         config: { prompt_injection: { threshold: Number(threshold) } },
-        context: direction === 'output' && systemPrompt ? { system_prompt: systemPrompt } : {},
+        context: direction === 'output' ? leakContext(systemPrompt, canaries) : {},
       });
       setScan({ text, response });
     });
@@ -341,14 +364,27 @@ export default function PromptCheckPage({ active, notify }) {
         })}
 
         {direction === 'output' && enabled.includes('leakage') && (
-          <label className="leak-source">
-            System prompt the response must not reveal
-            <textarea
-              value={systemPrompt}
-              disabled={!!pending}
-              onChange={(event) => setSystemPrompt(event.target.value)}
-            />
-          </label>
+          <>
+            <label className="leak-source">
+              System prompt the response must not reveal
+              <textarea
+                value={systemPrompt}
+                disabled={!!pending}
+                onChange={(event) => setSystemPrompt(event.target.value)}
+              />
+            </label>
+            <label className="leak-source">
+              Secret tokens planted in the system prompt
+              <input
+                type="text"
+                value={canaries}
+                placeholder="CANARY-7f3a91, another-token"
+                disabled={!!pending}
+                onChange={(event) => setCanaries(event.target.value)}
+              />
+              <small>Separate tokens with commas. A response that contains one is a leak.</small>
+            </label>
+          </>
         )}
 
         <details>

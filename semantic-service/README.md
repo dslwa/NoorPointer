@@ -6,7 +6,8 @@ Serwis uruchamia się przez `uvicorn app.main:app --host 0.0.0.0 --port 8001 --l
 
 - HTTP: `POST /v1/scan`, `POST /v1/scan/model`, `POST /v1/scan/model/hf`, `GET /healthz`, `GET /readyz`.
 - gRPC: port `50051`, kontrakt w `../proto/semantic/v1/semantic.proto`.
-- Kontrole: DeBERTa prompt injection, Presidio/spaCy PII, Llama Guard przez Ollamę, leakage i picklescan. Compose ustawia `OLLAMA_URL=http://mock-llm:11434` (mock odpowiada werdyktem Llama Guard); z prawdziwą Ollamą trzeba wskazać jej adres i zrobić `ollama pull llama-guard3:1b`.
+- Kontrole: DeBERTa prompt injection, Presidio/spaCy PII (angielski `en_core_web_lg` i polski `pl_core_news_lg`), Llama Guard przez Ollamę, leakage i picklescan. Compose ustawia `OLLAMA_URL=http://mock-llm:11434` (mock odpowiada werdyktem Llama Guard na podstawie słów kluczowych); `make ollama-up` przełącza serwis na prawdziwy `llama-guard3:1b`.
+- PII po polsku: język wybierany jest dla każdego fragmentu tekstu (częste słowa, polskie litery tylko przy remisie). Dla polskiego imiona i miejsca rozpoznaje polski model; wzorce (PESEL, e-mail, karta, IBAN) działają w obu językach. Wynik ma `details.languages`. `SPACY_MODEL_PL=""` wyłącza polski model.
 - Testy jednostkowe i gRPC: `uv run pytest`; testy z rzeczywistymi modelami: `uv run pytest -m models`.
 
 Prototypowe `server.py`, `requirements.txt` i `guardrails.proto` zostały usunięte; poniższy zakres zespołu częściowo opisuje pierwotny plan.
@@ -174,6 +175,13 @@ Zmienne środowiskowe: `GRPC_PORT` (0 = wyłączony), `ARTIFACT_ROOT`, `ARTIFACT
 - **Limity uploadu:** `MAX_UPLOAD_MB` jest egzekwowany w trakcie odbierania żądania (middleware), a nie po zapisaniu
   całego pliku. Skan repo HF pobiera pliki z konkretnego commita (`info.sha`) i sprawdza faktyczny rozmiar.
 - **Llama Guard:** odpowiedź inna niż `safe` / `unsafe` -> `STATUS_ERROR`, nigdy „bezpieczne”.
+
+## Znane ograniczenia
+
+- **Prompt injection, fałszywy alarm na poleceniach z danymi finansowymi.** `Please refund card 4111 1111 1111 1111 to IBAN GB82 WEST 1234 5698 7654 32.` dostaje od DeBERTy wynik 1.0, więc żaden próg nie oddzieli go od ataku. Opisuje to test `test_refund_request_with_card_and_iban_is_not_an_injection` (`xfail(strict=True)`): zaczerwieni się, gdy model przestanie się mylić.
+- **LOCATION z angielskiego spaCy.** Presidio daje każdemu trafieniu NER stały wynik 0.85, więc pojedyncze nieznane słowo (np. `jjjj`) bywa oznaczane jako miejsce. Planowana jest weryfikacja miejsc lokalną bazą nazw.
+- **Wykrywanie języka** rozróżnia tylko angielski i polski; tekst w innym języku idzie przez model angielski.
+- **Llama Guard na CPU jest wolniejszy niż limit z polityki.** Pomiar `llama-guard3:1b` w Ollamie na CPU (8 zapytań, 3 października 2026): mediana 871 ms, maksimum 945 ms, pierwsze zapytanie po starcie 4,1 s. Werdykty 8/8 poprawne, także po polsku (`Jak zrobić bombę w domu?` -> S1). Przy `semantic_ms: 200` każdy check `content_safety` skończy się `STATUS_TIMEOUT`, a z `on_timeout: fail_closed` gateway zablokuje każde żądanie. Na demo: `timeout_ms` dla `content_safety` ok. 1500 ms albo GPU.
 
 ---
 

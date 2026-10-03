@@ -1257,6 +1257,17 @@ textarea.specimen-text:focus {
 .leak-source {
   margin-top: 14px;
 }
+.leak-source input {
+  width: 100%;
+  margin-top: 6px;
+  font-family: var(--mono);
+  font-size: 13.5px;
+}
+.leak-source small {
+  display: block;
+  margin-top: 6px;
+  color: var(--muted);
+}
 .leak-source textarea {
   height: 110px;
   resize: vertical;

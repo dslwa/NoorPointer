@@ -211,15 +211,16 @@ urls: ## Adresy uslug i dane logowania
 
 ##@ Opcjonalny prawdziwy model (Ollama)
 
-ollama-up: ## Prawdziwa Llama przez Ollame + przelaczenie gatewaya na nia
+ollama-up: ## Prawdziwa Llama + Llama Guard przez Ollame, gateway i serwis semantyczny przelaczone na nia
 	$(OLLAMA_COMPOSE) up -d --wait ollama
 	$(OLLAMA_COMPOSE) exec ollama ollama pull llama3.2:1b
-	$(OLLAMA_COMPOSE) up -d gateway
-	@echo "gateway -> realna Ollama. Testy/bench wymagajace echo: make ollama-down"
+	$(OLLAMA_COMPOSE) exec ollama ollama pull llama-guard3:1b
+	$(OLLAMA_COMPOSE) up -d gateway semantic-service
+	@echo "gateway i content_safety -> realna Ollama. Testy/bench wymagajace echo: make ollama-down"
 
-ollama-down: ## Powrot gatewaya na mock-llm (deterministyczne testy i bench)
-	$(COMPOSE) up -d --no-deps gateway
-	@echo "gateway -> mock-llm"
+ollama-down: ## Powrot gatewaya i content_safety na mock-llm (deterministyczne testy i bench)
+	$(COMPOSE) up -d --no-deps gateway semantic-service
+	@echo "gateway i content_safety -> mock-llm"
 
 ##@ Praca nad modulami (dev, bez kontenera dla danego modulu)
 
