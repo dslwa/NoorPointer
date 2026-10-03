@@ -1,11 +1,7 @@
 #!/usr/bin/env bash
-# Ustawia polityke demo w control plane: dopisuje modele uzywane w testach, benchmarkach i demo
-# oraz deterministyczny wpis budzetowy dla przypadku testowego. Operacja jest powtarzalna:
-# jesli aktywna polityka juz to zawiera, skrypt nic nie zmienia i nie tworzy nowej rewizji.
-#
-# Kontrakt control plane: POST /api/v1/policy-revisions tworzy rewizje (dokument jako string),
-# PUT /api/v1/active-policy {"version": N} ja aktywuje. Gateway odbiera dokument pod
-# GET /api/gateway/policy i przeladowuje go na /admin/policy/reload albo w ciagu refreshu.
+# Ustawia zasady demo w control plane: dopisuje modele uzywane w testach i demo oraz jeden wpis
+# budzetowy. Powtarzalne - jesli to juz jest, nie tworzy nowej wersji.
+
 set -euo pipefail
 cd "$(dirname "$0")/.."
 

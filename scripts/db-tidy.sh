@@ -1,21 +1,8 @@
 #!/usr/bin/env bash
-# Przywraca dane demonstracyjne do stanu z repozytorium. Uruchamianie: make db-tidy
-# (wymaga sudo, bo korzysta z psql w kontenerze postgresa).
-#
-# Co robi:
-#   1. czysci tabele zdarzen audytu - rosnie o 30 zdarzen przy kazdym `make seed`, wiec po wielu
-#      uruchomieniach eksport CEF ma setki wierszy i setki kilobajtow. Pomin ten krok przez SKIP_AUDIT=1,
-#   2. usuwa zdublowane rewizje polityki, zostawiajac po jednej z kazdej identycznej grupy
-#      (wpisy 5-7 powstawaly przy powtarzanych publikacjach tej samej polityki) i przepinajac
-#      wskaznik aktywnej rewizji na najstarsza wersje z grupy,
-#   3. usuwa z katalogu sygnatur wpisy, ktorych nie ma w zadnym zrodle (to wpisy dodane recznie
-#      w trakcie demonstracji - katalog jest uzupelniany addytywnie, wiec same z siebie nie znikaja).
-#
-# Uwaga o rewizjach: control plane zapisuje w dokumencie pole "version" z numerem rewizji, wiec dwie
-# publikacje tej samej polityki roznia sie tym jednym polem. Porownujemy dokumenty po usunieciu tego
-# klucza (`document::jsonb - 'version'`), inaczej duplikaty nigdy nie zostana wykryte.
-#
-# Po sprzatnieciu `make seed` odtworzy mala, czysta porcje danych: 30 zdarzen i 12 sygnatur.
+# Przywraca dane demonstracyjne do stanu z repozytorium. Uruchamianie: make db-tidy (wymaga sudo).
+# Czysci dziennik zdarzen, usuwa zdublowane wersje zasad i wpisy sygnatur, ktorych nie ma
+# w zadnym zrodle. Czyszczenie dziennika pominiesz przez SKIP_AUDIT=1.
+
 set -euo pipefail
 cd "$(dirname "$0")/.."
 

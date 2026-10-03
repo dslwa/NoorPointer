@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Sprawdzenie stanu srodowiska. Uruchamianie: make doctor
-# Weryfikuje narzedzia, klucze JWT, konfiguracje compose, wystawianie tokenu oraz to, czy dzialajacy
-# gateway odrzuca ruch bez tokenu i przyjmuje token poprawny. Nie zmienia stanu stosu.
+# Sprawdza, czy srodowisko jest gotowe: narzedzia, klucze, konfiguracja, token i to, czy
+# dzialajaca brama odrzuca ruch bez tokenu. Uruchamianie: make doctor. Nic nie zmienia w systemie.
+
 set -uo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"; cd "$ROOT"
 

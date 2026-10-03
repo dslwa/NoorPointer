@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Wypelnia control plane danymi demonstracyjnymi: zdarzenia audytu (POST /api/v1/demo-batches)
-# oraz katalog sygnatur z feedu. Uruchamianie: make seed (wywolywane tez przez make up i make test).
-# Powtarza probe, dopoki control plane nie wstanie (docker compose up konczy sie przed gotowoscia).
+# Wypelnia control plane danymi demonstracyjnymi: zdarzenia dziennika i katalog sygnatur.
+# Uruchamiane przez make seed, make up i make test. Czeka, az control plane wstanie.
+
 set -uo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"; cd "$ROOT"
 

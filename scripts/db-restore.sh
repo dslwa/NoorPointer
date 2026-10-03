@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Odtworzenie bazy z kopii. Uruchamianie: make db-restore FILE=backups/noorpointer-....dump (wymaga sudo)
-# UWAGA: nadpisuje dane aplikacji (pg_restore --clean --if-exists). Kopia: `make db-dump`.
+# Odtwarza baze z kopii. Uruchamianie: make db-restore FILE=backups/....dump (wymaga sudo).
+# UWAGA: nadpisuje dane aplikacji.
+
 set -euo pipefail
 cd "$(dirname "$0")/.."
 

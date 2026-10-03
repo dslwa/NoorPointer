@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Lint: containers must not install packages or download models AT RUNTIME. Usage: make offline-check
-# Build-time steps (RUN pip/uv/apt, model bake in RUN python -m app.download) are fine and expected.
+# Sprawdza, ze kontenery nie pobieraja niczego w trakcie dzialania (instalacji ani modeli).
+# Pobieranie na etapie budowy obrazu jest w porzadku. Uruchamianie: make offline-check
+
 set -uo pipefail
 cd "$(dirname "$0")/.."
 

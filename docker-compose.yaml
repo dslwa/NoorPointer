@@ -1,9 +1,8 @@
-# Wspolne ustawienia serwisow dlugotrwalych (restart + siec). Serwisy jednorazowe
-# (tests, benchmarks, semantic-tests, controlplane-tests) ustawiaja tylko siec - bez restart policy.
+# Caly system: kazda usluga to osobny kontener. Blok x-service ustawia wspolne rzeczy:
+# restart po awarii, jedna siec i rotacje logow (max 10 MB x 3 pliki na usluge).
 x-service: &service
   restart: unless-stopped
   networks: [noorpointer-net]
-  # Rotacja logow: bez tego json-file rosnie bez limitu na dlugo dzialajacym stosie.
   logging:
     driver: json-file
     options:
@@ -11,9 +10,7 @@ x-service: &service
       max-file: "3"
 
 services:
-  # ========================================================
-  # DATA PLANE & PROXY (Go Gateway)
-  # ========================================================
+  # Brama (Go): sprawdza token, model i tresc, potem przekazuje pytanie do modelu.
   gateway:
     mem_limit: 512m
     build:
@@ -21,8 +18,8 @@ services:
       dockerfile: Dockerfile
     container_name: noorpointer-gateway
     ports:
-      - "8080:8080" # OpenAI-compatible Reverse Proxy
-      - "9090:9090" # Prometheus Metrics (/metrics)
+      - "8080:8080" # pytania w formacie OpenAI
+      - "9090:9090" # metryki (na razie nieuzywane)
     environment:
       - PORT=8080
       - METRICS_PORT=9090
@@ -38,7 +35,7 @@ services:
     volumes:
       - ./gateway/keys/jwt.pub:/app/keys/jwt.pub:ro,z
     healthcheck:
-      # 127.0.0.1, nie localhost - BusyBox wget potrafi wybrac ::1 (ta sama pulapka co w semantic-lb).
+      # 127.0.0.1, nie "localhost": BusyBox wget probuje IPv6, a brama slucha tylko IPv4.
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/healthz"]
       interval: 10s
       timeout: 3s
@@ -57,12 +54,8 @@ services:
         condition: service_healthy
     <<: *service
 
-  # ========================================================
-  # AI GUARDRAILS (Python DeBERTa v3, Presidio NER, Llama Guard, Picklescan RCE via gRPC :50051)
-  # ========================================================
-  # Usluga skalowalna: `make scale REPLIKI=3` podnosi liczbe tych kontenerow.
-  # Nie publikuje portow (robiloby to konflikt przy drugiej replice) i nie ma nazwy kontenera -
-  # ruch z zewnatrz wchodzi przez load balancer `semantic-lb` ponizej.
+  # Kontrole AI (Python): szuka prob ataku i danych osobowych. Nie ma wlasnych portow,
+  # bo dziala w wielu kopiach za load balancerem nizej (latwo ja skalowac).
   semantic-app:
     mem_limit: 4g
     build:
@@ -73,15 +66,10 @@ services:
       - GRPC_PORT=50051
       - OLLAMA_URL=http://mock-llm:11434
       - GUARD_MODEL=llama-guard3:1b
-      # Strojenie pod procesor. Wzgorze: repliki x PI_WORKERS x TORCH_THREADS <= liczba watkow CPU.
-      # Na tej maszynie (8 watkow) uklad domyslny 1x2x4 wykorzystuje ja co do watku, wiec dokladanie
-      # replik bez zmniejszenia tych dwoch liczb tylko dlawi procesor (zmierzone: 3 repliki po 2x4
-      # dawaly 2,5x mniejsza przepustowosc niz jedna). Skalowanie poziome ma sens na osobnych maszynach.
+      # Zasada strojenia: repliki x PI_WORKERS x TORCH_THREADS <= liczba watkow CPU.
       - TORCH_THREADS=${TORCH_THREADS:-4}
       - PI_WORKERS=${PI_WORKERS:-2}
       - PYTHONUNBUFFERED=1
-    # Jawny healthcheck (taki sam jak w Dockerfile). `semantic-lb` czeka na `service_healthy`,
-    # wiec zaleznosc jest widoczna w compose, a nie tylko odziedziczona z obrazu.
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/healthz')"]
       interval: 10s
@@ -93,14 +81,13 @@ services:
         condition: service_healthy
     <<: *service
 
-  # Load balancer przed replikami. Dziedziczy nazwe `semantic-service`, wiec brama,
-  # testy i skrypty dalej mowia do `semantic-service:8001` - zmiana jest po naszej stronie.
+  # Rozdziela ruch miedzy kopie uslugi AI i udaje jeden adres "semantic-service".
   semantic-lb:
     mem_limit: 256m
     image: nginx:1.30-alpine
     container_name: noorpointer-semantic-lb
     ports:
-      - "8001:8001" # HTTP: skany, /metrics, /readyz
+      - "8001:8001" # HTTP: skany i metryki
       - "50051:50051" # gRPC dla bramy
     volumes:
       - ./telemetry/nginx-lb/nginx.conf:/etc/nginx/nginx.conf:ro,z
@@ -111,8 +98,7 @@ services:
         aliases:
           - semantic-service
     healthcheck:
-      # 127.0.0.1, nie localhost: BusyBox wget potrafi wybrac ::1, a nginx nasluchuje tylko IPv4
-      # (0.0.0.0:8001) - wtedy healthcheck jest wiecznie "unhealthy", choc LB dziala.
+      # 127.0.0.1 z tego samego powodu co w bramie (BusyBox wget i IPv6).
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8001/lb-healthz"]
       interval: 10s
       timeout: 5s
@@ -123,9 +109,7 @@ services:
         condition: service_healthy
     <<: *service
 
-  # ========================================================
-  # CONTROL PLANE (Policy Catalog, PostgreSQL Audit, SIEM CEF Export & Dashboard API)
-  # ========================================================
+  # Zasady bezpieczenstwa, lista sygnatur, dziennik zdarzen i API panelu (Java).
   controlplane:
     mem_limit: 2g
     build:
@@ -153,9 +137,7 @@ services:
         condition: service_started
     <<: *service
 
-  # ========================================================
-  # MANAGEMENT & SECURITY DASHBOARD (React + Vite + Nginx API proxy)
-  # ========================================================
+  # Panel w przegladarce: incydenty, zasady, sygnatury i budzety (React + Nginx).
   dashboard:
     mem_limit: 256m
     build:
@@ -175,9 +157,7 @@ services:
       start_period: 5s
     <<: *service
 
-  # ========================================================
-  # THREAT INTELLIGENCE FEED (External CVEs / Signatures)
-  # ========================================================
+  # Podaje liste znanych atakow (sygnatury) jako plik JSON.
   signatures-feed:
     mem_limit: 128m
     image: nginx:1.30-alpine
@@ -195,9 +175,7 @@ services:
       start_period: 5s
     <<: *service
 
-  # ========================================================
-  # INFRASTRUCTURE STORAGE (PostgreSQL 16 JSONB & Redis 7 Token Bucket)
-  # ========================================================
+  # Baza danych: audyt i zasady. Dane zostaja w wolumenie miedzy restartami.
   postgres:
     mem_limit: 1g
     image: postgres:16-alpine
@@ -217,6 +195,7 @@ services:
       retries: 5
     <<: *service
 
+  # Szybki licznik zuzycia dla budzetow.
   redis:
     mem_limit: 256m
     image: redis:7-alpine
@@ -230,10 +209,7 @@ services:
       retries: 5
     <<: *service
 
-  # ========================================================
-  # MOCK LLM UPSTREAM (OpenAI- + Ollama-compatible, zero deps)
-  # Swap for real Ollama/OpenAI later via UPSTREAM_LLM_URL / OLLAMA_URL.
-  # ========================================================
+  # Zastepczy model: udaje LLM w formacie OpenAI i Ollama, zeby dzialac bez internetu.
   mock-llm:
     mem_limit: 512m
     build:
@@ -241,29 +217,25 @@ services:
       dockerfile: Dockerfile
     container_name: noorpointer-mock-llm
     ports:
-      - "11434:11434" # drop-in for the old ollama port (curl debugging)
+      - "11434:11434" # ten sam port co Ollama, latwo podmienic
     <<: *service
 
-  # ========================================================
-  # TELEMETRY & OBSERVABILITY (Prometheus & Grafana)
-  # ========================================================
+  # Prometheus zbiera liczby z uslug, Grafana rysuje z nich wykresy.
   prometheus:
     mem_limit: 512m
     image: prom/prometheus:v2.54.1
     container_name: noorpointer-prometheus
     ports:
-      - "9091:9090" # Zewnętrzny 9091 (unikamy konfliktu z gateway:9090)
+      - "9091:9090" # na zewnatrz 9091, bo 9090 zajmuje brama
     volumes:
       - ./telemetry/prometheus.yml:/etc/prometheus/prometheus.yml:ro,z
       - ./telemetry/alert.rules.yml:/etc/prometheus/alert.rules.yml:ro,z
-      # Token ADMIN_TOKEN jako plik, zeby nie trzymac go na sztywno w prometheus.yml.
-      # Generuje go `make prometheus-token` (wola je `make up` / `make dev-infra`).
+      # Tokenu nie wpisujemy w pliku konfiguracji, tylko w osobnym pliku (robi go make up).
       - ./telemetry/.prometheus-admin-token:/etc/prometheus/admin_token:ro,z
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
       - "--storage.tsdb.path=/prometheus"
-      # Pozwala przeladowac reguly bez restartu kontenera: curl -X POST localhost:9091/-/reload
-      - "--web.enable-lifecycle"
+      - "--web.enable-lifecycle" # pozwala przeladowac reguly bez restartu
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:9090/-/ready"]
       interval: 10s
@@ -297,9 +269,7 @@ services:
       - prometheus
     <<: *service
 
-  # ========================================================
-  # EVALUATION & AUTOMATION PROFILES (Tests & Benchmarks)
-  # ========================================================
+  # Testy i pomiary. Nie startuja przy "make up" - tylko na zawolanie (profile).
   tests:
     mem_limit: 512m
     build:
@@ -312,8 +282,7 @@ services:
       - GATEWAY_TOKEN=${GATEWAY_TOKEN:-local-dev-gateway}
       - SEMANTIC_URL=http://semantic-service:8001
     volumes:
-      # Kod testow jest montowany rownolegle do kopii w obrazie, zeby zmiany w pliku testow
-      # dzialaly bez przebudowy obrazu. Zmiany w requirements.txt nadal wymagaja: make test-rebuild.
+      # Test montujemy z repozytorium, zeby zmiana pliku dzialala bez przebudowy obrazu.
       - ./tests/test_guardrails.py:/app/test_guardrails.py:ro,z
       - ./reports:/app/reports:z
     profiles:
@@ -332,20 +301,15 @@ services:
       - bench
     networks: [noorpointer-net]
 
-  # Testy modulu Java. Uruchamiamy je w obrazie uzywanym do budowy control plane (etap `build` ma juz
-  # pobrane zaleznosci Mavena, wiec nie trzeba instalowac Javy na hoscie). Baza testowa pochodzi
-  # z `make postgres-test-up`: postgres-test-up tworzy ja, ten serwis tylko sie do niej podlacza.
-  # Testy modulu semantycznego (181 przypadkow, 27 pominietych markerem "models"). Obraz jest produkcyjny, bez zaleznosci deweloperskich,
-  # wiec dokladamy grupe "dev" (pytest) i montujemy katalog testow z repozytorium - testujemy dokladnie
-  # ten kod, ktory jest w repo. Testy z markerem "models" sa domyslnie pomijane (wymagaja pobrania modeli).
+  # Testy uslugi AI (Python, pytest) na kodzie z repozytorium.
   semantic-tests:
     mem_limit: 4g
     build:
       context: ./semantic-service
       dockerfile: Dockerfile
     working_dir: /app
-    # Obraz semantyki chodzi jako uzytkownik `semantic` (non-root). Ten serwis testowy instaluje
-    # zaleznosci deweloperskie do /app/.venv, ktore nalezy do roota, wiec swiadomie wracamy tu do roota.
+    # Obraz dziala jako uzytkownik "semantic", ale ten serwis dopisuje biblioteki do /app/.venv,
+    # ktore nalezy do roota - dlatego tutaj swiadomie wracamy do roota.
     user: root
     volumes:
       - ./semantic-service/tests:/app/tests:ro,z
@@ -365,6 +329,7 @@ services:
       - semantic
     networks: [noorpointer-net]
 
+  # Testy modulu Java (Maven) na osobnej bazie, zeby nie ruszyc danych z pokazu.
   controlplane-tests:
     mem_limit: 2g
     build:

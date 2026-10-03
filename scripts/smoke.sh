@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
-# Zero-prep smoke check of the whole stack. Usage: make smoke
+# Szybkie sprawdzenie, czy caly system odpowiada. Uruchamianie: make smoke
+# Sprawdza zdrowie uslug, dzialanie bramy i przyjmowanie tokenu.
+
 set -uo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"; cd "$ROOT"
 

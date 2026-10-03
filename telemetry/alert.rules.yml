@@ -1,93 +1,84 @@
 groups:
   - name: noorpointer
     rules:
-      # --- dostepnosc --------------------------------------------------------------------------------------
-      # Zadanie zbierajace metryki gatewaya w prometheus.yml jest zakomentowane do czasu, gdy gateway
-      # wystawi /metrics. Bez celu nie istnieje seria up{}, wiec alert nie moze sie wyzwolic.
-      # Po dodaniu metryk odkomentuj jednoczesnie zadanie w prometheus.yml i usun ten komentarz.
+      # Dostepnosc uslug
       - alert: GatewayDown
+        # Na razie nie ma danych: gateway nie wystawia /metrics (patrz prometheus.yml).
         expr: up{job="noorpointer-gateway"} == 0
         for: 30s
         labels: { severity: critical }
         annotations:
           summary: "Brak odpowiedzi z gatewaya"
-          description: "Prometheus nie moze pobrac metryk z gateway:9090/metrics (endpoint nie istnieje lub proces nie dziala)."
+          description: "Prometheus nie moze pobrac metryk z gateway:9090/metrics (endpoint nie istnieje albo proces nie dziala)."
 
       - alert: SemanticDown
-        # Usluga dziala w replikach, wiec ten alert opisuje calkowita awarie: zadna replika nie odpowiada.
-        # Prog dluzszy niz dla pozostalych uslug: kontener wczytuje modele okolo 2 minut, wiec krotsze
-        # okno zglaszaloby "brak odpowiedzi" przy kazdym starcie, choc usluga jest w trakcie uruchamiania.
+        # "max(...) == 0" znaczy: zaden z kontenerow uslugi AI nie odpowiada (calkowita awaria).
+        # Czekamy 2 minuty, bo na starcie usluga wczytuje modele (ok. 2 min).
         expr: max(up{job="noorpointer-semantic"}) == 0
         for: 2m
         labels: { severity: critical }
         annotations:
-          summary: "Zadna replika uslugi semantycznej nie odpowiada"
-          description: "Prometheus nie moze pobrac metryk z zadnej repliki od ponad 2 minut. Krotkie przerwy w czasie startu (wczytywanie modeli) sa normalne i nie wyzwalaja alertu."
+          summary: "Zadna kopia uslugi AI nie odpowiada"
+          description: "Prometheus nie moze pobrac metryk z zadnej kopii od ponad 2 minut."
 
       - alert: SemanticReplicaLost
-        # Czesciowa utrata: czesc replik odpowiada, czesc nie. Ruch nadal idzie, ale zapas sie zmniejszyl.
+        # Czesciowa awaria: czesc kopii dziala, czesc nie - ruch idzie, ale zapas sie zmniejszyl.
         expr: min(up{job="noorpointer-semantic"}) == 0 and max(up{job="noorpointer-semantic"}) == 1
         for: 2m
         labels: { severity: warning }
         annotations:
-          summary: "Czesc replik uslugi semantycznej nie odpowiada"
-          description: "Przynajmniej jedna replika dziala, a przynajmniej jedna nie odpowiada. Prometheus pokazuje kazda replike jako osobny cel."
+          summary: "Czesc kopii uslugi AI nie odpowiada"
+          description: "Przynajmniej jedna kopia dziala, a przynajmniej jedna nie odpowiada."
 
       - alert: ControlPlaneDown
         expr: up{job="noorpointer-controlplane"} == 0
         for: 30s
         labels: { severity: critical }
         annotations:
-          summary: "Brak odpowiedzi z control plane lub blad uwierzytelnienia metryk"
+          summary: "Brak odpowiedzi z control plane lub blad tokenu metryk"
 
-      # --- kontrole semantyczne (zalozony prog 200 ms) -----------------------------------------------------
+      # Jakosc kontroli AI (prog: 200 ms)
       - alert: SemanticSlow
-        # Okno 5 minut, nie 1: przy malym ruchu p95 z minuty skacze przy pojedynczych pomiarach.
+        # Okno 5 minut, bo przy malym ruchu p95 z jednej minuty skacze.
         expr: histogram_quantile(0.95, sum(rate(semantic_check_latency_seconds_bucket[5m])) by (le)) > 0.2
         for: 2m
         labels: { severity: warning }
         annotations:
-          summary: "p95 kontroli semantycznych powyzej 200 ms"
-          description: "Percentyl 95 z 5-minutowego okna przekracza 200 ms. Budzet kontroli w polityce (defaults.semantic_timeout_ms) to 1500 ms, wiec alert ostrzega z wyprzedzeniem przed zblizaniem sie do limitu."
+          summary: "p95 kontroli AI powyzej 200 ms"
+          description: "Limit z polityki to 1500 ms, wiec alert ostrzega, zanim zblizymy sie do limitu."
 
       - alert: SemanticCheckFailing
         expr: sum(rate(semantic_check_latency_seconds_count{status=~"error|timeout"}[1m])) > 0
         for: 1m
         labels: { severity: warning }
         annotations:
-          summary: "Kontrole semantyczne konczace sie bledem lub przekroczeniem czasu"
+          summary: "Kontrole AI konczace sie bledem lub przekroczeniem czasu"
 
-      # --- plaszczyzna danych (dziala po dodaniu /metrics w gatewayu) --------------------------------------
+      # Plaszczyzna danych (zadziala po dodaniu /metrics w gatewayu)
       - alert: GatewayBlockSpike
-        # Etykieta musi byc taka sama jak w metryce, ktora wystawi gateway. W kontrakcie zdarzenia
-        # audytowego akcje to allow|block|redact|monitor|timeout, wiec uzywamy "block", a nie "blocked".
+        # Etykieta "block" musi sie zgadzac z nazwa akcji w metryce gatewaya (allow|block|redact|monitor|timeout).
         expr: sum(rate(gateway_requests_total{action="block"}[1m])) > 5
         for: 1m
         labels: { severity: info }
         annotations:
-          summary: "Skok liczby zablokowanych zadan (powyzej 5 na sekunde)"
-          description: "Gateway blokuje ponad 5 zadan na sekunde. Przy normalnej pracy to sygnal ataku; po wlaczeniu kontroli sprawdz, czy nie jest to falszywy alarm regulatora."
+          summary: "Skok liczby zablokowanych zadan (ponad 5 na sekunde)"
+          description: "Przy normalnej pracy to sygnal ataku. Sprawdz, czy to nie falszywy alarm."
 
-      # --- brak danych (metryka nie istnieje albo nie ma ruchu) --------------------------------------------
-      # Alert oparty na rate() milczy zarowno wtedy, gdy wszystko dziala, jak i wtedy, gdy danych nie ma.
-      # Ponizsze reguly rozrozniaja te dwie sytuacje i nazywaja je wprost.
+      # Brak danych (metryka nie istnieje albo nie ma ruchu)
       - alert: SemanticNoTraffic
-        # Warunek wymaga ruchu w gatewayu: alert ma pokazywac brakujace podlaczenie semantyki do sciezki
-        # zadania, a nie przerwe w pracy zespolu. Bez tego warunku wyzwalalby sie za kazdym razem, gdy
-        # nikt nie korzysta z systemu (np. w nocy albo w trakcie przerwy w pokazie).
+        # Warunek "jest ruch w gatewayu" jest po to, zeby alert nie wyzwalal sie w nocy, gdy nikt nie pracuje.
         expr: sum(rate(gateway_requests_total[5m])) > 0 and sum(increase(semantic_check_latency_seconds_count[5m])) == 0
         for: 10m
         labels: { severity: info }
         annotations:
-          summary: "Gateway obsluguje ruch, a usluga semantyczna nie wykonuje zadnej kontroli"
-          description: "Przez 10 minut gateway przyjmowal zadania, a licznik kontroli semantycznych sie nie zmienil. To znaczy, ze sprawdzanie tresci nie jest jeszcze podlaczone do sciezki zadania."
+          summary: "Gateway ma ruch, a usluga AI nie wykonuje kontroli"
+          description: "Przez 10 minut byly zadania, a licznik kontroli sie nie zmienil - sprawdzanie tresci nie jest podlaczone do sciezki zadania."
 
       - alert: GatewayMetricsMissing
-        # Warunek prawdziwy, bo metryka nie istnieje: gateway nie wystawia /metrics (znana luka).
-        # Alert wygasa sam, gdy pojawi sie gateway_requests_total.
+        # Alert jest prawdziwy, dopoki gateway nie wystawia /metrics. Zniknie sam po dodaniu metryki.
         expr: absent(gateway_requests_total)
         for: 5m
         labels: { severity: info }
         annotations:
           summary: "Gateway nie wystawia metryk"
-          description: "Brak serii gateway_requests_total. Po dodaniu /metrics odkomentuj zadanie zbierajace w prometheus.yml."
+          description: "Brak serii gateway_requests_total. Po dodaniu /metrics odkomentuj zadanie w prometheus.yml."

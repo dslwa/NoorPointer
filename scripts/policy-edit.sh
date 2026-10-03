@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
-# Zapisuje aktywna polityke bezpieczenstwa do pliku, zeby mozna ja bylo edytowac w dowolnym
-# edytorze. Nic nie zmienia w systemie - to tylko zrzut do pliku.
-#
-# Uzycie: make policy-edit     (plik wynikowy: policy.local.json)
+# Zapisuje aktualne zasady do pliku policy.local.json, zeby mozna je bylo edytowac w edytorze.
+# Nic nie zmienia w systemie. Uzycie: make policy-edit
+
 set -euo pipefail
 cd "$(dirname "$0")/.."
 

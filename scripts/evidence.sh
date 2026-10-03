@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
-# Zbiera najwazniejsze dowody z katalogu reports/ do katalogu dowody/, ktory jest czescia
-# repozytorium. Dzieki temu osoba oceniajaca widzi wyniki bez uruchamiania czegokolwiek.
-#
-# Uruchamianie: make evidence
+# Kopiuje najwazniejsze wyniki z reports/ do katalogu dowody/, ktory jest w repozytorium.
+# Dzieki temu osoba oceniajaca widzi wyniki bez uruchamiania czegokolwiek. Uruchamianie: make evidence.
+
 set -euo pipefail
 cd "$(dirname "$0")/.."
 

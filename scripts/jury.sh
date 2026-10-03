@@ -1,13 +1,8 @@
 #!/usr/bin/env bash
-# JEDNO polecenie dla osoby oceniajacej: sprawdza srodowisko, buduje i uruchamia stos, uruchamia
-# wszystkie testy, generuje ruch na panele i zbiera dowody do katalogu dowody/.
-#
-# Konsola pokazuje wyniki, a nie prace: budowanie obrazow, logi Mavena i Springa oraz pelne wyjscie
-# testow trafiaja do plikow w reports/. Dzieki temu na koncu widac tylko to, co wazne.
-#
-# Uzycie:
-#   sudo make jury           # przebieg dla osoby oceniajacej (cichy)
-#   sudo make jury VERBOSE=1 # to samo, ale ze wszystkim: budowanie, logi, szczegoly
+# JEDNO polecenie dla osoby oceniajacej: sprawdza srodowisko, uruchamia system, robi testy,
+# wysyla ruch na wykresy i zbiera dowody do katalogu dowody/.
+# Uzycie: sudo make jury   (VERBOSE=1 pokazuje budowanie i pelne logi).
+
 set -uo pipefail
 cd "$(dirname "$0")/.."
 

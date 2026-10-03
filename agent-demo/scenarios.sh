@@ -1,18 +1,8 @@
 #!/usr/bin/env bash
-# Advanced demo scenarios promised by agent-demo/README.md but missing from run.sh:
-#   runaway-loop, unauthorized-tool, budget-exhaust.
-#
-# Each scenario is judged against the gateway response:
-#   PASS    - blocked/limited as expected (guardrail active)
-#   PENDING - request was proxied because the gateway does not enforce this control yet
-#             -> turns into PASS on its own once the control lands
-#   FAIL    - wrong response (e.g. 401 without a JWT, 5xx, or unreachable gateway)
-#
-# Usage:
-#   ./agent-demo/scenarios.sh                 # PENDING is allowed (control not enforced yet)
-#   ./agent-demo/scenarios.sh --strict        # PENDING counts as FAIL (after the gateway lands it)
-#   ./agent-demo/scenarios.sh runaway-loop    # single scenario
-# Env: GATEWAY_URL, GATEWAY_JWT, EXHAUST_BURST
+# Trzy scenariusze ataku: petla agenta, nieuprzywilejowane narzedzie i przekroczenie budzetu.
+# Wynik kazdego: PASS (zablokowane), PENDING (brama jeszcze tego nie sprawdza) lub FAIL (zla odpowiedz).
+# Uzycie: ./agent-demo/scenarios.sh [--strict] [nazwa scenariusza]
+
 set -uo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"; cd "$ROOT"
 

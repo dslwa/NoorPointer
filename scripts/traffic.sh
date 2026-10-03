@@ -1,16 +1,8 @@
 #!/usr/bin/env bash
-# Wysyla realny ruch, zeby panele Grafany mialy dane w trakcie prezentacji.
-#
-# Co robi:
-#   1. kilka zapytan do gatewaya (sciezka danych: klient -> gateway -> mock LLM),
-#   2. kilka skanow uslugi semantycznej: teksty bezpieczne i takie, ktore zostana oznaczone
-#      (prompt injection, PII) - bez tych wywolan panele semantyczne sa puste, bo gateway
-#      nie wywoluje jeszcze tej uslugi.
-#
-# To sa prawdziwe zadania, a nie wstrzykniete liczby: kazde przechodzi normalna sciezka
-# i zostawia slad w metrykach oraz w audycie.
-#
-# Uzycie: make traffic [LICZNIK=3]
+# Wysyla prawdziwy ruch, zeby panele Grafany mialy dane w trakcie prezentacji: kilka pytan
+# przez brame i kilka skanow uslugi AI (bezpieczne i takie, ktore zostana oznaczone).
+# To prawdziwe zadania - zostawiaja slad w metrykach i w dzienniku.
+
 set -euo pipefail
 cd "$(dirname "$0")/.."
 

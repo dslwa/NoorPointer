@@ -6,24 +6,16 @@ rule_files:
   - /etc/prometheus/alert.rules.yml
 
 scrape_configs:
-  # Zadanie dla gatewaya jest wylaczone, dopoki gateway nie wystawi GET /metrics na porcie 9090.
-  # Bez tego celu nie da sie zmierzyc narzutu, a alert GatewayDown nie ma danych.
-  # Po dodaniu endpointu odkomentuj ponizszy blok.
+  # Gateway nie wystawia jeszcze /metrics, wiec nie ma go na liscie celow. Po dodaniu endpointu
+  # wystarczy odkomentowac ponizsze linie.
   # - job_name: "noorpointer-gateway"
   #   metrics_path: /metrics
-  #   static_configs:
-  #     - targets: ["gateway:9090"]
-  #       labels:
-  #         component: "gateway"
-  #         tier: "data-plane"
+  #   static_configs: [{ targets: ["gateway:9090"], labels: { component: "gateway", tier: "data-plane" } }]
 
-  # Usluga semantyczna dziala w replikach, wiec nie wpisujemy adresu na sztywno: Prometheus pyta
-  # Dockera o wszystkie adresy pod nazwa `semantic-app` i zbiera metryki z kazdej repliki osobno.
-  # Dzieki temu wykresy pokazuja sume ruchu, a nie tylko to, co trafilo do jednego kontenera.
+  # Usluga AI dziala w kilku kopiach, wiec pytamy Dockera o wszystkie adresy pod nazwa
+  # "semantic-app" - kazda kopia to osobny cel na wykresach.
   - job_name: "noorpointer-semantic"
-    # Z ukonczeniem "/": FastAPI montuje /metrics jako podaplikacje ASGI, wiec bez ukosnika odpowiada
-    # 307, a nginx przekazuje Host bez portu. Prometheus idzie za redirectem na :80 i cel jest "down"
-    # (falszywy alert SemanticDown). Sprawdzone na dzialajacym stosie: /metrics -> 307, /metrics/ -> 200.
+    # Koncowe "/" jest konieczne: bez niego FastAPI odpowiada 307 i Prometheus uznaje cel za "down".
     metrics_path: /metrics/
     dns_sd_configs:
       - names: ["semantic-app"]
@@ -39,9 +31,8 @@ scrape_configs:
 
   - job_name: "noorpointer-controlplane"
     metrics_path: /actuator/prometheus
-    # Endpoint /actuator/prometheus wymaga roli administratora, dlatego wysylamy token w naglowku.
-    # Token czytamy z pliku (credentials_file), bo prom/prometheus nie rozwija ${ADMIN_TOKEN} w configu.
-    # Plik generuje `make prometheus-token` z ADMIN_TOKEN (.env); `make up` i `make dev-infra` go pilnuja.
+    # Ten endpoint wymaga tokenu administratora, wiec wysylamy go w naglowku.
+    # Token lezy w osobnym pliku (robi go `make up`), a nie na sztywno w tym pliku.
     authorization:
       type: Bearer
       credentials_file: /etc/prometheus/admin_token

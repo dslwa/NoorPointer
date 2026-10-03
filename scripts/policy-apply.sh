@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
-# Publikuje edytowana polityke jako nowa rewizje, aktywuje ja i kaze gatewayowi przeladowac
-# konfiguracje. Nie restartuje zadnego kontenera.
-#
-# Uzycie: make policy-apply        (domyslnie plik policy.local.json, NAME= nazwa rewizji)
+# Publikuje edytowane zasady jako nowa wersje, wlacza ja i kaze bramie przeladowac konfiguracje.
+# Nie restartuje zadnego kontenera. Uzycie: make policy-apply (plik: policy.local.json).
+
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
