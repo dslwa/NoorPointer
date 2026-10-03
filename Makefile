@@ -1,4 +1,4 @@
-.PHONY: help up dev-infra down restart logs status build test bench demo clean postgres-up postgres-test-up controlplane-run controlplane-test controlplane-build dashboard-dev smoke bench-flood bench-budget offline-check report demo-full demo-strict verify verify-strict keys token doctor
+.PHONY: help up dev-infra down restart logs status build test bench demo clean postgres-up postgres-test-up controlplane-run controlplane-test controlplane-build dashboard-dev smoke bench-flood bench-budget offline-check report demo-full demo-strict verify verify-strict keys token doctor seed
 
 help: ## Pokazuje dostępne komendy
 	@echo "🛡️ NoorPointer Hackathon Commands:"
@@ -25,7 +25,10 @@ logs: ## Wyświetla zagregowane logi ze wszystkich kontenerów
 status: ## Pokazuje stan kontenerów i ich porty
 	docker compose ps
 
-test: ## Uruchamia automatyczny pakiet testów e2e (z generowaniem raportu HTML)
+seed: ## Wypełnia bazę audytu danymi demo (wymagane dla eksportu CEF)
+	./scripts/seed.sh
+
+test: seed ## Uruchamia automatyczny pakiet testów e2e (seed + raport HTML)
 	docker compose run --rm -e GATEWAY_JWT="$$(./scripts/token.sh)" tests
 
 bench: ## Uruchamia benchmarki wydajnościowe k6 (narzut p95)
