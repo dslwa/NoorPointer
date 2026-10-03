@@ -242,6 +242,7 @@ services:
       - GATEWAY_URL=http://gateway:8080
       - CONTROLPLANE_URL=http://controlplane:8082
       - ADMIN_TOKEN=${ADMIN_TOKEN:-local-dev-admin}
+      - GATEWAY_TOKEN=${GATEWAY_TOKEN:-local-dev-gateway}
       - SEMANTIC_URL=http://semantic-service:8001
     volumes:
       # Test source is live-mounted: the image also COPYs it, and a stale image once made

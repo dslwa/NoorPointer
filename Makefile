@@ -1,4 +1,4 @@
-.PHONY: help up dev-infra down restart logs status build test test-rebuild bench demo clean postgres-up postgres-test-up controlplane-run controlplane-test controlplane-build dashboard-dev smoke bench-flood bench-budget offline-check report demo-full demo-strict verify verify-strict keys token doctor seed urls checkpoint ollama-up ollama-down mint-build
+.PHONY: help up dev-infra down restart logs status build test test-rebuild bench demo clean postgres-up postgres-test-up controlplane-run controlplane-test controlplane-build dashboard-dev smoke bench-flood bench-budget offline-check report demo-full demo-strict verify verify-strict keys token reload-policy doctor seed urls checkpoint ollama-up ollama-down mint-build
 
 help: ## Pokazuje dostępne komendy
 	@echo "🛡️ NoorPointer Hackathon Commands:"
@@ -114,6 +114,11 @@ mint-build: ## Buduje gateway/bin/mint raz, zeby token nie wymagal 'go run' (dzi
 
 token: ## Wypisuje świeży JWT dla gatewaya (AGENT=... TEAM=... TTL=...)
 	./scripts/token.sh
+
+reload-policy: ## Wymusza natychmiastowy reload polityki w gatewayu (Bearer GATEWAY_TOKEN)
+	@body=$$(mktemp); code=$$(curl -s -o "$$body" -w '%{http_code}' -X POST http://localhost:8080/admin/policy/reload \
+	  -H "Authorization: Bearer $${GATEWAY_TOKEN:-local-dev-gateway}"); \
+	echo "  HTTP $$code $$(cat "$$body")"; rm -f "$$body"; [ "$$code" = "200" ]
 
 doctor: ## Pre-flight: klucze JWT, compose, token, wymuszanie auth (bez zmian w stacku)
 	./scripts/doctor.sh
