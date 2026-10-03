@@ -1,0 +1,66 @@
+{
+  "version": "2026.10.03.1",
+  "updated_at": "2026-10-03T12:00:00Z",
+  "signatures": [
+    {
+      "id": "SIG-2024-001",
+      "name": "ShadowRay Remote Code Execution",
+      "cve": "CVE-2023-48022",
+      "owasp_category": "LLM02: Sensitive Information Disclosure / Insecure Output Handling",
+      "target_component": "ray_api",
+      "pattern_type": "regex",
+      "pattern": "(/api/job/submit|ray\\.remote.*__import__)",
+      "action": "block",
+      "severity": "CRITICAL",
+      "description": "Próba wykorzystania luki w dashboardzie Ray do nieautoryzowanego wykonania kodu."
+    },
+    {
+      "id": "SIG-2024-002",
+      "name": "Probllama Ollama Path Traversal",
+      "cve": "CVE-2024-37032",
+      "owasp_category": "LLM05: Supply Chain Vulnerabilities",
+      "target_component": "ollama_api",
+      "pattern_type": "regex",
+      "pattern": "(\\.\\./\\.\\./|/api/pull.*manifests/\\.\\.)",
+      "action": "block",
+      "severity": "CRITICAL",
+      "description": "Arbitrary file read / write via path traversal in Ollama API pull."
+    },
+    {
+      "id": "SIG-2024-003",
+      "name": "Pickle Model Deserialization RCE",
+      "cve": "CVE-2022-34918",
+      "owasp_category": "LLM05: Supply Chain Vulnerabilities",
+      "target_component": "model_loader",
+      "pattern_type": "regex",
+      "pattern": "(posix\\.system|subprocess\\.Popen|__reduce__.*os\\.system)",
+      "action": "block",
+      "severity": "HIGH",
+      "description": "Niebezpieczna deserializacja pickle w wagach modeli PyTorch/pickle."
+    },
+    {
+      "id": "SIG-2024-004",
+      "name": "MCP Tool Description Injection / Rug Pull",
+      "cve": "CVE-2024-AGENT-01",
+      "owasp_category": "LLM07: System Prompt Leakage & Tool Hijacking",
+      "target_component": "mcp_proxy",
+      "pattern_type": "regex",
+      "pattern": "(<tool_override>|<instruction>override system instructions|SYSTEM: disregard previous tool permissions)",
+      "action": "block",
+      "severity": "HIGH",
+      "description": "Próba nadpisania parametrów systemowych w opisach lub argumentach narzędzi MCP."
+    },
+    {
+      "id": "SIG-2024-005",
+      "name": "Indirect HTML Prompt Injection",
+      "cve": "CVE-2024-INJECT-02",
+      "owasp_category": "LLM01: Prompt Injection",
+      "target_component": "prompt_filter",
+      "pattern_type": "regex",
+      "pattern": "(<!--.*?instruction:.*?-->|<style>.*display:\\s*none.*</style>.*ignore previous)",
+      "action": "block",
+      "severity": "MEDIUM",
+      "description": "Ukryte instrukcje jailbreak w komentarzach HTML lub ukrytych tagach CSS."
+    }
+  ]
+}

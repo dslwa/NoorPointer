@@ -10,7 +10,7 @@
 
 System łączy **dwuwarstwową obronę hybrydową**:
 1. **Deterministyczną (Data Plane w Go)** – natychmiastowe reguły regex (PII/sekrety), walidacja allowlisty MCP, kontrola budżetów tokenowych w Redis oraz detekcja pętli agenta (narzut < 5 ms).
-2. **Semantyczną (AI Guardrails w Pythonie)** – głęboka inspekcja intencji promptów (DeBERTa v3 Prompt Injection Classifier), zaawansowane PII (Presidio NER) oraz analiza bezpieczeństwa artefaktów modeli (skanowanie pikli pod kątem Unsafe Deserialization RCE).
+2. **Semantyczną (AI Guardrails w Pythonie via gRPC)** – głęboka inspekcja intencji promptów (**DeBERTa v3** Prompt Injection Classifier), zaawansowane PII (**GLiNER** Zero-Shot NER) oraz analiza bezpieczeństwa artefaktów modeli (**picklescan** pod kątem Unsafe Deserialization RCE).
 
 Zarządzanie odbywa się centralnie przez **Control Plane**, a wyniki i telemetria są prezentowane w czasie rzeczywistym na dedykowanym **Dashboardzie** oraz w **Grafanie**.
 
@@ -21,17 +21,20 @@ Zarządzanie odbywa się centralnie przez **Control Plane**, a wyniki i telemetr
 Cały system uruchamia się jednym poleceniem – bez konieczności pobierania modeli z internetu w trakcie prezentacji:
 
 ```bash
-# 1. Uruchomienie całego środowiska (Gateway, Semantic Svc, Control Plane, Dashboard, DB, Ollama, Telemetria)
+# A. Tryb dla Developerów (tylko Postgres, Redis, Ollama, Threat Feed i Telemetria):
+make dev-infra
+
+# B. Tryb Pełny (uruchomienie wszystkich 10 serwisów w kontenerach):
 make up
 # lub: docker compose up -d --build
 
-# 2. Uruchomienie automatycznego pakietu testów (z generowaniem raportu HTML dla jury)
+# C. Uruchomienie automatycznego pakietu testów (z generowaniem raportu HTML dla jury):
 make test
 
-# 3. Uruchomienie benchmarków wydajnościowych (p95 latencji i throughput)
+# D. Uruchomienie benchmarków wydajnościowych (p95 latencji i throughput):
 make bench
 
-# 4. Uruchomienie interaktywnych scenariuszy demonstracyjnych agenta
+# E. Uruchomienie interaktywnych scenariuszy demonstracyjnych agenta:
 make demo
 ```
 
@@ -41,11 +44,11 @@ make demo
 | :--- | :--- | :--- | :--- |
 | **Gateway (Data Plane)** | Go | `8080` / `9090` | `http://localhost:8080/v1` (Prometheus: `:9090/metrics`) |
 | **Security Dashboard** | React / UI | `3000` | `http://localhost:3000` |
-| **Grafana Telemetry** | Grafana | `3001` | `http://localhost:3001` (`admin` / `admin`) |
-| **Control Plane API** | Java / Go | `8082` | `http://localhost:8082/api/v1` |
-| **Semantic Service** | Python | `8001` / `50051` | `http://localhost:8001` (lub gRPC `:50051`) |
-| **Signatures Feed** | Nginx / Mock | `8085` | `http://localhost:8085/signatures.json` |
-| **Ollama (Upstream LLM)**| Ollama | `11434` | `http://localhost:11434` |
+| **Grafana Telemetry** | Grafana | `3001` | `http://localhost:3001` (Auto-login: `admin` / `admin`) |
+| **Control Plane API** | Python / Go | `8082` | `http://localhost:8082/api/v1` (Eksport SIEM: `/audit/export?format=cef`) |
+| **Semantic Service** | Python | `8001` / `50051` | `http://localhost:8001` (Główny gRPC: `:50051`) |
+| **Signatures Feed** | Nginx | `8085` | `http://localhost:8085/signatures.json` |
+| **Ollama (Upstream LLM)**| Ollama | `11434` | `http://localhost:11434` (`llama3.2:1b`) |
 
 ---
 
@@ -65,20 +68,20 @@ make demo
 │  • Aktywny zbiór sygnatur ataków z Feed                      │
 │  • Hot-reload polityki (fsnotify)                            │
 └──────────────┬──────────────────────────────┬────────────────┘
-               │                              │ gRPC / REST (Timeout: 200ms)
+               │                              │ gRPC :50051 (Protobuf v3, Timeout: 200ms)
                │ Upstream (Allowed)           ▼
                │               ┌──────────────────────────────┐
                │               │  SEMANTIC SERVICE (Python)   │
                │               │  • DeBERTa Prompt Injection  │
-               │               │  • Presidio PII NER          │
-               │               │  • Model Pickle Scanner RCE  │
+               │               │  • GLiNER Zero-Shot PII NER  │
+               │               │  • Picklescan RCE Scanner    │
                │               └──────────────────────────────┘
                ▼                              │
 ┌──────────────────────────────┐              │ Zdarzenia audytowe
 │  LLM / MCP SERWERY           │              │ (Asynchroniczny strumień)
 │  (Ollama / OpenAI / Claude)  │              ▼
 └──────────────────────────────┘ ┌──────────────────────────────┐
-                                │  CONTROL PLANE (Java / Go)   │
+                                │  CONTROL PLANE (Python/Go)   │
                                 │  • Katalog i walidacja reguł │
                                 │  • Ingestion feedu sygnatur  │
                                 │  • Zapis audytu w PostgreSQL │
@@ -102,8 +105,8 @@ Każdy katalog posiada własny, szczegółowy plik `README.md` z zakresem i defi
 | Katalog | Właściciel | Opis & README |
 | :--- | :--- | :--- |
 | [`gateway/`](file:///home/dawid/NoorPointer/gateway/README.md) | **Go Dev** | Szybka bramka proxy, regexy PII/sekretów, integracja z Redisem, loop breaker, metryki Prometheus. |
-| [`semantic-service/`](file:///home/dawid/NoorPointer/semantic-service/README.md) | **Python Dev** | Klasyfikator DeBERTa prompt injection, Presidio NER, skaner deserializacji modeli pickle. |
-| [`controlplane/`](file:///home/dawid/NoorPointer/controlplane/README.md) | **Java/Go Dev** | Baza polityk, odbiór logów, import zewnętrznego feedu sygnatur, eksport do SIEM (CEF). |
+| [`semantic-service/`](file:///home/dawid/NoorPointer/semantic-service/README.md) | **Python Dev** | Klasyfikator DeBERTa prompt injection, GLiNER Zero-Shot NER, picklescan RCE (gRPC `:50051`). |
+| [`controlplane/`](file:///home/dawid/NoorPointer/controlplane/README.md) | **Backend Dev** | Baza polityk, odbiór logów, import zewnętrznego feedu sygnatur, eksport do SIEM (CEF). |
 | [`dashboard/`](file:///home/dawid/NoorPointer/dashboard/README.md) | **Frontend Dev** | Widok executive (Security Posture Score, koszty), widok SOC (incydenty OWASP), przełącznik reguł. |
 | [`telemetry/`](file:///home/dawid/NoorPointer/telemetry/README.md) | **DevOps** | Prekonfigurowany Prometheus i Grafana z dashboardami narzutu p95 i rozkładu blokad. |
 | [`tests/`](file:///home/dawid/NoorPointer/tests/README.md) | **Python + DevOps** | Samouruchamiający się zestaw testów e2e z parami pozytywnymi/negatywnymi (`make test`). |

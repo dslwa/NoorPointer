@@ -1,0 +1,36 @@
+version: "1.0"
+mode: "enforce" # enforce | monitor
+timeouts:
+  semantic_ms: 200
+  on_timeout: "fail_closed" # fail_closed | fail_open
+
+controls:
+  pii_regex:
+    enabled: true
+    action: "redact" # redact | block
+    types: ["email", "pesel", "iban", "credit_card"]
+  secrets:
+    enabled: true
+    action: "block"
+    types: ["aws_key", "github_token", "jwt", "openai_key"]
+  prompt_injection:
+    enabled: true
+    action: "block"
+    threshold: 0.85
+  attack_signatures:
+    enabled: true
+    feed_url: "http://signatures-feed:8085/signatures.json"
+    sync_interval_s: 60
+  agent_guardrails:
+    max_session_steps: 25
+    max_identical_tool_calls: 3
+
+budgets:
+  - tenant: "team-finance"
+    monthly_usd: 100.0
+    daily_tokens: 500000
+    on_exceed: "block"
+  - tenant: "agent-demo"
+    monthly_usd: 10.0
+    daily_tokens: 50000
+    on_exceed: "block"

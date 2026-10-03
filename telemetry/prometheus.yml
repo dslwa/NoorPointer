@@ -1,0 +1,24 @@
+global:
+  scrape_interval: 2s
+  evaluation_interval: 2s
+
+scrape_configs:
+  - job_name: "noorpointer-gateway"
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["gateway:9090"]
+        labels:
+          component: "gateway"
+          tier: "data-plane"
+
+  - job_name: "noorpointer-semantic"
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["semantic-service:8001"]
+        labels:
+          component: "semantic-service"
+          tier: "ai-guardrails"
+
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]
