@@ -23,7 +23,7 @@ K6        = $(COMPOSE) run --rm -e GATEWAY_JWT="$$jwt" benchmarks run
 
 .PHONY: help \
         up dev-infra down restart build clean logs status wait \
-        seed test test-unit test-local test-rebuild bench bench-flood bench-budget traffic \
+        seed test test-unit test-local test-rebuild bench bench-flood bench-budget bench-semantic traffic \
         smoke verify verify-strict offline-check report deck checkpoint \
         demo demo-full demo-strict \
         keys mint-build token token-file reload-policy new-signature db-tidy doctor urls \
@@ -131,6 +131,9 @@ bench: ## k6: baseline (narzut p95)
 
 bench-flood: ## k6: zalew zlosliwych promptow
 	@$(JWT_GUARD); $(K6) /benchmarks/benchmark_malicious_flood.js
+
+bench-semantic: ## Przepustowosc kontroli semantycznych (RUNDY=10 ROZMIAR=10, sam Python)
+	python3 benchmarks/semantic_throughput.py --rounds $(or $(RUNDY),10) --concurrency $(or $(ROZMIAR),10)
 
 bench-budget: ## k6: rownolegle zapytania jednego agenta (atomowosc budzetu)
 	@$(JWT_GUARD); $(K6) /benchmarks/benchmark_budget_concurrency.js
@@ -264,6 +267,12 @@ postgres-test-up: postgres-up ## Osobna baza PostgreSQL dla testow Javy
 
 controlplane-run: postgres-up ## Uruchamia Jave (REST/panel) na :8082
 	cd controlplane && ./mvnw spring-boot:run
+
+test-semantic: ## Testy modulu semantycznego (117 przypadkow) w kontenerze z pytest
+	@mkdir -p reports
+	@$(COMPOSE) --profile semantic run --rm semantic-tests > reports/log-semantic-test.txt 2>&1; rc=$$?; \
+	grep -E "[0-9]+ (passed|failed)|^(FAILED|ERROR)|error" reports/log-semantic-test.txt | tail -18; \
+	[ $$rc -eq 0 ] || echo "  szczegoly: reports/log-semantic-test.txt"; exit $$rc
 
 controlplane-test: postgres-test-up ## Testy modulu Java w kontenerze (pelny log: reports/log-java-test.txt)
 	@mkdir -p reports

@@ -255,6 +255,32 @@ services:
   # Testy modulu Java. Uruchamiamy je w obrazie uzywanym do budowy control plane (etap `build` ma juz
   # pobrane zaleznosci Mavena, wiec nie trzeba instalowac Javy na hoscie). Baza testowa pochodzi
   # z `make postgres-test-up`: postgres-test-up tworzy ja, ten serwis tylko sie do niej podlacza.
+  # Testy modulu semantycznego (117 przypadkow). Obraz jest produkcyjny, bez zaleznosci deweloperskich,
+  # wiec dokladamy grupe "dev" (pytest) i montujemy katalog testow z repozytorium - testujemy dokladnie
+  # ten kod, ktory jest w repo. Testy z markerem "models" sa domyslnie pomijane (wymagaja pobrania modeli).
+  semantic-tests:
+    build:
+      context: ./semantic-service
+      dockerfile: Dockerfile
+    working_dir: /app
+    volumes:
+      - ./semantic-service/tests:/app/tests:ro,z
+    environment:
+      - MODELS_OFFLINE=1
+      - OLLAMA_URL=http://mock-llm:11434
+      - GUARD_MODEL=llama-guard3:1b
+      - PYTHONUNBUFFERED=1
+    command:
+      - sh
+      - -c
+      - uv sync --frozen --dev --no-install-project && python -m pytest tests -q --tb=no
+    depends_on:
+      mock-llm:
+        condition: service_healthy
+    profiles:
+      - semantic
+    networks: [noorpointer-net]
+
   controlplane-tests:
     build:
       context: .
