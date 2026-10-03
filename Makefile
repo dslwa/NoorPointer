@@ -1,4 +1,4 @@
-.PHONY: help up dev-infra down restart logs status build test bench demo clean postgres-up postgres-test-up controlplane-run controlplane-test controlplane-build smoke bench-flood bench-budget offline-check report
+.PHONY: help up dev-infra down restart logs status build test bench demo clean postgres-up postgres-test-up controlplane-run controlplane-test controlplane-build smoke bench-flood bench-budget offline-check report demo-full demo-strict
 
 help: ## Pokazuje dostępne komendy
 	@echo "🛡️ NoorPointer Hackathon Commands:"
@@ -66,3 +66,11 @@ offline-check: ## Lint: brak instalacji/pobierania w runtime (finalny stage obra
 
 report: ## Zbiera dowody dla jury do reports/INDEX.md
 	./scripts/report.sh
+
+demo-full: ## Pełne demo: run.sh (5 scenariuszy) + scenariusze zaawansowane (PENDING dozwolone)
+	./agent-demo/run.sh all
+	./agent-demo/scenarios.sh
+
+demo-strict: ## Jak demo-full, ale PENDING (gateway bez guardraili) liczy się jako FAIL
+	./agent-demo/run.sh all
+	./agent-demo/scenarios.sh --strict
