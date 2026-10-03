@@ -4,12 +4,16 @@
 #
 # Co robi:
 #   1. czysci tabele zdarzen audytu - rosnie o 30 zdarzen przy kazdym `make seed`, wiec po wielu
-#      uruchomieniach eksport CEF ma setki wierszy i setki kilobajtow;
+#      uruchomieniach eksport CEF ma setki wierszy i setki kilobajtow. Pomin ten krok przez SKIP_AUDIT=1,
 #   2. usuwa zdublowane rewizje polityki, zostawiajac po jednej z kazdej identycznej grupy
 #      (wpisy 5-7 powstawaly przy powtarzanych publikacjach tej samej polityki) i przepinajac
-#      wskaznik aktywnej rewizji na najstarsza wersje z grupy;
+#      wskaznik aktywnej rewizji na najstarsza wersje z grupy,
 #   3. usuwa z katalogu sygnatur wpisy, ktorych nie ma w zadnym zrodle (to wpisy dodane recznie
 #      w trakcie demonstracji - katalog jest uzupelniany addytywnie, wiec same z siebie nie znikaja).
+#
+# Uwaga o rewizjach: control plane zapisuje w dokumencie pole "version" z numerem rewizji, wiec dwie
+# publikacje tej samej polityki roznia sie tym jednym polem. Porownujemy dokumenty po usunieciu tego
+# klucza (`document::jsonb - 'version'`), inaczej duplikaty nigdy nie zostana wykryte.
 #
 # Po sprzatnieciu `make seed` odtworzy mala, czysta porcje danych: 30 zdarzen i 12 sygnatur.
 set -euo pipefail
@@ -31,15 +35,20 @@ psql -At -c "SELECT 'zdarzenia audytu: ' || count(*) FROM controlplane.audit_eve
 psql -At -c "SELECT 'rewizje polityki: ' || count(*) FROM controlplane.policy_revision;"
 psql -At -c "SELECT 'sygnatury w katalogu: ' || count(*) FROM controlplane.signature;"
 
-echo "== 1/3 czyszczenie zdarzen audytu =="
-psql -q -c "TRUNCATE TABLE controlplane.audit_event;"
+if [[ "${SKIP_AUDIT:-0}" == "1" ]]; then
+  echo "== 1/3 czyszczenie zdarzen audytu: pominiete (SKIP_AUDIT=1) =="
+else
+  echo "== 1/3 czyszczenie zdarzen audytu =="
+  psql -q -c "TRUNCATE TABLE controlplane.audit_event;"
+fi
 
 echo "== 2/3 usuwanie zdublowanych rewizji polityki =="
-# Najpierw przepinamy aktywna rewizje na najstarsza w jej grupie identycznych dokumentow,
+# Najpierw przepinamy aktywna rewizje na najstarsza w swojej grupie identycznych dokumentow,
 # potem kasujemy pozostale duplikaty (poza ta, na ktora wskazuje active_policy).
 psql -q -c "
   WITH groups AS (
-    SELECT id, MIN(id) OVER (PARTITION BY name, md5(document)) AS first_id
+    SELECT id,
+           MIN(id) OVER (PARTITION BY name, md5((document::jsonb - 'version')::text)) AS first_id
     FROM controlplane.policy_revision
   )
   UPDATE controlplane.active_policy a
@@ -47,19 +56,25 @@ psql -q -c "
   FROM groups g
   WHERE a.revision_id = g.id AND g.first_id <> g.id;
 "
-psql -q -c "
+psql -At -c "
   WITH ranked AS (
-    SELECT id, ROW_NUMBER() OVER (PARTITION BY name, md5(document) ORDER BY id) AS rn
+    SELECT id,
+           ROW_NUMBER() OVER (
+             PARTITION BY name, md5((document::jsonb - 'version')::text)
+             ORDER BY id
+           ) AS rn
     FROM controlplane.policy_revision
   )
   DELETE FROM controlplane.policy_revision
   WHERE id IN (SELECT id FROM ranked WHERE rn > 1)
-    AND id <> (SELECT revision_id FROM controlplane.active_policy);
+    AND id <> (SELECT revision_id FROM controlplane.active_policy)
+  RETURNING '  usunieto rewizje: ' || id;
 "
 
 echo "== 3/3 przywracanie katalogu sygnatur do stanu z repozytorium =="
 known_ids="$(python3 - <<'PY'
 import json
+import sys
 
 sources = (
     "controlplane/src/main/resources/signatures/defaults.json",
@@ -71,12 +86,12 @@ for path in sources:
         with open(path) as handle:
             identifiers += [entry["id"] for entry in json.load(handle).get("signatures", [])]
     except FileNotFoundError:
-        print(f"db-tidy: pomijam brakujacy {path}", file=__import__("sys").stderr)
+        print(f"db-tidy: pomijam brakujacy {path}", file=sys.stderr)
 print(",".join("'" + identifier.replace("'", "''") + "'" for identifier in identifiers))
 PY
 )"
 if [[ -n "$known_ids" ]]; then
-  psql -At -c "DELETE FROM controlplane.signature WHERE id NOT IN ($known_ids) RETURNING '  usunieto: ' || id;"
+  psql -At -c "DELETE FROM controlplane.signature WHERE id NOT IN ($known_ids) RETURNING '  usunieto sygnature: ' || id;"
 else
   echo "  brak zrodel sygnatur - pomijam ten krok" >&2
 fi
