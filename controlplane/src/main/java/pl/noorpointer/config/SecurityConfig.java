@@ -89,7 +89,7 @@ public class SecurityConfig {
                         "/api/v1/audit/events",
                         "/api/gateway/events")
                     .hasAnyRole("ADMIN", "GATEWAY")
-                    .requestMatchers("/api/**", "/actuator/prometheus")
+                    .requestMatchers("/api/**", "/gateway/check", "/actuator/prometheus")
                     .hasRole("ADMIN")
                     .anyRequest()
                     .denyAll())

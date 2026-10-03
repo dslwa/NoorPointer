@@ -927,6 +927,40 @@ dialog::backdrop {
   }
 }
 
+.prompt-input {
+  min-height: 200px;
+  resize: vertical;
+  line-height: 1.6;
+}
+.prompt-results {
+  border-top: 1px solid var(--rule);
+}
+.prompt-verdict,
+.prompt-section {
+  padding: 20px 24px;
+}
+.prompt-verdict .badge {
+  margin-right: 12px;
+}
+.prompt-warning {
+  color: var(--caution);
+  padding-inline: 24px;
+}
+.prompt-results caption {
+  text-align: left;
+  padding: 16px 24px;
+  font-weight: 600;
+}
+.prompt-score {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.prompt-score progress {
+  width: 100px;
+  accent-color: var(--lamp);
+}
+
 /* ---------- Narrower screens ---------- */
 @media (max-width: 1150px) {
   .sidebar {

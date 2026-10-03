@@ -69,3 +69,7 @@ Odpowiada za deterministyczne, natychmiastowe kontrole bezpieczeństwa (low-late
 - [ ] Wykrycie numeru karty kredytowej lub klucza API natychmiast maskuje lub blokuje żądanie (< 5 ms).
 - [ ] Przekroczenie budżetu tokenów w Redis zwraca błąd `429 Too Many Requests / Budget Exceeded`.
 - [ ] Zmiana rewizji polityki w control plane jest uwzględniana w locie, bez restartu kontenera (także przez `make reload-policy`).
+
+### Dashboard prompt checks
+
+`POST /admin/check` requires `ADMIN_TOKEN` and accepts `{ "direction": "input", "messages": [{ "role": "user", "content": "text" }] }`. It uses the same scanning pipeline as the proxy and returns the decision, active policy version and mode, redacted messages, regex findings, semantic scores and individual control statuses. `audit_saved` and `audit_event_id` confirm delivery to control-plane Events using `GATEWAY_TOKEN`. Submitted text is excluded from the stored event. Signature matching, budgets and agent-session controls are not marked as passed by this text-only check.

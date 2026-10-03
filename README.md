@@ -425,3 +425,5 @@ Wagi i nazwy kryteriów są przepisane z regulaminu konkursu.
 2. W czasie działania żaden kontener nie może pobierać modeli ani pakietów — to sprawdza `make offline-check`.
 3. Serwisy logują na standardowe wyjście, żeby dało się je zebrać przez `make logs`.
 4. Dopóki moduł nie jest gotowy, pracujemy przeciwko mockom (`mock-llm`), żeby nie blokować innych.
+
+Prompt check in the control panel sends text to Go `/admin/check`. Go applies the active policy; the result and control details are recorded in Events. No upstream model completion is requested.

@@ -7,6 +7,15 @@ const request = createApi('test-token');
 beforeEach(() => vi.stubGlobal('fetch', vi.fn()));
 
 describe('control plane API', () => {
+  it('authenticates gateway checks using the panel session without exposing a gateway secret', async () => {
+    fetch.mockResolvedValue(new Response(JSON.stringify({ decision: 'allow' })));
+    await createApi('panel-token', '/gateway')('/check', { method: 'POST', body: '{}' });
+    expect(fetch).toHaveBeenCalledWith('/gateway/check', {
+      method: 'POST',
+      body: '{}',
+      headers: { Authorization: 'Bearer panel-token', 'Content-Type': 'application/json' },
+    });
+  });
   it('sends authenticated JSON and forwards the cancellation signal', async () => {
     fetch.mockResolvedValue(new Response(JSON.stringify({ version: 4 }), { status: 201 }));
     const signal = new AbortController().signal;

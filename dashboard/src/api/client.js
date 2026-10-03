@@ -1,6 +1,6 @@
-export function createApi(token) {
+export function createApi(token, base = '/api/v1') {
   return async (path, { download = false, ...options } = {}) => {
-    const response = await fetch('/api/v1' + path, {
+    const response = await fetch(base + path, {
       ...options,
       headers: {
         Authorization: 'Bearer ' + token,

@@ -31,45 +31,62 @@ func (s *Server) semantic(r *http.Request, agent string, p *config.Policy, doc m
 	}
 	msgs := chatMessages(doc)
 	// ponytail: nil client only in tests that don't exercise semantic checks
-	if s.semanticClient == nil || len(checks) == 0 || len(msgs) == 0 {
+	if len(checks) == 0 || len(msgs) == 0 {
 		return verdict{}, nil
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), time.Duration(p.Defaults.SemanticTimeoutMs)*time.Millisecond)
-	defer cancel()
-	resp, err := s.semanticClient.Analyze(ctx, &pb.AnalyzeRequest{
-		RequestId: r.Header.Get("X-Request-Id"),
-		AgentId:   agent,
-		Direction: pb.Direction_DIRECTION_INPUT,
-		Messages:  msgs,
-		Checks:    checks,
-	})
-	if err != nil {
-		log.Printf("semantic: %v", err)
-		return unavailable(p, err.Error()), nil
+	results := []*pb.CheckResult{}
+	detail := "Semantic service unavailable."
+	if s.semanticClient != nil {
+		ctx, cancel := context.WithTimeout(r.Context(), time.Duration(p.Defaults.SemanticTimeoutMs)*time.Millisecond)
+		defer cancel()
+		resp, err := s.semanticClient.Analyze(ctx, &pb.AnalyzeRequest{
+			RequestId: r.Header.Get("X-Request-Id"), AgentId: agent,
+			Direction: pb.Direction_DIRECTION_INPUT, Messages: msgs, Checks: checks,
+		})
+		if err != nil {
+			log.Printf("semantic: %v", err)
+		} else if resp != nil {
+			results = resp.Results
+			detail = "Gateway received no result for this check."
+		}
 	}
+	for _, check := range checks {
+		for _, msg := range msgs {
+			if !slices.ContainsFunc(results, func(res *pb.CheckResult) bool {
+				return res.Check == check.Check && (res.MessageId == msg.Id || res.MessageId == "")
+			}) {
+				results = append(results, &pb.CheckResult{Check: check.Check, MessageId: msg.Id, Status: pb.Status_STATUS_ERROR, Error: detail})
+			}
+		}
+	}
+	return semanticVerdict(p, results), results
+}
 
-	for _, res := range resp.Results {
+func semanticVerdict(p *config.Policy, results []*pb.CheckResult) verdict {
+	pi, cs := p.Controls.PromptInjection, p.Controls.ContentSafety
+
+	for _, res := range results {
 		var v verdict
 		switch {
 		case res.Status == pb.Status_STATUS_REJECTED:
 			// The caller can trigger a hard limit at will, so this never fails open.
-			return verdict{http.StatusForbidden, "SEMANTIC_INPUT_REJECTED", res.Error}, resp.Results
+			return verdict{http.StatusForbidden, "SEMANTIC_INPUT_REJECTED", res.Error}
 		case res.Status != pb.Status_STATUS_OK:
 			log.Printf("semantic: %s %s: %s", res.Check, res.Status, res.Error)
 			v = unavailable(p, res.Error)
-		case res.Check == pb.Check_CHECK_PROMPT_INJECTION && float64(res.Score) >= pi.Threshold:
+		case res.Check == pb.Check_CHECK_PROMPT_INJECTION && pi != nil && pi.Enabled && float64(res.Score) >= pi.Threshold:
 			v = act(pi.Control, "PROMPT_INJECTION_DETECTED", fmt.Sprintf("prompt injection score %.2f", res.Score))
 		// Llama Guard can say unsafe without a category; Python flags that too.
-		case res.Check == pb.Check_CHECK_CONTENT_SAFETY && res.Score >= 0.5 &&
+		case res.Check == pb.Check_CHECK_CONTENT_SAFETY && cs != nil && cs.Enabled && res.Score >= 0.5 &&
 			(len(res.Categories) == 0 || slices.ContainsFunc(res.Categories, func(c string) bool { return slices.Contains(cs.Categories, c) })):
 			v = act(cs.Control, "UNSAFE_CONTENT_DETECTED", fmt.Sprintf("unsafe content %v", res.Categories))
 		}
 		if v.code != "" {
-			return v, resp.Results
+			return v
 		}
 	}
-	return verdict{}, resp.Results
+	return verdict{}
 }
 
 func act(c config.Control, code, msg string) verdict {

@@ -1,4 +1,5 @@
 export const labels = {
+  prompt_check: 'Prompt check',
   pii_regex: 'Personal data (PII)',
   secrets: 'Secrets and API keys',
   prompt_injection: 'Prompt injection',

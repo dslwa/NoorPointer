@@ -15,6 +15,7 @@ export default defineConfig({
     strictPort: true,
     proxy: {
       '/api': process.env.CONTROLPLANE_URL || 'http://127.0.0.1:8082',
+      '/gateway/check': process.env.CONTROLPLANE_URL || 'http://127.0.0.1:8082',
     },
   },
 });

@@ -7,6 +7,7 @@ import { useAction } from '../hooks/useAction.js';
 import { useResource } from '../hooks/useResource.js';
 import { paths } from '../api/paths.js';
 import Modal from '../components/common/Modal.jsx';
+import PromptCheckResults from '../features/prompts/PromptCheckResults.jsx';
 
 const emptyFilters = { action: '', agent: '', category: '' };
 export default function EventsPage({ active, authenticated, request, refreshKey, notify }) {
@@ -207,6 +208,16 @@ export default function EventsPage({ active, authenticated, request, refreshKey,
             Close
           </button>
         </div>
+        {detail?.context.source === 'prompt_check' && (
+          <PromptCheckResults
+            report={{
+              ...detail.context,
+              decision: detail.action,
+              message: detail.message,
+              policy_version: detail.policy_version,
+            }}
+          />
+        )}
         <pre id="event-detail">{detail ? JSON.stringify(detail, null, 2) : ''}</pre>
       </Modal>
     </>

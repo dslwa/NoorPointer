@@ -1,4 +1,9 @@
 export const views = {
+  prompt: {
+    name: 'Prompt check',
+    title: 'Check a prompt',
+    description: 'Gateway decisions and check results under the active security policy.',
+  },
   overview: {
     name: 'Overview',
     title: 'This week across your agents',

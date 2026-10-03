@@ -12,6 +12,7 @@ import OverviewPage from '../pages/OverviewPage.jsx';
 import PoliciesPage from '../pages/PoliciesPage.jsx';
 import EventsPage from '../pages/EventsPage.jsx';
 import SignaturesPage from '../pages/SignaturesPage.jsx';
+import PromptCheckPage from '../pages/PromptCheckPage.jsx';
 
 export default function App() {
   const [token, setToken] = useState(() => sessionStorage.getItem('noorpointer-token'));
@@ -21,6 +22,7 @@ export default function App() {
   const { toast, notify } = useToast();
   const { pending, run } = useAction(notify);
   const request = useMemo(() => createApi(token), [token]);
+  const gateway = useMemo(() => createApi(token, '/gateway'), [token]);
   const onUnauthorized = useCallback((message) => {
     setLoginError(message);
     setLoginOpen(true);
@@ -101,6 +103,15 @@ export default function App() {
             request={request}
             refreshKey={refreshKey}
             notify={notify}
+          />
+        </section>
+        <section id="prompt" className="view" hidden={view !== 'prompt'}>
+          <PromptCheckPage
+            authenticated={!!dashboard}
+            gateway={gateway}
+            notify={notify}
+            refresh={refresh}
+            onEvents={() => setView('events')}
           />
         </section>
       </AppShell>

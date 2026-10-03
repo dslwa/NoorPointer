@@ -24,6 +24,7 @@ services:
       - SEMANTIC_GRPC_URL=semantic-service:50051
       - CONTROLPLANE_URL=http://controlplane:8082
       - GATEWAY_TOKEN=${GATEWAY_TOKEN:-local-dev-gateway}
+      - ADMIN_TOKEN=${ADMIN_TOKEN:-local-dev-admin}
       - UPSTREAM_LLM_URL=http://mock-llm:11434
       - SIGNATURES_FEED_URL=http://signatures-feed:8085/signatures.json
       - JWT_PUBLIC_KEY=/app/keys/jwt.pub
@@ -126,6 +127,7 @@ services:
       - DATABASE_URL=jdbc:postgresql://postgres:5432/noorpointer?currentSchema=controlplane
       - DATABASE_USER=noor
       - DATABASE_PASSWORD=noorpass
+      - GATEWAY_URL=http://gateway:8080
       - SPRING_FLYWAY_SCHEMAS=controlplane
       - SPRING_FLYWAY_DEFAULT_SCHEMA=controlplane
       - ADMIN_TOKEN=${ADMIN_TOKEN:-local-dev-admin}

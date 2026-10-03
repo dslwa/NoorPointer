@@ -27,6 +27,7 @@ management:
     health:
       show-details: never
 control-plane:
+  gateway-url: ${GATEWAY_URL:http://localhost:8080}
   admin-token: ${ADMIN_TOKEN:local-dev-admin}
   gateway-token: ${GATEWAY_TOKEN:local-dev-gateway}
   demo-enabled: ${DEMO_ENABLED:true}

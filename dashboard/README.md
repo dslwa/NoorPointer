@@ -7,6 +7,22 @@ Control plane zarządza politykami i sygnaturami oraz udostępnia je gatewayowi 
 aktualny feed sygnatur. Oba endpointy wymagają tokenu gatewaya i obsługują `ETag` / `If-None-Match`.
 Kontrole treści i decyzje o blokowaniu należą do gatewaya; panel nie wysyła tekstu do serwisu Python.
 
+**Prompt check** wysyła `POST /gateway/check` z tokenem panelu. Java sprawdza uprawnienia
+administratora i przekazuje `{direction, messages}` do `POST /admin/check` w Go z `ADMIN_TOKEN`.
+`GATEWAY_URL` wskazuje Go (lokalnie `http://localhost:8080`, w Compose `http://gateway:8080`).
+Ten sam przepływ działa na 8082, 3000 i przez Vite. Java nie ocenia tekstu ani nie wywołuje Pythona.
+
+Decyzja, wersja polityki, znaleziska i skory pochodzą z odpowiedzi Go. Próg nie jest edytowany
+w tym widoku. Go używa aktywnej polityki, skanera PII/sekretów oraz kontroli semantycznych;
+nie wysyła żądania do upstream LLM. Kontrole pominięte, wyłączone lub niedostępne mają osobne
+statusy. Dopasowywanie sygnatur nie jest jeszcze zaimplementowane w Go i jest oznaczone `Not run`.
+Budżety, uprawnienia narzędzi i pętle wymagają sesji agenta, więc nie są oceniane w tym sprawdzeniu tekstu.
+
+Gateway zapisuje jedno zdarzenie decyzyjne przez `/api/gateway/events`, z wynikami w kontekście
+`source: prompt_check`. Events pokazuje te wyniki w szczegółach. Treść wiadomości nie jest
+zapisywana w audycie. `audit_saved` i `audit_event_id` potwierdzają zapis; przy błędzie audytu
+panel wyświetla ostrzeżenie. Zwykłe wywołania proxy agenta nie korzystają z tego endpointu testowego.
+
 ## Uruchomienie
 
 Najprościej z głównego katalogu repo:
@@ -29,6 +45,8 @@ W Docker Compose panel jest dostępny na **http://localhost:3000**. Obraz buduje
 
 ## Funkcje
 
+- Prompt check: decyzja gatewaya i wyniki kontroli według aktywnej polityki, wiadomości po redakcji oraz zapis do Events.
+
 - Overview: statystyki, wykres, kategorie blokad i budżety.
 - Policies: profile, przełączniki kontroli, próg prompt injection, edytor JSON/YAML, walidacja, wersje i publikacja.
 - Events: filtry, stronicowanie, szczegóły i eksport JSON/CSV/CEF.
@@ -40,7 +58,7 @@ W Docker Compose panel jest dostępny na **http://localhost:3000**. Obraz buduje
 
 Testy frontendu: `make dashboard-test` z katalogu głównego lub `npm test` w `dashboard/`
 po instalacji zależności (`npm ci`). Vitest i React Testing Library sprawdzają klienta API,
-usuwanie polityk oraz zachowanie niezapisanych
+usuwanie polityk, sprawdzanie promptów przez Go, szczegóły wyników w Events oraz zachowanie niezapisanych
 zmian edytora. Odpowiedzi usług są zastępowane w testach; backendy i modele nie muszą działać.
 `npm run test:watch` uruchamia testy przy zmianach plików. Integrację Javy z PostgreSQL
 sprawdza osobno `make controlplane-test`.
