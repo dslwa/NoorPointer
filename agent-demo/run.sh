@@ -4,17 +4,23 @@ set -e
 GATEWAY_URL="${GATEWAY_URL:-http://localhost:8080}"
 SCENARIO="${1:-safe-query}"
 
-echo "🤖 ========================================================"
+# Gateway wymaga tokenu na kazdej trasie poza /healthz. Token podstawia `make demo`
+# (GATEWAY_JWT); przy uruchomieniu recznie: GATEWAY_JWT="$(./scripts/token.sh)" ./run.sh all
+AUTH=()
+[[ -n "${GATEWAY_JWT:-}" ]] && AUTH=(-H "Authorization: Bearer $GATEWAY_JWT")
+
+echo "============================================================"
 echo "   NoorPointer Agent Showcase Demo"
 echo "   Target Gateway: $GATEWAY_URL"
 echo "   Scenario:       $SCENARIO"
 echo "============================================================"
 
 run_safe_query() {
-  echo -e "\n🔹 [SCENARIO 1] Safe Business Query:"
+  echo -e "\n[SCENARIO 1] Safe Business Query:"
   curl -s -w "\nHTTP Status: %{http_code}\nTime: %{time_total}s\n" \
     -X POST "$GATEWAY_URL/v1/chat/completions" \
     -H "Content-Type: application/json" \
+    "${AUTH[@]}" \
     -d '{
       "model": "llama3.2:1b",
       "agent_id": "agent-finance-01",
@@ -23,10 +29,11 @@ run_safe_query() {
 }
 
 run_prompt_injection() {
-  echo -e "\n🔥 [SCENARIO 2] Adversarial Prompt Injection / Jailbreak:"
+  echo -e "\n[SCENARIO 2] Adversarial Prompt Injection / Jailbreak:"
   curl -s -w "\nHTTP Status: %{http_code}\nTime: %{time_total}s\n" \
     -X POST "$GATEWAY_URL/v1/chat/completions" \
     -H "Content-Type: application/json" \
+    "${AUTH[@]}" \
     -d '{
       "model": "llama3.2:1b",
       "agent_id": "agent-external-untrusted",
@@ -35,10 +42,11 @@ run_prompt_injection() {
 }
 
 run_pii_redaction() {
-  echo -e "\n🛡️ [SCENARIO 3] PII Leakage in Flight (Automatic Redaction):"
+  echo -e "\n[SCENARIO 3] PII Leakage in Flight (Automatic Redaction):"
   curl -s -w "\nHTTP Status: %{http_code}\nTime: %{time_total}s\n" \
     -X POST "$GATEWAY_URL/v1/chat/completions" \
     -H "Content-Type: application/json" \
+    "${AUTH[@]}" \
     -d '{
       "model": "llama3.2:1b",
       "agent_id": "agent-support-02",
@@ -47,10 +55,11 @@ run_pii_redaction() {
 }
 
 run_secret_leakage() {
-  echo -e "\n🚫 [SCENARIO 4] Hardcoded Cloud Secret Leakage (Block 403):"
+  echo -e "\n[SCENARIO 4] Hardcoded Cloud Secret Leakage (Block 403):"
   curl -s -w "\nHTTP Status: %{http_code}\nTime: %{time_total}s\n" \
     -X POST "$GATEWAY_URL/v1/chat/completions" \
     -H "Content-Type: application/json" \
+    "${AUTH[@]}" \
     -d '{
       "model": "llama3.2:1b",
       "agent_id": "agent-dev-01",
@@ -59,10 +68,11 @@ run_secret_leakage() {
 }
 
 run_cve_exploit() {
-  echo -e "\n⚡ [SCENARIO 5] Known AI Infrastructure Exploit (ShadowRay CVE-2023-48022):"
+  echo -e "\n[SCENARIO 5] Known AI Infrastructure Exploit (ShadowRay CVE-2023-48022):"
   curl -s -w "\nHTTP Status: %{http_code}\nTime: %{time_total}s\n" \
     -X POST "$GATEWAY_URL/v1/chat/completions" \
     -H "Content-Type: application/json" \
+    "${AUTH[@]}" \
     -d '{
       "model": "llama3.2:1b",
       "agent_id": "agent-ray-attacker",
@@ -99,4 +109,4 @@ case "$SCENARIO" in
     ;;
 esac
 
-echo -e "\n🎉 Demonstration scenario [$SCENARIO] finished!"
+echo -e "\nDemonstration scenario [$SCENARIO] finished!"

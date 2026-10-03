@@ -91,7 +91,7 @@ def sync_signatures():
         if resp.status_code == 200:
             data = resp.json()
             sigs = data.get("signatures", [])
-            logger.info(f"✅ Synced {len(sigs)} signatures from external feed.")
+            logger.info(f"Synced {len(sigs)} signatures from external feed.")
             return {"status": "synced", "count": len(sigs), "version": data.get("version")}
     except Exception as e:
         logger.error(f"Failed to sync signatures: {e}")
