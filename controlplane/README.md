@@ -37,7 +37,7 @@ To control plane. Wykrywanie zagrożeń, proxy LLM/MCP, egzekwowanie polityki i 
 1. Wczytaj dane demo i obejrzyj wykres oraz budżety.
 2. W „Policies” utwórz kopię `balanced`, zmień próg lub wyłącz kontrolę.
 3. Sprawdź konfigurację i zapisz nową wersję. Aktywna polityka jeszcze się nie zmienia.
-4. Kliknij „Publish” przy nowej wersji. `/api/gateway/policy` zwraca nową konfigurację i nowy ETag.
+4. Kliknij „Publish” przy nowej wersji. `/api/v1/active-policy/document` zwraca nową konfigurację i nowy ETag.
 5. W „Events” wybierz `block`, otwórz szczegóły i pobierz CSV.
 
 Dane demo są syntetyczne i nie symulują silnika detekcji ani zastosowania zmienionej polityki w gateway’u.
@@ -70,37 +70,40 @@ Schemat tworzą migracje Flyway. W Compose Java używa osobnego schematu `contro
 
 ## Kontrakt integracji
 
-API wymaga `Authorization: Bearer <token>`. Gateway ma dostęp do `/api/gateway/**` i `/api/contracts/**`; reszta API wymaga tokenu administratora. Healthcheck i pliki dashboardu są publiczne, dane dashboardu są chronione.
+API wymaga `Authorization: Bearer <token>`. Endpointy panelu mają wspólny prefiks `/api/v1`. Gateway może pobierać dokument aktywnej polityki, feed i schematy oraz wysyłać audyt; pozostałe operacje wymagają administratora. Healthcheck i pliki dashboardu są publiczne, dane panelu są chronione.
 
 | Metoda / ścieżka | Funkcja |
 | --- | --- |
-| `GET /api/dashboard` | Statystyki, budżety i aktywna polityka |
-| `GET /api/policies` | Wersje, najnowsze pierwsze |
-| `GET /api/policies/active` | Aktywna wersja i czas publikacji |
-| `GET /api/policies/{version}` | Szczegóły wersji |
-| `POST /api/policies/validate` | Walidacja `{ "document": "JSON lub YAML" }` |
-| `POST /api/policies` | Zapis `{ "name": "…", "description": "…", "document": "…" }`; description opcjonalne |
-| `POST /api/policies/{version}/publish` | Publikacja/rollback |
-| `GET /api/profiles/{name}` | `permissive`, `balanced`, `strict` |
-| `GET /api/contracts/{name}` | JSON Schema: `policy`, `audit`, `signatures` |
-| `GET /api/gateway/policy` | Dokument polityki, ETag/304 |
-| `GET /api/gateway/signatures` | Feed, ETag/304 |
-| `POST /api/gateway/events` | Jeden event audytowy |
-| `GET /api/events` | Filtry `action`, `category`, `agent`, `from`, `to`; `page`, `size` |
-| `GET /api/events/{id}` | Szczegóły eventu |
-| `GET /api/events/export?format=json` | `json`, `csv`, `cef`; te same filtry |
-| `GET /api/signatures` | Bieżący feed |
-| `POST /api/signatures/import` | `{ "document": "JSON lub YAML" }`; zastępuje feed |
-| `POST /api/demo/events` | Zdarzenia demo, jeśli włączone |
+| `GET /api/v1/dashboard` | Statystyki, budżety i aktywna polityka |
+| `GET /api/v1/policy-revisions` | Wersje, najnowsze pierwsze |
+| `POST /api/v1/policy-revisions` | Zapis `{ "name": "…", "description": "…", "document": "JSON lub YAML" }`; `201 Created` i `Location` |
+| `GET /api/v1/policy-revisions/{version}` | Szczegóły niezmiennej wersji |
+| `GET /api/v1/active-policy` | Aktywna wersja i czas publikacji |
+| `PUT /api/v1/active-policy` | Publikacja/rollback: `{ "version": 3 }`; ponowienie tej samej wersji zachowuje czas publikacji |
+| `GET /api/v1/active-policy/document` | Dokument dla gateway’a, ETag/304 |
+| `POST /api/v1/policy-validations` | Walidacja `{ "document": "JSON lub YAML" }` bez zapisu |
+| `GET /api/v1/policy-profiles/{name}` | `permissive`, `balanced`, `strict` |
+| `GET /api/v1/schemas/{name}` | JSON Schema: `policy`, `audit`, `signatures` |
+| `GET /api/v1/signature-feed` | Bieżący feed, ETag/304 |
+| `PUT /api/v1/signature-feed` | `{ "document": "JSON lub YAML" }`; atomowo zastępuje cały feed, zwraca `{ "signatures": [...] }` |
+| `POST /api/v1/audit-events` | Jeden event; `201 Created` i `Location` przy nowym ID, `200 OK` przy ponowieniu |
+| `GET /api/v1/audit-events` | Filtry `action`, `category`, `agent`, `from`, `to`; `page`, `size` |
+| `GET /api/v1/audit-events/{id}` | Szczegóły eventu |
+| `GET /api/v1/audit-events/export?format=json` | `json`, `csv`, `cef`; te same filtry |
+| `POST /api/v1/demo-batches` | Nowa partia demo: `201`, ID partii i liczba zdarzeń; jeśli demo jest włączone |
 | `GET /actuator/health` | Healthcheck |
 | `GET /actuator/prometheus` | Metryki Spring/Micrometer, token administratora |
+
+Zapis tworzy nową wersję przez `POST`; wersje są niezmienne. Zmiana pojedynczego zasobu aktywnej polityki i zastąpienie feedu używają `PUT`. Błędy zwracają jednolity JSON: `status`, `message`, `path`, `timestamp`, z odpowiednim kodem HTTP (`400`, `401`, `403`, `404`, `405`, `409`, `415`, `500`).
+
+Starsze ścieżki integracyjne gateway’a pozostają w `controller/compatibility/`: `GET /api/gateway/policy`, `GET /api/gateway/signatures`, `POST /api/gateway/events`, `GET /api/contracts/{name}`, `GET /api/v1/policies`, `POST /api/v1/audit/events` i `GET /api/v1/audit/export`. Panel korzysta z nowego API. Starsze endpointy zarządzania `/api/policies`, `/api/events`, `/api/signatures/import` i `/api/demo/events` zostały zastąpione ścieżkami z tabeli.
 
 Gateway powinien cyklicznie odpytywać politykę i feed, zachowywać ETag i wysyłać `If-None-Match`. Odpowiedź 304 oznacza brak zmian. W audycie raportuje zastosowaną `policy_version`. Control plane generuje `version` przy zapisie, zastępując ewentualny przesłany numer.
 
 Przykładowa decyzja:
 
 ```sh
-curl http://localhost:8082/api/gateway/events \
+curl http://localhost:8082/api/v1/audit-events \
   -H 'Authorization: Bearer local-dev-gateway' \
   -H 'Content-Type: application/json' \
   -d '{
@@ -137,14 +140,28 @@ java -jar controlplane/target/control-plane-0.1.0.jar
 
 Testy używają osobnej bazy `noorpointer_test` i schematu `controlplane_test`, a nie danych aplikacji. Make tworzy bazę testową przed uruchomieniem testów. Dla własnego PostgreSQL utwórz osobną bazę i ustaw `TEST_DATABASE_URL` (domyślnie `jdbc:postgresql://localhost:5432/noorpointer_test?currentSchema=controlplane_test`), `TEST_DATABASE_USER` i `TEST_DATABASE_PASSWORD`, a następnie uruchom `./mvnw verify` w `controlplane/`.
 
-Testy obejmują autoryzację, walidację, publikację wersji, ETag, idempotencję audytu, zużycie, filtrowanie, eksport i atomowy import feedu. GitHub Actions stawia usługę PostgreSQL i uruchamia `verify` przy pushu i pull requestach.
+Testy obejmują autoryzację, walidację, publikację wersji, ETag, idempotencję audytu, zużycie, filtrowanie, eksport i atomowy import feedu. Uruchamiaj je lokalnie przez `make controlplane-test`.
 
 Zakres MVP: pojedyncza instancja, ręczny import feedu, proste tokeny API. Bez kolejek, kont użytkowników i potwierdzeń zastosowania polityki przez gateway. Publikacje są last-write-wins. Dashboard pokazuje dziewięć najnowszych wersji; pełna historia pozostaje dostępna przez API.
 
 ## Struktura i zgodność ze zdalnym repo
 
+Kod Javy jest podzielony według odpowiedzialności w `src/main/java/pl/noorpointer/`:
+
+- `controller/`: cienkie kontrolery REST i dobór kodów HTTP.
+- `controller/compatibility/`: adaptery starszych kontraktów gateway’a.
+- `service/`: logika aplikacji, transakcje, audyt, raportowanie i demo.
+- `repository/`: wszystkie zapytania SQL i mapowanie rekordów PostgreSQL.
+- `dto/`: typowane żądania/odpowiedzi oraz walidacja wejścia.
+- `config/`: bezpieczeństwo i inicjalizacja profili.
+- `document/`: parsowanie JSON/YAML i walidacja JSON Schema.
+- `exception/`: wspólna obsługa błędów API.
+- `web/`: ETag i odpowiedzi eksportu.
+
+Kontrolery delegują do serwisów, a serwisy do repozytoriów. Wstrzykiwanie zależności odbywa się przez konstruktory; repozytoria nie zajmują się HTTP. Profile i migracje pozostają w `src/main/resources/`. Schemat bazy nie zmienił się w wyniku porządkowania kodu.
+
 - `src/`, `pom.xml`, Maven Wrapper należą do `controlplane/`.
-- `../dashboard/` jest jedynym źródłem plików frontendu; trafiają do JAR-a podczas builda.
+- `../dashboard/src/` jest źródłem komponentów React; Maven buduje Vite i pakuje `dashboard/dist/` do JAR-a.
 - `Dockerfile` buduj z katalogu głównego repo: `docker build -f controlplane/Dockerfile .`.
 - Pierwotny zakres zespołu zachowano w `SPEC.md`, a poprzedni backend Python w `mock/`.
 - `POST /api/v1/audit/events` przyjmuje format starszego mocka gateway’a (`timestamp`, `ALLOWED/BLOCKED/REDACTED`, `reason`, `owasp_category`). Wymaga tokenu gateway’a; mapuje zdarzenia do natywnego audytu. `request_id` zapewnia idempotencję. Nie zapisuje surowego `prompt_snippet`.

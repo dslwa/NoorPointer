@@ -32,10 +32,16 @@ W Docker Compose panel jest dostępny na **http://localhost:3000**. Obraz buduje
 
 ## Struktura i build
 
-- `src/App.jsx`: nawigacja, połączenie z API, token i komunikaty.
-- `src/components/`: widoki i dialog.
-- `src/api.js`, `src/hooks.js`: klient API i pobieranie danych.
-- `src/styles.css`, `public/favicon.svg`: style i ikona.
+- `src/app/`: główny komponent aplikacji i definicja nawigacji.
+- `src/pages/`: osobne widoki Overview, Policies, Events i Signatures.
+- `src/components/layout/`: układ panelu i nagłówek strony.
+- `src/components/common/`: wspólny dialog i komunikaty.
+- `src/features/auth/`: formularz połączenia i obsługa tokenu.
+- `src/api/`: klient HTTP oraz ścieżki REST pod `/api/v1`.
+- `src/hooks/`: pobieranie danych, odświeżanie, akcje i komunikaty.
+- `src/utils/`, `src/constants/`: formatowanie, eksport, filtry i stałe.
+- `src/styles/global.css`, `public/favicon.svg`: style i ikona.
+- `npm run format` / `npm run format:check`: formatowanie i sprawdzenie stylu kodu.
 - `npm ci && npm run build`: wynik w ignorowanym `dist/`.
 - Maven pakuje ten sam wynik do JAR-a; gotowy JAR działa bez Node.
 
