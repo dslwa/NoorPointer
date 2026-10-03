@@ -39,7 +39,7 @@ now=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
   echo
   echo "- **Gateway (Go)**: kontrole w ścieżce żądania nie są jeszcze włączone (dane osobowe, sekrety,"
   echo "  sygnatury ataków, ogranicznik pętli, budżety), brakuje \`GET /metrics\` oraz wysyłania zdarzeń"
-  echo "  audytowych do \`POST /api/v1/audit/events\`. Z tego powodu 7 z 16 testów e2e nie przechodzi,"
+  echo "  audytowych do \`POST /api/v1/audit/events\`. Z tego powodu 6 z 16 testów e2e nie przechodzi,"
   echo "  a pulpit gatewaya w Grafanie pozostaje pusty."
   echo "- **Kontrole semantyczne nie są w ścieżce żądania**: gateway nie wywołuje jeszcze \`/v1/scan\`."
   echo "  Osobny alert \`SemanticNoTraffic\` sygnalizuje brak ruchu do tej usługi."
