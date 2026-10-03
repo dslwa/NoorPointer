@@ -55,7 +55,9 @@ sudo make checkpoint # wszystko powyżej + reports/INDEX.md + lista adresów
 `make help` wypisuje wszystkie polecenia z podziałem na sekcje. Polecenia uruchamiane pojedynczo:
 
 ```bash
-sudo make bench            # k6: narzut przy typowym ruchu
+sudo make bench            # k6: pełna ścieżka kontroli przy obciążeniu, które warstwa AI wyrabia (VUS=3)
+sudo make bench-stress     # k6: przeciążenie (VUS=50) — pokazuje, że brama blokuje, gdy AI nie wyrabia
+sudo make bench-semantic   # przepustowość samych kontroli AI (Python, bez k6) i efekt skalowania
 sudo make bench-flood      # k6: duży ruch z próbami ataku
 sudo make bench-budget     # k6: równoległe żądania jednego agenta
 sudo make controlplane-test  # testy modułu Java w kontenerze (nie wymaga Javy na hoście)
@@ -211,7 +213,7 @@ a jego format różnił się od poniższego. Kształt dokumentu, który widzi ga
 ```json
 {
   "version": 4,
-  "defaults": {"mode": "enforce", "semantic_timeout_ms": 300, "on_semantic_timeout": "fail_closed"},
+  "defaults": {"mode": "enforce", "semantic_timeout_ms": 1500, "on_semantic_timeout": "fail_closed"},
   "models": {"allowed": ["llama3.1:8b", "llama3.2:1b", "mock-llm", "qwen2.5:7b"]},
   "controls": {
     "pii_regex": {"enabled": true, "action": "redact", "types": ["email", "pesel", "iban", "card"]},
@@ -296,8 +298,8 @@ repozytorium):
 7. `make traffic` — realny ruch na panele: zadania przez gateway oraz skany semantyczne, które
    oznaczają próbę prompt injection i dane osobowe. Bez tego kroku panele usługi semantycznej są puste,
    bo gateway nie wywołuje jej jeszcze w ścieżce żądania.
-8. Panel `http://localhost:3000` (login `local-dev-admin`) — incydenty, rewizje polityki, katalog sygnatur
-i strona „Prompt check”, która uruchamia kontrole semantyczne bez terminala.
+8. Panel `http://localhost:3000` (login `local-dev-admin`) — incydenty, rewizje polityki i katalog sygnatur.
+   Control plane udostępnia opublikowaną politykę oraz sygnatury gatewayowi Go.
 9. Grafana `http://localhost:3001` (admin/admin) — dostępność usług, kontrole semantyczne, ruch
    w control plane i alerty. Panel gatewaya jest tam opisany jako pusty do czasu `GET /metrics`.
 10. `sudo make test` — pakiet testów, `reports/test_report.html` i `reports/INDEX.md` z listą
@@ -319,7 +321,7 @@ Jak to jest zrobione i dlaczego właśnie tak:
 - Dlatego przed replikami stoi `semantic-lb` (nginx): pyta Dockera o adresy **przy każdym żądaniu**
   (`resolver 127.0.0.11`), więc ruch rozkłada się na wszystkie repliki, a nowe repliki wchodzą do gry
   w ciągu 5 sekund.
-- Load balancer **dziedziczy nazwę `semantic-service`**, więc brama, panel („Prompt check"), testy e2e
+- Load balancer **dziedziczy nazwę `semantic-service`**, więc brama, testy e2e
   i skrypty nadal rozmawiają z `semantic-service:8001` — nie trzeba było zmieniać niczyjego kodu.
 - gRPC (`:50051`) przechodzi przez tę samą barierę jako przekazanie TCP: każde nowe połączenie trafia
   do kolejnej repliki (jedna sesja klienta pracuje z jedną repliką — tak działa multipleksowanie gRPC).

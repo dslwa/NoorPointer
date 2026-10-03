@@ -17,7 +17,7 @@ export default function PageHeading({
           {current.description}
         </p>
       </div>
-      <div className="heading-actions" hidden={view === 'prompt'}>
+      <div className="heading-actions">
         <button
           className="button secondary"
           id="refresh"

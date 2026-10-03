@@ -19,9 +19,4 @@ export const views = {
     title: 'Attack signatures',
     description: 'Literal text patterns the gateway matches. Importing replaces every rule.',
   },
-  prompt: {
-    name: 'Prompt check',
-    title: 'Check a prompt',
-    description: 'Paste a prompt or a model response and see what each check finds in it.',
-  },
 };

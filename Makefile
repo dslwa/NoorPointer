@@ -24,7 +24,7 @@ K6        = $(COMPOSE) run --rm -e GATEWAY_JWT="$$jwt" benchmarks run
 
 .PHONY: help \
         up dev-infra down restart build clean logs status wait \
-        seed test test-unit test-local test-rebuild bench bench-flood bench-budget bench-semantic traffic \
+        seed test test-unit test-local test-rebuild bench bench-stress bench-flood bench-budget bench-semantic traffic \
         smoke verify verify-strict offline-check report deck checkpoint \
         demo demo-full demo-strict \
         keys mint-build token token-file reload-policy new-signature db-tidy doctor urls \
@@ -137,8 +137,11 @@ test-local: ## e2e bez Dockera na opublikowanych portach (szybka petla: kilka se
 test-rebuild: ## Przebudowuje obraz testow (po zmianie requirements.txt)
 	$(COMPOSE) build --no-cache tests
 
-bench: ## k6: baseline (narzut p95)
+bench: ## k6: pelna sciezka kontroli przy obciazeniu, ktore warstwa AI wyrabia (VUS=3)
 	@$(JWT_GUARD); $(K6) /benchmarks/benchmark_baseline.js
+
+bench-stress: ## k6: przeciazenie (VUS=50) - pokazuje, ze brama blokuje, gdy AI nie wyrabia
+	@$(JWT_GUARD); $(COMPOSE) run --rm -e GATEWAY_JWT="$$jwt" -e VUS=50 benchmarks run /benchmarks/benchmark_baseline.js
 
 bench-flood: ## k6: zalew zlosliwych promptow
 	@$(JWT_GUARD); $(K6) /benchmarks/benchmark_malicious_flood.js

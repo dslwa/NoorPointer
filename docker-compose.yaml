@@ -75,7 +75,7 @@ services:
         condition: service_healthy
     <<: *service
 
-  # Load balancer przed replikami. Dziedziczy nazwe `semantic-service`, wiec brama, panel,
+  # Load balancer przed replikami. Dziedziczy nazwe `semantic-service`, wiec brama,
   # testy i skrypty dalej mowia do `semantic-service:8001` - zmiana jest po naszej stronie.
   semantic-lb:
     image: nginx:alpine
@@ -143,8 +143,6 @@ services:
     depends_on:
       controlplane:
         condition: service_healthy
-      semantic-app:
-        condition: service_started
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:3000/"]
       interval: 10s

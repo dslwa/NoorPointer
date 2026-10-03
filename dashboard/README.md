@@ -2,6 +2,11 @@
 
 Panel control plane’u jest napisany w **React + Vite**, z prostym CSS. Teksty interfejsu są po angielsku. Backend pozostaje w Javie / Spring Boot, a dane w PostgreSQL.
 
+Control plane zarządza politykami i sygnaturami oraz udostępnia je gatewayowi Go:
+`GET /api/gateway/policy` zwraca opublikowaną politykę, a `GET /api/gateway/signatures`
+aktualny feed sygnatur. Oba endpointy wymagają tokenu gatewaya i obsługują `ETag` / `If-None-Match`.
+Kontrole treści i decyzje o blokowaniu należą do gatewaya; panel nie wysyła tekstu do serwisu Python.
+
 ## Uruchomienie
 
 Najprościej z głównego katalogu repo:
@@ -34,8 +39,8 @@ W Docker Compose panel jest dostępny na **http://localhost:3000**. Obraz buduje
 ## Struktura i build
 
 Testy frontendu: `make dashboard-test` z katalogu głównego lub `npm test` w `dashboard/`
-po instalacji zależności (`npm ci`). Vitest i React Testing Library sprawdzają klienty API,
-wyniki skanowania (także timeouty i błędy), usuwanie polityk oraz zachowanie niezapisanych
+po instalacji zależności (`npm ci`). Vitest i React Testing Library sprawdzają klienta API,
+usuwanie polityk oraz zachowanie niezapisanych
 zmian edytora. Odpowiedzi usług są zastępowane w testach; backendy i modele nie muszą działać.
 `npm run test:watch` uruchamia testy przy zmianach plików. Integrację Javy z PostgreSQL
 sprawdza osobno `make controlplane-test`.
