@@ -1,4 +1,4 @@
-.PHONY: help up dev-infra down restart logs status build test bench demo clean postgres-up postgres-test-up controlplane-run controlplane-test controlplane-build dashboard-dev smoke bench-flood bench-budget offline-check report demo-full demo-strict verify verify-strict keys token doctor seed
+.PHONY: help up dev-infra down restart logs status build test bench demo clean postgres-up postgres-test-up controlplane-run controlplane-test controlplane-build dashboard-dev smoke bench-flood bench-budget offline-check report demo-full demo-strict verify verify-strict keys token doctor seed urls checkpoint ollama-up ollama-down
 
 help: ## Pokazuje dostępne komendy
 	@echo "🛡️ NoorPointer Hackathon Commands:"
@@ -104,3 +104,34 @@ token: ## Wypisuje świeży JWT dla gatewaya (AGENT=... TEAM=... TTL=...)
 
 doctor: ## Pre-flight: klucze JWT, compose, token, wymuszanie auth (bez zmian w stacku)
 	./scripts/doctor.sh
+
+urls: ## Wypisuje adresy usług i dane logowania
+	@echo "  dashboard     http://localhost:3000   (login: ADMIN_TOKEN = local-dev-admin)"
+	@echo "  grafana       http://localhost:3001   (admin/admin, anonimowo wlaczony)"
+	@echo "  prometheus    http://localhost:9091/targets  oraz /alerts"
+	@echo "  controlplane  http://localhost:8082/actuator/health"
+	@echo "  semantic      http://localhost:8001/healthz , /readyz"
+	@echo "  gateway       http://localhost:8080/healthz (reszta tras wymaga JWT: make token)"
+	@echo "  feed sygnatur http://localhost:8085/signatures.json"
+	@echo "  mock LLM      http://localhost:11434/healthz"
+
+checkpoint: ## Zero-prep dowód na checkpoint: doctor -> up -> seed -> test -> raport + URL-e
+	-@./scripts/doctor.sh
+	$(MAKE) up
+	-$(MAKE) test
+	./scripts/report.sh
+	@echo ""
+	@echo "== checklista =="
+	@$(MAKE) --no-print-directory urls
+
+OLLAMA_COMPOSE = docker compose -f docker-compose.yaml -f docker-compose.ollama.yaml
+
+ollama-up: ## Opcjonalnie: prawdziwa Llama przez Ollame (overlay), potem przelaczenie gatewaya
+	$(OLLAMA_COMPOSE) up -d --wait ollama
+	$(OLLAMA_COMPOSE) exec ollama ollama pull llama3.2:1b
+	$(OLLAMA_COMPOSE) up -d gateway
+	@echo "gateway -> realna Ollama. Testy/bench wymagajace echo: make ollama-down"
+
+ollama-down: ## Powrot gatewaya na mock-llm (deterministyczne testy/bench)
+	docker compose up -d --no-deps gateway
+	@echo "gateway -> mock-llm"
