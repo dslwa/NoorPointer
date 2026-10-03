@@ -1,12 +1,12 @@
 # NoorPointer — dowody dla oceniających
 
-- wygenerowano: 2026-10-03T19:53:02Z
-- commit: `1474222`
+- wygenerowano: 2026-10-03T21:07:06Z
+- commit: `94e7efb`
 
 ## Pliki wynikowe
 
-- [`reports/test_report.html`](test_report.html) — zmieniony 2026-10-03T19:18:13Z
-- [`reports/smoke.txt`](smoke.txt) — zmieniony 2026-10-03T19:04:23Z
+- [`reports/test_report.html`](test_report.html) — zmieniony 2026-10-03T21:06:42Z
+- [`reports/smoke.txt`](smoke.txt) — zmieniony 2026-10-03T21:03:13Z
 
 ## Wynik sprawdzenia spójności (smoke)
 
@@ -14,23 +14,21 @@
 smoke: 16 passed, 0 failed
 ```
 
-## Znane luki (stan na 2026-10-03T19:53:02Z)
+## Znane luki (stan na 2026-10-03T21:07:06Z)
 
-- **Gateway (Go)**: kontrole w ścieżce żądania nie są jeszcze włączone (dane osobowe, sekrety,
-  sygnatury ataków, ogranicznik pętli, budżety), brakuje `GET /metrics` oraz wysyłania zdarzeń
-  audytowych do `POST /api/v1/audit/events`. Z tego powodu 6 z 16 testów e2e nie przechodzi,
-  a pulpit gatewaya w Grafanie pozostaje pusty.
-- **Kontrole semantyczne nie są w ścieżce żądania**: gateway nie wywołuje jeszcze `/v1/scan`.
-  Osobny alert `SemanticNoTraffic` sygnalizuje brak ruchu do tej usługi.
-- **Dwa formaty sygnatur**: feed Nginx (`signatures-feed/signatures.json`, wyrażenia regularne)
-  i kontrakt control plane (dopasowanie dosłowne oraz pola `source`/`category`/`target`) to dwa
-  różne kontrakty. Katalog w panelu zawiera reguły startowe aplikacji (migracja V2) oraz wpisy
-  z naszego feedu, dodawane pojedynczo przez `scripts/import-signatures.sh` (pierwsza alternatywa
-  wzorca jako wartość dosłowna); gateway jeszcze nie konsumuje sygnatur.
-- **Dane audytu są demonstracyjne**: panel pokazuje wpisy utworzone przez `make seed`,
-  a nie rzeczywiste decyzje gatewaya.
-- **Metryki gatewaya**: alert `GatewayMetricsMissing` (waga info) sygnalizuje brak `/metrics`.
-  Po dodaniu endpointu trzeba odkomentować zadanie zbierające w `telemetry/prometheus.yml`.
+- **Brama egzekwuje część kontroli**: działają allowlista modeli, sekrety, redakcja danych osobowych
+  oraz kontrole semantyczne (prompt injection, content safety) przez gRPC. Otwarte pozostają:
+  sygnatury ataków, budżety, ogranicznik pętli i lista narzędzi MCP.
+- **Brak `GET /metrics` w bramie** (port 9090). Alert `GatewayMetricsMissing` (waga info) to
+  sygnalizuje; po dodaniu endpointu odkomentuj zadanie zbierające w `telemetry/prometheus.yml`.
+- **Brama nie wysyła zdarzeń audytowych** do `POST /api/v1/audit/events` — dziennik w panelu
+  zasilają dane demonstracyjne z `make seed` (oznaczone jako `synthetic`).
+- **PII w wolnym tekście i wyciek systemowego promptu** (`pii_ner`, `leakage`) działają w usłudze
+  semantycznej, ale brama woła na razie tylko prompt injection i content safety.
+- **Dwa formaty sygnatur**: feed Nginx (regex) i kontrakt control plane (dopasowanie dosłowne +
+  pola `source`/`category`/`target`) to dwa różne kontrakty; gateway nie konsumuje sygnatur.
+- **Testy e2e**: `tests/test_guardrails.py` ma 25 przypadków; pełny wynik tego przebiegu jest
+  w raporcie HTML z `sudo make test` (PENDING = kontroli jeszcze nie ma, FAIL = kontrola nie działa).
 
 ## Jak to odtworzyć
 
