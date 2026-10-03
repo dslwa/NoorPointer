@@ -1,4 +1,4 @@
-.PHONY: help up dev-infra down restart logs status build test bench demo clean postgres-up postgres-test-up controlplane-run controlplane-test controlplane-build dashboard-dev smoke bench-flood bench-budget offline-check report demo-full demo-strict verify verify-strict keys token
+.PHONY: help up dev-infra down restart logs status build test bench demo clean postgres-up postgres-test-up controlplane-run controlplane-test controlplane-build dashboard-dev smoke bench-flood bench-budget offline-check report demo-full demo-strict verify verify-strict keys token doctor
 
 help: ## Pokazuje dostępne komendy
 	@echo "🛡️ NoorPointer Hackathon Commands:"
@@ -94,3 +94,6 @@ keys: ## Generuje lokalną parę kluczy JWT gatewaya (gateway/keys, gitignored)
 
 token: ## Wypisuje świeży JWT dla gatewaya (AGENT=... TEAM=... TTL=...)
 	./scripts/token.sh
+
+doctor: ## Pre-flight: klucze JWT, compose, token, wymuszanie auth (bez zmian w stacku)
+	./scripts/doctor.sh
