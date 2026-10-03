@@ -63,7 +63,12 @@ services:
       - GRPC_PORT=50051
       - OLLAMA_URL=http://mock-llm:11434
       - GUARD_MODEL=llama-guard3:1b
-      - TORCH_THREADS=4
+      # Strojenie pod procesor. Wzgorze: repliki x PI_WORKERS x TORCH_THREADS <= liczba watkow CPU.
+      # Na tej maszynie (8 watkow) uklad domyslny 1x2x4 wykorzystuje ja co do watku, wiec dokladanie
+      # replik bez zmniejszenia tych dwoch liczb tylko dlawi procesor (zmierzone: 3 repliki po 2x4
+      # dawaly 2,5x mniejsza przepustowosc niz jedna). Skalowanie poziome ma sens na osobnych maszynach.
+      - TORCH_THREADS=${TORCH_THREADS:-4}
+      - PI_WORKERS=${PI_WORKERS:-2}
       - PYTHONUNBUFFERED=1
     depends_on:
       mock-llm:

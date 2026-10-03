@@ -340,9 +340,43 @@ sudo make scale REPLIKI=1        # powrót do jednej repliki
 Trzy linie po ~33% znaczą, że load balancing działa; jedna linia z 100% znaczyłaby, że cały ruch idzie
 do jednego kontenera i skalowanie jest pozorne.
 
-Uczciwa uwaga o koszcie: każda replika to osobna kopia modeli w pamięci (kilka GB RAM łącznie przy
-trzech replikach). Skalowanie jest poziome, więc liniowo rośnie też zużycie pamięci — to normalny
-kompromis, ale trzeba go mieć świadomie.
+### Co pokazał pomiar i gdzie jest granica
+
+Zmierzone na tej maszynie (8 wątków CPU, Intel i7-1165G7), 100 żądań po 10 naraz, 2 kontrole na żądanie:
+
+| Układ | Przepustowość | Opóźnienie (mediana / p95) |
+| :--- | :--- | :--- |
+| 1 replika, `PI_WORKERS=2`, `TORCH_THREADS=4` | 13,4 żądań/s (26,8 kontroli/s) | 736 ms / 785 ms |
+| 3 repliki, `PI_WORKERS=2`, `TORCH_THREADS=4` | **5,4 żądań/s** (10,9 kontroli/s) | 1645 ms / 3123 ms |
+
+Trzy repliki wypadły **gorzej** i to jest pouczające, a nie ukryte: procesor był już zajęty.
+Każda replika może prowadzić `PI_WORKERS` równoległych analiz, a każda z nich zajmuje `TORCH_THREADS`
+wątków, więc trzy repliki w konfiguracji domyślnej mogły zażądać 24 wątków na maszynie z ośmioma.
+Efekt to przeskakiwanie między wątkami i spadek wszystkiego — mechanizm rozkładu ruchu działał
+(`make scale-check` pokazał ruch we wszystkich replikach), ale **nie było czym skalować**.
+
+Zasada, którą stosujemy przy strojeniu:
+
+```
+repliki × PI_WORKERS × TORCH_THREADS  ≤  liczba wątków CPU
+```
+
+Poprawny pomiar efektu skalowania polega na zmianie **tylko liczby replik**, przy niezmienionej
+konfiguracji każdej z nich — inaczej porównujemy ze sobą dwa różne budżety wątków, a nie skalowanie:
+
+```bash
+# ta sama konfiguracja na replikę (1 × 1 × 2 watki), zmieniamy tylko liczbe replik
+sudo FORCE=1 TORCH_THREADS=2 PI_WORKERS=1 make scale REPLIKI=1 && make bench-semantic
+sudo FORCE=1 TORCH_THREADS=2 PI_WORKERS=1 make scale REPLIKI=3 && make bench-semantic
+```
+
+Czego oczekiwać i co to znaczy: na jednej maszynie przepustowość jest ograniczona procesorem, więc
+repliki dają przede wszystkim **dostępność** (jedna pada — ruch idzie dalej) i możliwość
+**wykorzystania kolejnych maszyn**. Zysk liniowy pojawia się, gdy repliki stoją na osobnych
+maszynach lub węzłach; na jednym laptopie dzielą ten sam procesor i tę samą pamięć.
+
+Uczciwa uwaga o koszcie: każda replika to osobna kopia modeli w pamięci, więc zużycie RAM rośnie
+liniowo z liczbą replik. To normalny kompromis skalowania poziomego, ale trzeba go mieć świadomie.
 
 ## Jak odnosimy się do kryteriów oceny
 
