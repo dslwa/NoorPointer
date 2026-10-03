@@ -54,6 +54,11 @@ make verify          # smoke + offline-check + scenariusze demo (bez przygotowan
 sudo make checkpoint # wszystko powyżej + reports/INDEX.md + lista adresów
 ```
 
+Limity pamięci kontenerów (`mem_limit`) są dobrane pod maszynę 31 GiB / 8 wątków: semantyka 4 GB,
+control plane 2 GB, reszta 128–1024 MB. To miękkie bezpieczniki chroniące host przed jednym rozbieganym
+procesem; na mniejszej maszynie obniż je w `docker-compose.yaml`. Logi kontenerów mają rotację
+(`max-size: 10m`, `max-file: 3`), żeby `json-file` nie rósł bez limitu na długo działającym stosie.
+
 `make help` wypisuje wszystkie polecenia z podziałem na sekcje. Polecenia uruchamiane pojedynczo:
 
 ```bash
@@ -68,6 +73,8 @@ make reload-policy         # natychmiastowe przeładowanie polityki w gatewayu
 make new-signature         # demo: dodanie sygnatury ataku do feedu w trakcie działania
 make new-signature PATTERN='(/etc/passwd|\.\./)' NAME='Path traversal'   # wzorzec podany przez jury
 sudo make db-tidy          # reset danych demo: audyt, katalog sygnatur, zdublowane rewizje polityki
+sudo make db-dump          # kopia bazy audytu do backups/ (pg_dump); odtworzenie: make db-restore FILE=...
+make lint                  # skladnia skryptow bash + go vet (shellcheck, jesli zainstalowany)
 make urls                  # adresy usług i dane logowania
 ```
 
@@ -80,7 +87,7 @@ make urls                  # adresy usług i dane logowania
 | Control Plane | Java / Spring Boot | 8082 | `http://localhost:8082/api/v1`, eksport `?format=cef` |
 | Semantic Service | Python | 8001 / 50051 | `http://localhost:8001` (HTTP) i `:50051` (gRPC); działa w replikach za load balancerem `semantic-lb` — patrz „Skalowanie" niżej |
 | Prometheus | Prometheus 2.54 | 9091 | `http://localhost:9091/targets`, `/alerts` |
-| Grafana | Grafana 11 | 3001 | `http://localhost:3001` (admin / admin, logowanie wyłączone) |
+| Grafana | Grafana 11 | 3001 | `http://localhost:3001` (admin / admin, logowanie wyłączone — anonimowy admin, przeznaczone tylko do pracy lokalnej) |
 | Feed sygnatur | Nginx | 8085 | `http://localhost:8085/signatures.json` |
 | Mock LLM | Python (API OpenAI i Ollama) | 11434 | `http://localhost:11434` |
 | PostgreSQL / Redis | — | 5432 / 6379 | dane audytu i liczniki zużycia |

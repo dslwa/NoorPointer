@@ -10,9 +10,13 @@
 **/.venv/
 .venv-tests/
 reports/
+backups/
 **/node_modules/
 dashboard/dist/
 .claude/
 
 # Zrzut polityki do edycji przez osoby oceniajace (make policy-edit)
 policy.local.json
+
+# Token ADMIN_TOKEN dla Prometheusa, generowany przez `make prometheus-token`
+telemetry/.prometheus-admin-token

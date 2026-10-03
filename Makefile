@@ -16,6 +16,7 @@ COMPOSE         ?= docker compose
 SEMANTIC_REPLICAS ?= 1  # liczba replik uslugi semantycznej (make up); zmien: make scale REPLIKI=3
 COMPOSE_ALL      = $(COMPOSE) --profile tests --profile bench
 OLLAMA_COMPOSE   = $(COMPOSE) -f docker-compose.yaml -f docker-compose.ollama.yaml
+PROM_TOKEN_FILE  = telemetry/.prometheus-admin-token
 
 # Mintujemy JWT raz na recipe. Pusty token zamienia kazde wywolanie gatewaya w 401, a $(...)
 # w Makefile cicho zwraca pusty string - dlatego twardo przerywamy.
@@ -27,9 +28,10 @@ K6        = $(COMPOSE) run --rm -e GATEWAY_JWT="$$jwt" benchmarks run
         seed test test-unit test-local test-rebuild test-semantic bench bench-stress bench-flood bench-budget bench-semantic traffic \
         smoke verify verify-strict offline-check report deck checkpoint \
         demo demo-ready demo-full demo-strict \
-        keys mint-build token token-file reload-policy new-signature db-tidy doctor urls \
+        keys mint-build prometheus-token token token-file reload-policy new-signature db-tidy db-dump db-restore doctor urls \
         jury scan policy-edit policy-apply signature evidence pack stop scale scale-check \
         ollama-up ollama-down up-real \
+        lint \
         postgres-up postgres-test-up controlplane-run controlplane-test controlplane-build dashboard-dev dashboard-test
 
 # --- pomoc -----------------------------------------------------------------------------------------
@@ -78,8 +80,9 @@ scale-check: ## Sprawdza, czy ruch rozklada sie na repliki (mierzy licznik w kaz
 
 ##@ Stos
 
-up: ## Pelny stos + seed danych demo; czeka na gotowosc (VERBOSE=1 pokazuje budowanie)
+up: ## Pelny stos + seed danych demo; czeka na gotowosc (VERBOSE=1 pokazuje budowanie, NOSEED=1 pomija seed)
 	@test -f gateway/keys/jwt.pub || $(MAKE) --no-print-directory keys
+	@$(MAKE) --no-print-directory prometheus-token
 	@mkdir -p reports
 	@if [ -n "$(VERBOSE)" ]; then \
 	  $(COMPOSE) up -d --build --remove-orphans --scale semantic-app=$(SEMANTIC_REPLICAS); \
@@ -91,12 +94,13 @@ up: ## Pelny stos + seed danych demo; czeka na gotowosc (VERBOSE=1 pokazuje budo
 	fi
 	@./scripts/wait-ready.sh
 	@printf '  uslugi dzialajace: %s\n' "$$($(COMPOSE) ps --services --filter status=running 2>/dev/null | wc -l)"
-	-@./scripts/seed.sh
+	-@if [ -z "$(NOSEED)" ]; then ./scripts/seed.sh; fi
 
 wait: ## Czeka, az wszystkie uslugi odpowiedza (WAIT_TIMEOUT=sekundy, domyslnie 180)
 	./scripts/wait-ready.sh
 
 dev-infra: ## Tylko bazy i telemetria (Postgres, Redis, mock LLM, feed, Prometheus, Grafana)
+	@$(MAKE) --no-print-directory prometheus-token
 	$(COMPOSE) up -d postgres redis mock-llm signatures-feed prometheus grafana
 
 down: ## Zatrzymuje srodowisko
@@ -127,6 +131,13 @@ test: seed ## e2e (seed + raport HTML); --tb=no ukrywa tracebacki, pelne sa w ra
 
 test-unit: ## Testy jednostkowe modulow (Go teraz; nie wymagaja dzialajacego stosu)
 	cd gateway && go test ./...
+
+lint: ## Szybki lint: skladnia skryptow bash + go vet (shellcheck, jesli jest zainstalowany)
+	@for f in scripts/*.sh agent-demo/*.sh signatures-feed/*.sh deck/*.sh; do bash -n "$$f" || exit 1; done
+	@echo "  skladnia skryptow bash: OK"
+	@cd gateway && go vet ./...
+	@echo "  go vet: OK"
+	@if command -v shellcheck >/dev/null 2>&1; then shellcheck -S warning scripts/*.sh agent-demo/*.sh signatures-feed/*.sh && echo "  shellcheck: OK"; else echo "  (shellcheck nie zainstalowany - pomijam)"; fi
 
 test-local: ## e2e bez Dockera na opublikowanych portach (szybka petla: kilka sekund, nie minut)
 	@mkdir -p reports 2>/dev/null || true
@@ -223,6 +234,13 @@ mint-build: ## Buduje gateway/bin/mint raz (token bez 'go run', dziala tez pod s
 	cd gateway && go build -o bin/mint ./cmd/mint
 	@echo "zbudowano gateway/bin/mint"
 
+prometheus-token: ## Zapisuje ADMIN_TOKEN do pliku dla Prometheusa (zgodny z .env; wola to make up)
+	@tok=$$(sed -nE 's/^[[:space:]]*ADMIN_TOKEN=[[:space:]]*//p' .env 2>/dev/null | tail -1 | tr -d '"'); \
+	tok="$${tok:-$${ADMIN_TOKEN:-local-dev-admin}}"; \
+	printf '%s' "$$tok" > $(PROM_TOKEN_FILE); \
+	chmod 644 $(PROM_TOKEN_FILE); \
+	echo "  $(PROM_TOKEN_FILE) gotowy (zgodny z ADMIN_TOKEN)"
+
 token: ## Wypisuje swiezy JWT i tylko jego (bez tego nie nadaje sie do TOK=$(make token))
 	@./scripts/token.sh
 
@@ -240,6 +258,12 @@ new-signature: ## Demo dla jury: dodaje sygnature do feedu (PATTERN=, NAME=, ACT
 
 db-tidy: ## Porzadkuje dane demo: czysci audyt i usuwa zdublowane rewizje polityki (wymaga sudo)
 	./scripts/db-tidy.sh
+
+db-dump: ## Kopia bazy audytu do backups/ (pg_dump, wymaga sudo; OUT=sciezka)
+	./scripts/db-dump.sh $(OUT)
+
+db-restore: ## Odtworzenie bazy z kopii: make db-restore FILE=backups/noorpointer-....dump (wymaga sudo)
+	./scripts/db-restore.sh $(FILE)
 
 token-file: ## Zapisuje swiezy JWT do pliku 0600 (domyslnie /tmp/noorpointer-e2e.jwt); env GATEWAY_JWT jest preferowany
 	@f="$${TOKEN_FILE:-/tmp/noorpointer-e2e.jwt}"; umask 077; ./scripts/token.sh > "$$f"; \

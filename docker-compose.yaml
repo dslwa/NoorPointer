@@ -3,12 +3,19 @@
 x-service: &service
   restart: unless-stopped
   networks: [noorpointer-net]
+  # Rotacja logow: bez tego json-file rosnie bez limitu na dlugo dzialajacym stosie.
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
 
 services:
   # ========================================================
   # DATA PLANE & PROXY (Go Gateway)
   # ========================================================
   gateway:
+    mem_limit: 512m
     build:
       context: ./gateway
       dockerfile: Dockerfile
@@ -56,6 +63,7 @@ services:
   # Nie publikuje portow (robiloby to konflikt przy drugiej replice) i nie ma nazwy kontenera -
   # ruch z zewnatrz wchodzi przez load balancer `semantic-lb` ponizej.
   semantic-app:
+    mem_limit: 4g
     build:
       context: ./semantic-service
       dockerfile: Dockerfile
@@ -87,7 +95,8 @@ services:
   # Load balancer przed replikami. Dziedziczy nazwe `semantic-service`, wiec brama,
   # testy i skrypty dalej mowia do `semantic-service:8001` - zmiana jest po naszej stronie.
   semantic-lb:
-    image: nginx:alpine
+    mem_limit: 256m
+    image: nginx:1.30-alpine
     container_name: noorpointer-semantic-lb
     ports:
       - "8001:8001" # HTTP: skany, /metrics, /readyz
@@ -115,6 +124,7 @@ services:
   # CONTROL PLANE (Policy Catalog, PostgreSQL Audit, SIEM CEF Export & Dashboard API)
   # ========================================================
   controlplane:
+    mem_limit: 2g
     build:
       context: .
       dockerfile: controlplane/Dockerfile
@@ -144,6 +154,7 @@ services:
   # MANAGEMENT & SECURITY DASHBOARD (React + Vite + Nginx API proxy)
   # ========================================================
   dashboard:
+    mem_limit: 256m
     build:
       context: ./dashboard
       dockerfile: Dockerfile
@@ -165,19 +176,27 @@ services:
   # THREAT INTELLIGENCE FEED (External CVEs / Signatures)
   # ========================================================
   signatures-feed:
-    image: nginx:alpine
+    mem_limit: 128m
+    image: nginx:1.30-alpine
     container_name: noorpointer-signatures-feed
     ports:
       - "8085:8085"
     volumes:
       - ./signatures-feed:/usr/share/nginx/html:ro,z
       - ./signatures-feed/nginx.conf:/etc/nginx/conf.d/default.conf:ro,z
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8085/signatures.json"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
     <<: *service
 
   # ========================================================
   # INFRASTRUCTURE STORAGE (PostgreSQL 16 JSONB & Redis 7 Token Bucket)
   # ========================================================
   postgres:
+    mem_limit: 1g
     image: postgres:16-alpine
     container_name: noorpointer-postgres
     ports:
@@ -196,6 +215,7 @@ services:
     <<: *service
 
   redis:
+    mem_limit: 256m
     image: redis:7-alpine
     container_name: noorpointer-redis
     ports:
@@ -212,6 +232,7 @@ services:
   # Swap for real Ollama/OpenAI later via UPSTREAM_LLM_URL / OLLAMA_URL.
   # ========================================================
   mock-llm:
+    mem_limit: 512m
     build:
       context: ./mock-llm
       dockerfile: Dockerfile
@@ -224,6 +245,7 @@ services:
   # TELEMETRY & OBSERVABILITY (Prometheus & Grafana)
   # ========================================================
   prometheus:
+    mem_limit: 512m
     image: prom/prometheus:v2.54.1
     container_name: noorpointer-prometheus
     ports:
@@ -231,14 +253,24 @@ services:
     volumes:
       - ./telemetry/prometheus.yml:/etc/prometheus/prometheus.yml:ro,z
       - ./telemetry/alert.rules.yml:/etc/prometheus/alert.rules.yml:ro,z
+      # Token ADMIN_TOKEN jako plik, zeby nie trzymac go na sztywno w prometheus.yml.
+      # Generuje go `make prometheus-token` (wola je `make up` / `make dev-infra`).
+      - ./telemetry/.prometheus-admin-token:/etc/prometheus/admin_token:ro,z
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
       - "--storage.tsdb.path=/prometheus"
       # Pozwala przeladowac reguly bez restartu kontenera: curl -X POST localhost:9091/-/reload
       - "--web.enable-lifecycle"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:9090/-/ready"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 15s
     <<: *service
 
   grafana:
+    mem_limit: 512m
     image: grafana/grafana:11.1.0
     container_name: noorpointer-grafana
     ports:
@@ -249,6 +281,12 @@ services:
       - GF_AUTH_ANONYMOUS_ENABLED=true
       - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
       - GF_AUTH_DISABLE_LOGIN_FORM=true
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:3000/api/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 15s
     volumes:
       - ./telemetry/grafana/provisioning:/etc/grafana/provisioning:ro,z
       - ./telemetry/grafana/dashboards:/var/lib/grafana/dashboards:ro,z
@@ -260,10 +298,10 @@ services:
   # EVALUATION & AUTOMATION PROFILES (Tests & Benchmarks)
   # ========================================================
   tests:
+    mem_limit: 512m
     build:
       context: ./tests
       dockerfile: Dockerfile
-    container_name: noorpointer-tests
     environment:
       - GATEWAY_URL=http://gateway:8080
       - CONTROLPLANE_URL=http://controlplane:8082
@@ -280,8 +318,8 @@ services:
     networks: [noorpointer-net]
 
   benchmarks:
-    image: grafana/k6:latest
-    container_name: noorpointer-benchmarks
+    mem_limit: 512m
+    image: grafana/k6:2.3.0
     volumes:
       - ./benchmarks:/benchmarks:z
       - ./reports:/reports:z
@@ -298,10 +336,14 @@ services:
   # wiec dokladamy grupe "dev" (pytest) i montujemy katalog testow z repozytorium - testujemy dokladnie
   # ten kod, ktory jest w repo. Testy z markerem "models" sa domyslnie pomijane (wymagaja pobrania modeli).
   semantic-tests:
+    mem_limit: 4g
     build:
       context: ./semantic-service
       dockerfile: Dockerfile
     working_dir: /app
+    # Obraz semantyki chodzi jako uzytkownik `semantic` (non-root). Ten serwis testowy instaluje
+    # zaleznosci deweloperskie do /app/.venv, ktore nalezy do roota, wiec swiadomie wracamy tu do roota.
+    user: root
     volumes:
       - ./semantic-service/tests:/app/tests:ro,z
     environment:
@@ -321,6 +363,7 @@ services:
     networks: [noorpointer-net]
 
   controlplane-tests:
+    mem_limit: 2g
     build:
       context: .
       dockerfile: controlplane/Dockerfile

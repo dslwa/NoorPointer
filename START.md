@@ -33,6 +33,8 @@ Jeśli chcesz zobaczyć wszystko (budowanie, logi, szczegóły testów), użyj `
 
 Wymagania: Docker z Compose v2, uprawnienia `sudo` (albo członkostwo w grupie `docker`), kilka GB
 miejsca na obrazy z modelami i wolne porty 3000, 3001, 5432, 6379, 8001, 8080, 8082, 8085, 9091, 11434.
+Kontenery mają limity pamięci dobrane pod maszynę 31 GiB / 8 wątków (największy: semantyka 4 GB, control
+plane 2 GB) — to miękkie bezpieczniki, na mniejszej maszynie obniż `mem_limit` w `docker-compose.yaml`.
 Pierwsze budowanie obrazów pobiera pakiety (npm, Maven, pip), więc potrzebuje internetu — samo
 działanie aplikacji już nie.
 

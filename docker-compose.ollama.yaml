@@ -2,7 +2,10 @@
 # Start ollama and pull llama3.2:1b (gateway upstream) and llama-guard3:1b (content safety) first: make ollama-up.
 services:
   ollama:
-    image: ollama/ollama:latest
+    image: ollama/ollama:0.35.1
+    # Limit pamieci: llama3.2:1b + llama-guard3:1b to ok. 3-4 GB, 10g zostawia zapas na
+    # kontekst, a chroni host, gdy model sie rozjedzie.
+    mem_limit: 10g
     environment:
       - OLLAMA_HOST=0.0.0.0:11434
     volumes:
@@ -14,6 +17,12 @@ services:
       retries: 5
       start_period: 10s
     restart: unless-stopped
+    # Ten plik nie uzywa kotwicy x-service z docker-compose.yaml, wiec rotacje logow ustawiamy osobno.
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     networks:
       - noorpointer-net
 
