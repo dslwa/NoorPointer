@@ -37,28 +37,31 @@ krok() { # $1 = opis, $2 = plik logu, $3 = filtr linii na ekran, reszta = polece
   return 1
 }
 
-krok "0/7 Sprawdzam narzedzia, klucze i konfiguracje" \
+krok "0/8 Sprawdzam narzedzia, klucze i konfiguracje" \
   reports/log-jury-doctor.txt "^doctor:|OSTRZ|BLAD" ./scripts/doctor.sh
 
-step "1/7 Buduje obrazy i uruchamiam stos (pierwsze uruchomienie moze potrwac kilka minut)"
+step "1/8 Buduje obrazy i uruchamiam stos (pierwsze uruchomienie moze potrwac kilka minut)"
 if ! $MAKE up; then
   echo "jury: nie udalo sie uruchomic stosu - dalsze kroki nie maja sensu" >&2
   exit 1
 fi
 
-krok "2/7 Testy jednostkowe modulow (Go)" reports/log-jury-go.txt \
+krok "2/8 Testy jednostkowe modulow (Go)" reports/log-jury-go.txt \
   "^ok |FAIL|^---" $MAKE test-unit
 
-krok "3/7 Testy modulowe (Java, w kontenerze, na osobnej bazie)" reports/log-java-test.txt \
+krok "3/8 Testy modulowe (Java, w kontenerze, na osobnej bazie)" reports/log-java-test.txt \
   "Tests run: [0-9]+, Fail|BUILD (SUCCESS|FAILURE)|^\[ERROR\]" $MAKE controlplane-test
 
-krok "4/7 Testy e2e (16 przypadkow: dobra tresc przechodzi, zla jest blokowana)" reports/log-jury-e2e.txt \
+krok "4/8 Testy panelu operacyjnego (React, bez uruchamiania backendow)" reports/log-jury-dashboard.txt \
+  "Test Files|Tests  |✓" $MAKE dashboard-test
+
+krok "5/8 Testy e2e (16 przypadkow: dobra tresc przechodzi, zla jest blokowana)" reports/log-jury-e2e.txt \
   "PASSED|FAILED|[0-9]+ (failed|passed)" $MAKE test
 
-krok "5/7 Ruch na panele Grafany" reports/log-jury-traffic.txt \
+krok "6/8 Ruch na panele Grafany" reports/log-jury-traffic.txt \
   "^ruch:|brama" ./scripts/traffic.sh
 
-krok "6/7 Dowody dla osoby oceniajacej" reports/log-jury-evidence.txt \
+krok "7/8 Dowody dla osoby oceniajacej" reports/log-jury-evidence.txt \
   "^  jest:|^evidence:" $MAKE evidence
 
 # --- podsumowanie na jedna ekran -------------------------------------------------------------------
@@ -67,13 +70,18 @@ java="$(grep -oE 'Tests run: [0-9]+, Failures: [0-9]+, Errors: [0-9]+' reports/l
 go_status="OK"
 grep -qE "^(FAIL|--- FAIL)" reports/log-jury-go.txt && go_status="BLAD"
 uslugi="$(docker compose ps --services --filter status=running 2>/dev/null | wc -l | tr -d " ")"
+panel="$(grep -oE "Tests  +[0-9]+ passed" reports/log-jury-dashboard.txt | tail -1 | tr -s " ")"
 
-step "7/7 Podsumowanie"
+step "8/8 Podsumowanie"
 cat <<TEXT
   stos            uslugi dzialajace: $uslugi z 10
-  testy Go        $go_status
+  testy Go        $go_status (4 pakiety)
   testy Java      ${java:-brak wyniku}
+  testy panelu    ${panel:-brak wyniku}
   testy e2e       ${e2e:-brak wyniku}
+  razem           68 testow modulowych (Java 37, panel 31) + 4 pakiety testow Go
+                  + 16 przypadkow e2e, 16 sprawdzen stosu, 12 kontroli przed startem, 9 sprawdzen offline
+                  (osobno: 117 testow modulu semantycznego - uruchom: make test-semantic)
   dowody          dowody/ (raport, sprawdzenia stosu, raport testow, prezentacja PDF)
 
   Adresy:

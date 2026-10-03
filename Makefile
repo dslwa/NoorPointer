@@ -13,6 +13,7 @@
 
 # --- narzedzia i zmienne wspolne -------------------------------------------------------------------
 COMPOSE         ?= docker compose
+SEMANTIC_REPLICAS ?= 1  # liczba replik uslugi semantycznej (make up); zmien: make scale REPLIKI=3
 COMPOSE_ALL      = $(COMPOSE) --profile tests --profile bench
 OLLAMA_COMPOSE   = $(COMPOSE) -f docker-compose.yaml -f docker-compose.ollama.yaml
 
@@ -23,11 +24,11 @@ K6        = $(COMPOSE) run --rm -e GATEWAY_JWT="$$jwt" benchmarks run
 
 .PHONY: help \
         up dev-infra down restart build clean logs status wait \
-        seed test test-unit test-local test-rebuild bench bench-flood bench-budget traffic \
+        seed test test-unit test-local test-rebuild bench bench-stress bench-flood bench-budget bench-semantic traffic \
         smoke verify verify-strict offline-check report deck checkpoint \
         demo demo-full demo-strict \
         keys mint-build token token-file reload-policy new-signature db-tidy doctor urls \
-        jury scan policy-edit policy-apply signature evidence stop \
+        jury scan policy-edit policy-apply signature evidence stop scale scale-check \
         ollama-up ollama-down \
         postgres-up postgres-test-up controlplane-run controlplane-test controlplane-build dashboard-dev dashboard-test
 
@@ -58,13 +59,23 @@ evidence: ## Zbiera dowody do katalogu dowody/ (widoczne na GitHubie bez urucham
 stop: ## Zatrzymuje stos (dane i wolumeny zostaja, wracasz przez: make up)
 	@$(MAKE) --no-print-directory down
 
+scale: ## Ustaw liczbe replik: sudo make scale REPLIKI=3 (FORCE=1 odtwarza, TORCH_THREADS=N zmienia watki)
+	@$(COMPOSE) run --rm --no-deps --entrypoint nginx semantic-lb -t >/dev/null 2>&1 || { echo "scale: blad w konfiguracji load balancera - uruchom: $(COMPOSE) run --rm --no-deps --entrypoint nginx semantic-lb -t"; exit 1; }
+	@echo "  konfiguracja load balancera poprawna"
+	@$(COMPOSE) up -d --scale semantic-app=$(or $(REPLIKI),3) $(if $(FORCE),--force-recreate semantic-app,--no-recreate) --remove-orphans 2>&1 | tail -4
+	@./scripts/wait-ready.sh
+	@$(COMPOSE) ps --format '  {{.Name}}  {{.Status}}' | grep semantic || true
+
+scale-check: ## Sprawdza, czy ruch rozklada sie na repliki (mierzy licznik w kazdym kontenerze)
+	./scripts/check-balance.sh
+
 ##@ Stos
 
 up: ## Pelny stos + seed danych demo; czeka na gotowosc (VERBOSE=1 pokazuje budowanie)
 	@test -f gateway/keys/jwt.pub || $(MAKE) --no-print-directory keys
 	@mkdir -p reports
 	@if [ -n "$(VERBOSE)" ]; then \
-	  $(COMPOSE) up -d --build --remove-orphans; \
+	  $(COMPOSE) up -d --build --remove-orphans --scale semantic-app=$(SEMANTIC_REPLICAS); \
 	else \
 	  if ! $(COMPOSE) up -d --build --remove-orphans > reports/log-up.txt 2>&1; then \
 	    echo "BLAD: nie udalo sie zbudowac lub uruchomic stosu. Ostatnie linie:"; tail -25 reports/log-up.txt; exit 1; \
@@ -126,11 +137,17 @@ test-local: ## e2e bez Dockera na opublikowanych portach (szybka petla: kilka se
 test-rebuild: ## Przebudowuje obraz testow (po zmianie requirements.txt)
 	$(COMPOSE) build --no-cache tests
 
-bench: ## k6: baseline (narzut p95)
+bench: ## k6: pelna sciezka kontroli przy obciazeniu, ktore warstwa AI wyrabia (VUS=3)
 	@$(JWT_GUARD); $(K6) /benchmarks/benchmark_baseline.js
+
+bench-stress: ## k6: przeciazenie (VUS=50) - pokazuje, ze brama blokuje, gdy AI nie wyrabia
+	@$(JWT_GUARD); $(COMPOSE) run --rm -e GATEWAY_JWT="$$jwt" -e VUS=50 benchmarks run /benchmarks/benchmark_baseline.js
 
 bench-flood: ## k6: zalew zlosliwych promptow
 	@$(JWT_GUARD); $(K6) /benchmarks/benchmark_malicious_flood.js
+
+bench-semantic: ## Przepustowosc kontroli semantycznych (RUNDY=10 ROZMIAR=10, sam Python)
+	python3 benchmarks/semantic_throughput.py --rounds $(or $(RUNDY),10) --concurrency $(or $(ROZMIAR),10)
 
 bench-budget: ## k6: rownolegle zapytania jednego agenta (atomowosc budzetu)
 	@$(JWT_GUARD); $(K6) /benchmarks/benchmark_budget_concurrency.js
@@ -244,15 +261,16 @@ urls: ## Adresy uslug i dane logowania
 
 ##@ Opcjonalny prawdziwy model (Ollama)
 
-ollama-up: ## Prawdziwa Llama przez Ollame + przelaczenie gatewaya na nia
+ollama-up: ## Prawdziwa Llama + Llama Guard przez Ollame, gateway i serwis semantyczny przelaczone na nia
 	$(OLLAMA_COMPOSE) up -d --wait ollama
 	$(OLLAMA_COMPOSE) exec ollama ollama pull llama3.2:1b
-	$(OLLAMA_COMPOSE) up -d gateway
-	@echo "gateway -> realna Ollama. Testy/bench wymagajace echo: make ollama-down"
+	$(OLLAMA_COMPOSE) exec ollama ollama pull llama-guard3:1b
+	$(OLLAMA_COMPOSE) up -d gateway semantic-service
+	@echo "gateway i content_safety -> realna Ollama. Testy/bench wymagajace echo: make ollama-down"
 
-ollama-down: ## Powrot gatewaya na mock-llm (deterministyczne testy i bench)
-	$(COMPOSE) up -d --no-deps gateway
-	@echo "gateway -> mock-llm"
+ollama-down: ## Powrot gatewaya i content_safety na mock-llm (deterministyczne testy i bench)
+	$(COMPOSE) up -d --no-deps gateway semantic-service
+	@echo "gateway i content_safety -> mock-llm"
 
 ##@ Praca nad modulami (dev, bez kontenera dla danego modulu)
 
@@ -264,6 +282,12 @@ postgres-test-up: postgres-up ## Osobna baza PostgreSQL dla testow Javy
 
 controlplane-run: postgres-up ## Uruchamia Jave (REST/panel) na :8082
 	cd controlplane && ./mvnw spring-boot:run
+
+test-semantic: ## Testy modulu semantycznego (117 przypadkow) w kontenerze z pytest
+	@mkdir -p reports
+	@$(COMPOSE) --profile semantic run --rm semantic-tests > reports/log-semantic-test.txt 2>&1; rc=$$?; \
+	grep -E "[0-9]+ (passed|failed)|^(FAILED|ERROR)|error" reports/log-semantic-test.txt | tail -18; \
+	[ $$rc -eq 0 ] || echo "  szczegoly: reports/log-semantic-test.txt"; exit $$rc
 
 controlplane-test: postgres-test-up ## Testy modulu Java w kontenerze (pelny log: reports/log-java-test.txt)
 	@mkdir -p reports

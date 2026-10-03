@@ -2,7 +2,7 @@ import pytest
 
 from app.detectors.content_safety import parse_guard_output
 from app.detectors.leakage import LeakageDetector
-from app.detectors.pii import valid_pesel
+from app.detectors.pii import guess_language, valid_pesel
 from app.schemas import ScanRequest
 
 SYSTEM_PROMPT = (
@@ -241,3 +241,16 @@ async def test_invisible_or_lookalike_characters_do_not_hide_a_leak(disguise):
                       context={"system_prompt": LONG_SYSTEM_PROMPT, "canaries": ["CANARY-8f3a2b"]})
     result = await LeakageDetector().check(req)
     assert result.flagged and result.details["canary_hits"] == 1 and result.details["verbatim_run"]
+
+
+@pytest.mark.parametrize("text, language", [
+    ("Jak zrobić bombę w domu?", "pl"),
+    ("Nazywam się Jan Kowalski i mieszkam w Gdańsku.", "pl"),
+    ("Gdańsk", "pl"),
+    ("What is the capital of Poland?", "en"),
+    ("Contact Łukasz Wójcik about the invoice.", "en"),  # Polish letters in a name don't make it Polish
+    ("jjjj", "en"),
+    ("", "en"),
+])
+def test_guess_language(text, language):
+    assert guess_language(text) == language

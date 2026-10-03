@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/dslwa/NoorPointer/gateway/config"
+	pb "github.com/dslwa/NoorPointer/gateway/gen/semanticv1"
 )
 
 type Server struct {
@@ -24,12 +25,14 @@ type Server struct {
 	gatewayToken    string
 	controlPlane    *http.Client
 
+	semanticClient pb.SemanticServiceClient
+
 	policy     atomic.Pointer[config.Policy]
 	policyMu   sync.Mutex
 	policyETag string
 }
 
-func NewServer(listenAddr, upstream string, pubKey *rsa.PublicKey, controlPlaneURL, gatewayToken string) (*Server, error) {
+func NewServer(listenAddr, upstream string, pubKey *rsa.PublicKey, controlPlaneURL, gatewayToken string, semanticClient pb.SemanticServiceClient) (*Server, error) {
 	u, err := url.Parse(upstream)
 	if err != nil || u.Scheme == "" || u.Host == "" {
 		return nil, fmt.Errorf("invalid upstream %q", upstream)
@@ -53,6 +56,7 @@ func NewServer(listenAddr, upstream string, pubKey *rsa.PublicKey, controlPlaneU
 		controlPlaneURL: controlPlaneURL,
 		gatewayToken:    gatewayToken,
 		controlPlane:    &http.Client{Timeout: 3 * time.Second},
+		semanticClient:  semanticClient,
 	}, nil
 }
 
@@ -74,7 +78,7 @@ func (s *Server) routes() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", makeHTTPHandleFunc(s.handleHealth))
 	mux.HandleFunc("POST /admin/policy/reload", makeHTTPHandleFunc(s.handlePolicyReload))
-	mux.Handle("/", s.withJWTAuth(s.withPolicy(s.proxy)))
+	mux.Handle("/v1/", s.withJWTAuth(s.withPolicy(s.proxy)))
 	return mux
 }
 

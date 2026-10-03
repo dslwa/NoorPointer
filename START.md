@@ -19,9 +19,12 @@ Co się dzieje po kolei (i ile to trwa):
 | :--- | :--- | :--- |
 | 0 | sprawdza narzędzia, klucze i konfigurację | kilka sekund |
 | 1 | buduje obrazy i uruchamia cały stos (10 usług) | 1–3 min, jeśli obrazy są już zbudowane; dłużej przy pierwszym uruchomieniu |
-| 2–4 | testy modułów (Go i Java) oraz 16 testów e2e | 2–4 min (Java startuje kontener) |
-| 5 | wysyła realny ruch, żeby wykresy miały dane | kilkanaście sekund |
-| 6 | zbiera dowody do katalogu `dowody/` | kilka sekund |
+| 2–5 | testy modułów (Go, Java, panel) oraz 16 testów e2e | 2–4 min (Java startuje kontener) |
+| 6 | wysyła realny ruch, żeby wykresy miały dane | kilkanaście sekund |
+| 7 | zbiera dowody do katalogu `dowody/` | kilka sekund |
+
+Dodatkowo dostępne są pełne pakiety testów modułów, których nie ma w przebiegu podstawowym:
+`make test-semantic` (117 testów usługi semantycznej) i `make dashboard-test` (31 testów panelu).
 
 Konsola pokazuje **wyniki, a nie pracę**: budowanie obrazów, logi Mavena i Springa oraz pełne wyjście
 testów trafiają do plików w `reports/`. Na końcu widzisz podsumowanie: ile usług działa, wyniki testów
@@ -92,6 +95,25 @@ i `sudo SKIP_AUDIT=1 make db-tidy`.
   sygnatur i budżety; control plane udostępnia zasady i sygnatury gatewayowi Go,
 - Grafana: <http://localhost:3001> (logowanie wyłączone) — dostępność usług, kontrole semantyczne, ruch,
 - Prometheus: <http://localhost:9091/targets> i `/alerts`.
+
+**5. Skalowanie — sprawdź, że naprawdę działa, a nie tylko „da się ustawić liczbę":**
+
+Usługa semantyczna działa za load balancerem (`semantic-lb`), który dziedziczy nazwę
+`semantic-service`, więc brama, panel i testy nie wymagały żadnych zmian. Load balancer pyta Dockera
+o adresy przy każdym żądaniu, dzięki czemu po dodaniu replik ruch rozkłada się na wszystkie.
+
+```bash
+make bench-semantic              # przepustowość przy 1 replice (punkt odniesienia)
+sudo make scale REPLIKI=3        # 3 repliki usługi semantycznej
+sudo make scale-check            # dowód: licznik kontroli przyrasta w KAŻDEJ replice
+make bench-semantic              # ten sam pomiar po skalowaniu
+sudo make scale REPLIKI=1        # powrót do jednej repliki
+```
+
+Czego szukać w `make scale-check`: trzy linie „replika … +N kontroli (33%)". Jeśli cały ruch
+poszedłby do jednego kontenera, zobaczylibyśmy jedną linię z 100% — to jest właśnie ten błąd,
+którego chcemy uniknąć. Każda replika to osobna kopia modelu w pamięci, więc liczba replik
+przekłada się na zużycie RAM (na tej maszynie bezpiecznie mieści się ich kilka).
 
 ## Czego jeszcze nie ma (mówimy wprost)
 

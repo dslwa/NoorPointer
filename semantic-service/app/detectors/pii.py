@@ -1,8 +1,12 @@
+import logging
+import re
 import time
 
 from app.detectors.base import CostModel, Detector
 from app.schemas import CheckResult, ScanRequest
 from app.workers import BoundedWorkers
+
+log = logging.getLogger(__name__)
 
 # Small enough that one segment (always attempted) stays cheap even for text that costs ~10x the average
 # per character, e.g. long digit runs; longer text is several segments, checked against the budget.
@@ -11,6 +15,39 @@ SEGMENT_OVERLAP = 200  # longer than any name, e-mail or account number
 PESEL_WEIGHTS = (1, 3, 7, 9, 1, 3, 7, 9, 1, 3)
 # Not personal data, and spaCy tags them very noisily ("Q3", "AI", e-mail domains). Still available on request.
 NOISY_ENTITIES = {"ORGANIZATION", "URL"}
+# spaCy NER labels -> Presidio entities. en_core_web_lg uses OntoNotes labels, pl_core_news_lg the NKJP ones.
+NER_MAPPING = {
+    "PERSON": "PERSON", "PER": "PERSON", "NORP": "NRP", "FAC": "LOCATION", "LOC": "LOCATION", "GPE": "LOCATION",
+    "ORG": "ORGANIZATION", "DATE": "DATE_TIME", "TIME": "DATE_TIME",
+    "persName": "PERSON", "placeName": "LOCATION", "geogName": "LOCATION", "orgName": "ORGANIZATION",
+    "date": "DATE_TIME", "time": "DATE_TIME",
+}
+
+# Language is picked per segment from function words, which every sentence has and names don't. Polish
+# letters only break a tie, so "Contact Łukasz Wójcik about the invoice" stays English. The lists are disjoint:
+# words like "i", "a", "to", "on" exist in both languages.
+WORD = re.compile(r"[^\W\d_]+")
+POLISH_LETTERS = re.compile(r"[ąćęłńóśźżĄĆĘŁŃÓŚŹŻ]")
+POLISH_WORDS = frozenset(
+    "w z na się nie jest że do jak co po dla czy mój moja moje mam jestem proszę oraz ale tak ten ta przez od "
+    "za są być mi mnie ja ty ona my wy oni jego jej ich już tylko jeszcze bardzo może można który która które "
+    "gdzie kiedy dlaczego ze we pod nad przy bez jako żeby mój twój nasz wszystkie wszystko".split()
+)
+ENGLISH_WORDS = frozenset(
+    "the and is are of in for you your my it this that with be what how please can me an at from as was were "
+    "will would should could have has had do does did not but or if they them their we our he she his her "
+    "about which who when where why all any some there here into".split()
+)
+
+
+def guess_language(text: str) -> str:
+    """'pl' or 'en'. Unknown or mixed text defaults to English, the language the patterns were written for."""
+    words = WORD.findall(text.lower())
+    pl = sum(w in POLISH_WORDS for w in words)
+    en = sum(w in ENGLISH_WORDS for w in words)
+    if pl != en:
+        return "pl" if pl > en else "en"
+    return "pl" if pl == 0 and POLISH_LETTERS.search(text) else "en"
 
 
 def redact_spans(text: str, results) -> str:
@@ -36,40 +73,73 @@ def valid_pesel(value: str) -> bool:
 
 class PiiDetector(Detector):
     """Presidio (spaCy NER + pattern recognizers) for PII in natural language, plus a Polish PESEL recognizer.
+    English and Polish text each get their own spaCy model for names and places (the English one tags most
+    Polish words as people); pattern recognizers (PESEL, e-mail, card, IBAN, ...) run in both languages.
     Finding details never include the matched values, so audit logs don't become a PII store themselves."""
 
     name = "pii_ner"
 
-    def __init__(self, spacy_model: str, workers: int = 4) -> None:
+    def __init__(self, spacy_model: str, workers: int = 4, spacy_model_pl: str = "") -> None:
         super().__init__()
         self.workers = BoundedWorkers("pii", workers)
         self.cost = CostModel(min_units=1000)  # seconds per character
         self.spacy_model = spacy_model
+        self.spacy_model_pl = spacy_model_pl
+        self.languages = ["en"]
 
     def _load(self) -> None:
-        from presidio_analyzer import AnalyzerEngine, Pattern, PatternRecognizer
+        from presidio_analyzer import AnalyzerEngine, Pattern, PatternRecognizer, RecognizerRegistry
         from presidio_analyzer.nlp_engine import NlpEngineProvider
+        from presidio_analyzer.predefined_recognizers import SpacyRecognizer
 
         class PeselRecognizer(PatternRecognizer):
             def validate_result(self, pattern_text: str) -> bool:
                 return valid_pesel(pattern_text)
 
+        models = [{"lang_code": "en", "model_name": self.spacy_model}]
+        if self.spacy_model_pl:
+            models.append({"lang_code": "pl", "model_name": self.spacy_model_pl})
+        self.languages = [m["lang_code"] for m in models]
         nlp = NlpEngineProvider(
             nlp_configuration={
                 "nlp_engine_name": "spacy",
-                "models": [{"lang_code": "en", "model_name": self.spacy_model}],
+                "models": models,
+                "ner_model_configuration": {
+                    "model_to_presidio_entity_mapping": NER_MAPPING,
+                    "low_confidence_score_multiplier": 0.4,
+                    "low_score_entity_names": ["ORG", "ORGANIZATION", "orgName"],
+                },
             }
         ).create_engine()
-        self.analyzer = AnalyzerEngine(nlp_engine=nlp, supported_languages=["en"])
-        self.analyzer.registry.add_recognizer(
-            PeselRecognizer(
-                supported_entity="PL_PESEL",
-                patterns=[Pattern("pesel", r"\b\d{11}\b", 0.4)],
-                context=["pesel"],
+        registry = RecognizerRegistry(supported_languages=self.languages)
+        registry.load_predefined_recognizers(languages=["en"], nlp_engine=nlp)
+        if "pl" in self.languages:
+            # Presidio ships its pattern recognizers for English only; the patterns themselves don't depend on
+            # the language, so register the same ones for Polish, with spaCy NER from the Polish model.
+            for recognizer in registry.get_recognizers("en", all_fields=True):
+                if isinstance(recognizer, SpacyRecognizer):
+                    continue
+                try:
+                    registry.add_recognizer(type(recognizer)(supported_language="pl"))
+                except TypeError:  # a recognizer without the usual constructor: stays English-only
+                    log.warning("PII recognizer %s not available for Polish", type(recognizer).__name__)
+            registry.add_recognizer(SpacyRecognizer(supported_language="pl",
+                                                    supported_entities=sorted(set(NER_MAPPING.values()))))
+        for language in self.languages:
+            registry.add_recognizer(
+                PeselRecognizer(
+                    supported_entity="PL_PESEL",
+                    patterns=[Pattern("pesel", r"\b\d{11}\b", 0.4)],
+                    context=["pesel"],
+                    supported_language=language,
+                )
             )
-        )
-        self.default_entities = sorted(set(self.analyzer.get_supported_entities("en")) - NOISY_ENTITIES)
+        self.analyzer = AnalyzerEngine(nlp_engine=nlp, registry=registry, supported_languages=self.languages)
+        supported = {e for language in self.languages for e in self.analyzer.get_supported_entities(language)}
+        self.default_entities = sorted(supported - NOISY_ENTITIES)
         self._analyze("warm up John Smith", None, 0.5, None)  # cold, and too small to count
+        if "pl" in self.languages:
+            self._analyze("Nazywam się Jan Kowalski.", None, 0.5, None)  # first call loads the Polish pipeline
         self._analyze("The meeting with the treasury team is at noon. " * 200, None, 0.5, None, False)  # calibrate
 
     def _analyze(self, text: str, entities: list[str] | None, threshold: float, deadline: float | None,
@@ -84,7 +154,7 @@ class PiiDetector(Detector):
         what = f"PII scan of {len(text)} chars"
         if deadline is not None:
             self.cost.refuse_if_too_big(len(text), budget_s, deadline, len(starts) > 1, what)
-        results, previous = [], []
+        results, previous, languages = [], [], set()
         run_started, done_chars = time.monotonic(), 0
         for i, start in enumerate(starts):
             owned_until = starts[i + 1] if i + 1 < len(starts) else len(text)
@@ -93,8 +163,10 @@ class PiiDetector(Detector):
                 run_rate = (time.monotonic() - run_started) / done_chars if done_chars else None
                 self.cost.refuse_next(len(segment), deadline, what, run_rate)
             segment_started = time.monotonic()
-            found = self.analyzer.analyze(text=segment, language="en", entities=entities or self.default_entities,
-                                          score_threshold=threshold)
+            language = guess_language(segment) if "pl" in self.languages else "en"
+            languages.add(language)
+            found = self.analyzer.analyze(text=segment, language=language,
+                                          entities=entities or self.default_entities, score_threshold=threshold)
             if len(segment) >= 1000:  # tiny texts are dominated by fixed overhead and would skew the estimate
                 self.cost.observe(len(segment), time.monotonic() - segment_started)
             done_chars += len(segment)
@@ -110,13 +182,13 @@ class PiiDetector(Detector):
                 current.append(RecognizerResult(r.entity_type, begin, end, r.score))
             results += current
             previous = current
-        return results, (redact_spans(text, results) if redact else None)
+        return results, (redact_spans(text, results) if redact else None), sorted(languages)
 
     async def check(self, req: ScanRequest) -> CheckResult:
         cfg = req.config.pii_ner
         budget = req.timeout_ms / 1000
         deadline = time.monotonic() + budget
-        results, redacted = await self.workers.run(self._analyze, req.text, cfg.entities, cfg.score_threshold,
+        results, redacted, languages = await self.workers.run(self._analyze, req.text, cfg.entities, cfg.score_threshold,
                                                    deadline, cfg.redact, budget)
         findings = sorted(
             ({"type": r.entity_type, "start": r.start, "end": r.end, "score": round(r.score, 3)} for r in results),
@@ -131,5 +203,6 @@ class PiiDetector(Detector):
                 "entities": findings,
                 "counts": {t: sum(f["type"] == t for f in findings) for t in {f["type"] for f in findings}},
                 "redacted_text": redacted,
+                "languages": languages,
             },
         )
