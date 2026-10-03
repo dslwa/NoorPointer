@@ -74,7 +74,7 @@ func (s *Server) routes() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", makeHTTPHandleFunc(s.handleHealth))
 	mux.HandleFunc("POST /admin/policy/reload", makeHTTPHandleFunc(s.handlePolicyReload))
-	mux.Handle("/", s.withJWTAuth(s.withPolicy(s.proxy)))
+	mux.Handle("/v1/", s.withJWTAuth(s.withPolicy(s.proxy)))
 	return mux
 }
 

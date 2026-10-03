@@ -1,15 +1,29 @@
 package api
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"fmt"
+	"io"
 	"log"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 
+	"github.com/dslwa/NoorPointer/gateway/config"
+	"github.com/dslwa/NoorPointer/gateway/scan"
 	"github.com/dslwa/NoorPointer/gateway/types"
 	"github.com/golang-jwt/jwt/v5"
 )
+
+const maxBodyBytes = 1 << 20
+
+var blockCodes = map[string]string{
+	"secrets":   "SECRET_LEAKAGE_DETECTED",
+	"pii_regex": "PII_DETECTED",
+}
 
 type ctxKey struct{}
 
@@ -26,10 +40,60 @@ func (s *Server) withPolicy(next http.Handler) http.Handler {
 			return
 		}
 		claims := claimsFor(r)
-		// ponytail: logs identity only, policy checks land here next
 		log.Printf("request sub=%s team=%s policy=%d %s %s", claims.Subject, claims.Team, p.Version, r.Method, r.URL.Path)
+
+		if r.Method == http.MethodPost {
+			body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxBodyBytes))
+			if err != nil {
+				WriteJSON(w, http.StatusBadRequest, APIError{Error: "cannot read request body"})
+				return
+			}
+
+			dec := json.NewDecoder(bytes.NewReader(body))
+			dec.UseNumber()
+			var doc map[string]any
+			if err := dec.Decode(&doc); err != nil {
+				WriteJSON(w, http.StatusBadRequest, APIError{Error: "invalid JSON body"})
+				return
+			}
+			model, _ := doc["model"].(string)
+			if !slices.Contains(p.Models.Allowed, model) &&
+				s.deny(w, p, http.StatusForbidden, "MODEL_NOT_ALLOWED", fmt.Sprintf("model %q is not allowed", model)) {
+				return
+			}
+
+			var found []scan.Finding
+			walkStrings(doc, func(text string) string { return scan.Text(p, text, &found) })
+			for _, f := range found {
+				log.Printf("%s: %s %s detected", f.Action, f.Control, f.Kind)
+			}
+			if i := slices.IndexFunc(found, func(f scan.Finding) bool { return f.Action == "block" }); i >= 0 &&
+				s.deny(w, p, http.StatusForbidden, blockCodes[found[i].Control], fmt.Sprintf("%s detected: %s", found[i].Control, found[i].Kind)) {
+				return
+			}
+
+			// Always forward the document we checked, never the raw bytes:
+			// duplicate keys or trailing data could read differently upstream.
+			var buf bytes.Buffer
+			enc := json.NewEncoder(&buf)
+			enc.SetEscapeHTML(false)
+			enc.Encode(doc) // re-encoding a document we just decoded cannot fail
+			body = bytes.TrimSuffix(buf.Bytes(), []byte("\n"))
+			r.Body = io.NopCloser(bytes.NewReader(body))
+			r.ContentLength = int64(len(body))
+		}
+
 		next.ServeHTTP(w, r)
 	})
+}
+
+func (s *Server) deny(w http.ResponseWriter, p *config.Policy, status int, code, msg string) bool {
+	if p.Defaults.Mode == "monitor" {
+		log.Printf("monitor: would block %s: %s", code, msg)
+		return false
+	}
+	WriteJSON(w, status, APIError{Error: msg, Code: code})
+	return true
 }
 
 func (s *Server) withJWTAuth(next http.Handler) http.Handler {

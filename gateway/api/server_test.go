@@ -1,9 +1,11 @@
 package api
 
 import (
+	"bytes"
 	"crypto/rand"
 	"crypto/rsa"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -47,13 +49,16 @@ func sign(t *testing.T, method jwt.SigningMethod, claims types.Claims, key any) 
 	return tok
 }
 
-// newTestServer returns the gateway handler in front of a fake upstream
-// that records the last request it received.
-func newTestServer(t *testing.T, pub *rsa.PublicKey) (http.Handler, *http.Request) {
+// newTestServer returns a gateway with a balanced-like enforce policy
+// (mock-llm allowed, secrets blocked, PII redacted),
+// in front of a fake upstream that records the last request and its body.
+func newTestServer(t *testing.T, pub *rsa.PublicKey) (*Server, *http.Request) {
 	t.Helper()
 	got := &http.Request{}
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
 		*got = *r.Clone(r.Context())
+		got.Body = io.NopCloser(bytes.NewReader(body))
 		w.WriteHeader(http.StatusOK)
 	}))
 	t.Cleanup(upstream.Close)
@@ -62,12 +67,27 @@ func newTestServer(t *testing.T, pub *rsa.PublicKey) (http.Handler, *http.Reques
 	if err != nil {
 		t.Fatal(err)
 	}
-	s.policy.Store(&config.Policy{Version: 1})
-	return s.routes(), got
+	s.policy.Store(&config.Policy{
+		Version:  1,
+		Defaults: config.Defaults{Mode: "enforce"},
+		Models:   config.Models{Allowed: []string{"mock-llm"}},
+		Controls: config.Controls{
+			Secrets: &config.Control{Enabled: true, Action: "block"},
+			PIIRegex: &config.PatternControl{
+				Control: config.Control{Enabled: true, Action: "redact"},
+				Types:   []string{"email", "pesel", "iban", "card", "phone"},
+			},
+		},
+	})
+	return s, got
 }
 
 func do(h http.Handler, method, path, auth string) *httptest.ResponseRecorder {
-	req := httptest.NewRequest(method, path, nil)
+	return doBody(h, method, path, auth, "")
+}
+
+func doBody(h http.Handler, method, path, auth, body string) *httptest.ResponseRecorder {
+	req := httptest.NewRequest(method, path, strings.NewReader(body))
 	if auth != "" {
 		req.Header.Set("Authorization", auth)
 	}
@@ -85,17 +105,17 @@ func TestNewServerInvalidUpstream(t *testing.T) {
 }
 
 func TestHealthzNoAuth(t *testing.T) {
-	h, _ := newTestServer(t, &newKey(t).PublicKey)
-	if rec := do(h, http.MethodGet, "/healthz", ""); rec.Code != http.StatusOK {
+	s, _ := newTestServer(t, &newKey(t).PublicKey)
+	if rec := do(s.routes(), http.MethodGet, "/healthz", ""); rec.Code != http.StatusOK {
 		t.Fatalf("got %d, want 200", rec.Code)
 	}
 }
 
 func TestValidTokenIsProxied(t *testing.T) {
 	key := newKey(t)
-	h, got := newTestServer(t, &key.PublicKey)
+	s, got := newTestServer(t, &key.PublicKey)
 
-	rec := do(h, http.MethodPost, "/v1/chat/completions", "Bearer "+sign(t, jwt.SigningMethodRS256, validClaims(), key))
+	rec := doBody(s.routes(), http.MethodPost, "/v1/chat/completions", "Bearer "+sign(t, jwt.SigningMethodRS256, validClaims(), key), `{"model":"mock-llm"}`)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("got %d, want 200: %s", rec.Code, rec.Body)
 	}
@@ -110,7 +130,8 @@ func TestValidTokenIsProxied(t *testing.T) {
 func TestRejectedTokens(t *testing.T) {
 	key := newKey(t)
 	otherKey := newKey(t)
-	h, got := newTestServer(t, &key.PublicKey)
+	s, got := newTestServer(t, &key.PublicKey)
+	h := s.routes()
 
 	expired := validClaims()
 	expired.ExpiresAt = jwt.NewNumericDate(time.Now().Add(-time.Hour))
