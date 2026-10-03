@@ -37,3 +37,9 @@ architekturę i wydajność (20%), pakiet testów (20%), wdrażalność (10%), s
    jest wersjonowany, a `build.py` obsługuje obrazy w linii.
 
 Nazwa zespołu, skład i liczby z k6 (p95 2,28 ms przy 506 żądaniach na sekundę) są już w treści.
+
+## Materiały towarzyszące
+
+- `opis-projektu.md` — treść do formularza na HackTribe.
+- `decyzja-silnik-pii.md` — notatka decyzyjna: dlaczego kontrolę PII realizuje Presidio, a nie GLiNER,
+  czego się wyrzekliśmy i po spełnieniu jakich warunków wrócilibyśmy do GLiNER-a.
