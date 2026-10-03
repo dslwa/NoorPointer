@@ -220,13 +220,18 @@ Gateway pobiera ją z `GET {CONTROLPLANE_URL}/api/gateway/policy` (nagłówek `A
 Prototypowy `config/policy.yaml` został usunięty z repozytorium: nie był czytany przez żaden komponent,
 a jego format różnił się od poniższego. Kształt dokumentu, który widzi gateway:
 
+<!-- DEVOPS-REVIEW (2026-10-03): typ "phone" w pii_regex dopisany przez DevOps, nie przez Java/Go.
+     Zmiana w trzech profilach w controlplane/src/main/resources/profiles/ i w tym przykładzie.
+     Kod Go juz obslugiwal telefon (gateway/scan/rules.go) - brakowalo go tylko w danych polityki.
+     Zmiana czeka na review wlasciciela control plane. -->
+
 ```json
 {
   "version": 4,
   "defaults": {"mode": "enforce", "semantic_timeout_ms": 8000, "on_semantic_timeout": "fail_closed"},
   "models": {"allowed": ["llama3.1:8b", "llama3.2:1b", "mock-llm", "qwen2.5:7b"]},
   "controls": {
-    "pii_regex": {"enabled": true, "action": "redact", "types": ["email", "pesel", "iban", "card"]},
+    "pii_regex": {"enabled": true, "action": "redact", "types": ["email", "pesel", "iban", "card", "phone"]},
     "secrets": {"enabled": true, "action": "block"},
     "prompt_injection": {"enabled": true, "action": "block", "threshold": 0.85},
     "content_safety": {"enabled": true, "action": "block", "categories": ["S1", "S2", "S9"]},

@@ -18,7 +18,8 @@
         "email",
         "pesel",
         "iban",
-        "card"
+        "card",
+        "phone"
       ]
     },
     "secrets": {
