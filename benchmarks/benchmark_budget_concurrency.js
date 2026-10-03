@@ -18,6 +18,22 @@ export const options = {
 const BASE_URL = __ENV.TARGET_URL || 'http://gateway:8080';
 const AGENT = __ENV.AGENT_ID || 'agent-budget-concurrency';
 
+// setup() runs once before the VUs. It uses its own agent id so warming up does not consume the
+// measured agent's budget, and it removes the cold-start outlier from the measured run.
+export function setup() {
+  const params = { headers: { 'Content-Type': 'application/json' } };
+  const codes = [];
+  for (let i = 0; i < 5; i++) {
+    codes.push(http.post(`${BASE_URL}/v1/chat/completions`, JSON.stringify({
+      model: 'mock-llm',
+      agent_id: 'k6-warmup',
+      messages: [{ role: 'user', content: 'warm up' }],
+    }), params).status);
+  }
+  console.log(`warm-up responses: ${codes.join(', ')}`);
+  return { warmup: codes };
+}
+
 export default function () {
   const payload = JSON.stringify({
     model: 'mock-llm',
