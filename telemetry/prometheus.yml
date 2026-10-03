@@ -21,7 +21,10 @@ scrape_configs:
   # Dockera o wszystkie adresy pod nazwa `semantic-app` i zbiera metryki z kazdej repliki osobno.
   # Dzieki temu wykresy pokazuja sume ruchu, a nie tylko to, co trafilo do jednego kontenera.
   - job_name: "noorpointer-semantic"
-    metrics_path: /metrics
+    # Z ukonczeniem "/": FastAPI montuje /metrics jako podaplikacje ASGI, wiec bez ukosnika odpowiada
+    # 307, a nginx przekazuje Host bez portu. Prometheus idzie za redirectem na :80 i cel jest "down"
+    # (falszywy alert SemanticDown). Sprawdzone na dzialajacym stosie: /metrics -> 307, /metrics/ -> 200.
+    metrics_path: /metrics/
     dns_sd_configs:
       - names: ["semantic-app"]
         type: A

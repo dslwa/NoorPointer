@@ -31,12 +31,13 @@ zamieniony na tekst wyjaśniający, że `GET /metrics` jeszcze nie istnieje.
 
 Odstęp między odpytaniami: 2 s (`global.scrape_interval`).
 
-Reguły alertów: `alert.rules.yml`, 8 pozycji.
+Reguły alertów: `alert.rules.yml`, 9 pozycji.
 
 | Alert | Waga | Wykrywa | Czy może zadziałać dziś |
 | :--- | :--- | :--- | :--- |
 | `GatewayDown` | critical | brak odpowiedzi `gateway:9090/metrics` | **nie** — nie ma zadania zbierającego, więc nie istnieje seria `up{job="noorpointer-gateway"}`; zadziała po dodaniu `/metrics` |
 | `SemanticDown` | critical | brak odpowiedzi usługi semantycznej dłużej niż 2 minuty | tak (krótsze przerwy w czasie startu są normalne: kontener wczytuje modele) |
+| `SemanticReplicaLost` | warning | część replik usługi semantycznej nie odpowiada, a część działa (ruch idzie dalej, spadł zapas) | tak |
 | `ControlPlaneDown` | critical | brak odpowiedzi control plane (lub zerwane uwierzytelnianie metryk) | tak |
 | `SemanticSlow` | warning | p95 kontroli semantycznych powyżej 200 ms (okno 5 minut) | tak |
 | `SemanticCheckFailing` | warning | kontroli semantycznych kończących się błędem lub przekroczeniem czasu | tak |
@@ -84,6 +85,9 @@ flagi uruchomienia, na przykład przy pierwszym włączeniu `--web.enable-lifecy
 
 ## Uwagi
 
+- Scrape usługi semantycznej używa `metrics_path: /metrics/` (z ukośnikiem). Bez niego FastAPI zwraca
+  307, a nginx przekazuje `Host` bez portu — Prometheus idzie za przekierowaniem na `:80` i cel jest
+  `down` (fałszywy `SemanticDown`). W LB nagłówek to `$http_host`, żeby przekierowania zachowały port.
 - W `prom/prometheus:v2.54.1` nie ma flagi `--config.expand-env`, dlatego token administratora jest
   wpisany w `prometheus.yml` na stałe. Przy zmianie `ADMIN_TOKEN` trzeba poprawić oba miejsca.
 - Metryki z k6 nie są wysyłane do Prometheusa; wyniki widać w konsoli po `make bench`.

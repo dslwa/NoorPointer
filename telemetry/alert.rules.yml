@@ -48,7 +48,7 @@ groups:
         labels: { severity: warning }
         annotations:
           summary: "p95 kontroli semantycznych powyzej 200 ms"
-          description: "Percentyl 95 z 5-minutowego okna przekracza 200 ms. Budzet kontroli w polityce to 300 ms, wiec alert ostrzega przed zblizaniem sie do limitu."
+          description: "Percentyl 95 z 5-minutowego okna przekracza 200 ms. Budzet kontroli w polityce (defaults.semantic_timeout_ms) to 1500 ms, wiec alert ostrzega z wyprzedzeniem przed zblizaniem sie do limitu."
 
       - alert: SemanticCheckFailing
         expr: sum(rate(semantic_check_latency_seconds_count{status=~"error|timeout"}[1m])) > 0

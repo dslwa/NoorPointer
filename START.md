@@ -136,7 +136,7 @@ ale nie działa). Nie ukrywamy pierwszego pod drugim.
 | `controlplane/` | zasady, katalog sygnatur i dziennik zdarzeń (Java, Spring Boot) |
 | `dashboard/` | panel operacyjny (React + Nginx) |
 | `tests/`, `benchmarks/` | 16 testów e2e i 3 scenariusze obciążeniowe |
-| `telemetry/` | Prometheus, 8 reguł alertów, tablice Grafany |
+| `telemetry/` | Prometheus, 9 reguł alertów, tablice Grafany |
 | `scripts/` | narzędzia, w tym te dla osób oceniających |
 | `deck/`, `dowody/` | prezentacja zgłoszeniowa i zrzuty wyników |
 | `README.md` | pełna dokumentacja techniczna, kontrakty i stan prac |

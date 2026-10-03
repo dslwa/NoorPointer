@@ -24,8 +24,11 @@ services:
       ollama:
         condition: service_healthy
 
-  # content_safety asks the real Llama Guard instead of the mock's keyword list
-  semantic-service:
+  # content_safety asks the real Llama Guard instead of the mock's keyword list.
+  # Nazwa musi byc `semantic-app` (serwis z docker-compose.yaml). `semantic-lb` dziedziczy
+  # dla ruchu alias `semantic-service`, ale nie jest serwisem, ktory mozna tu nadpisac -
+  # wpis `semantic-service` tworzyl serwis bez obrazu i psul `make ollama-up`.
+  semantic-app:
     environment:
       - OLLAMA_URL=http://ollama:11434
     depends_on:

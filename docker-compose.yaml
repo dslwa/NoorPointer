@@ -70,6 +70,14 @@ services:
       - TORCH_THREADS=${TORCH_THREADS:-4}
       - PI_WORKERS=${PI_WORKERS:-2}
       - PYTHONUNBUFFERED=1
+    # Jawny healthcheck (taki sam jak w Dockerfile). `semantic-lb` czeka na `service_healthy`,
+    # wiec zaleznosc jest widoczna w compose, a nie tylko odziedziczona z obrazu.
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/healthz')"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 120s
     depends_on:
       mock-llm:
         condition: service_healthy

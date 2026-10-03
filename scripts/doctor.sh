@@ -31,8 +31,20 @@ if [[ -x gateway/bin/mint ]]; then ok "gateway/bin/mint" "zbudowany (wystawianie
 else wn "gateway/bin/mint" "brak - uruchom: make mint-build (bez tego wymagane jest go)"; fi
 
 sec "konfiguracja compose"
-# Bez --profile polecenie docker compose config pomija serwisy z profilami (tests, benchmarks).
-if docker compose --profile tests --profile bench config --quiet 2>/dev/null; then ok "docker compose config" "poprawna (z profilami)"; else no "docker compose config" "niepoprawna - uruchom: docker compose --profile tests config"; fi
+# Bez --profile polecenie docker compose config pomija serwisy z profilami (tests, benchmarks, java, semantic).
+profiles=(--profile tests --profile bench --profile semantic --profile java)
+if docker compose "${profiles[@]}" config --quiet 2>/dev/null; then
+  ok "docker compose config" "poprawna (z profilami)"
+else
+  no "docker compose config" "niepoprawna - uruchom: docker compose ${profiles[*]} config"
+fi
+# Nadpisanie Ollamy musi wskazywac istniejace serwisy. Literowka w nazwie tworzy serwis bez obrazu
+# i psuje `make ollama-up` dopiero w trakcie pokazu - dlatego sprawdzamy to przed startem.
+if docker compose -f docker-compose.yaml -f docker-compose.ollama.yaml config --quiet 2>/dev/null; then
+  ok "docker compose config (ollama)" "poprawna"
+else
+  no "docker compose config (ollama)" "niepoprawna - uruchom: docker compose -f docker-compose.yaml -f docker-compose.ollama.yaml config"
+fi
 
 sec "sekrety lokalne"
 if [[ -f .env ]]; then

@@ -24,9 +24,9 @@ K6        = $(COMPOSE) run --rm -e GATEWAY_JWT="$$jwt" benchmarks run
 
 .PHONY: help \
         up dev-infra down restart build clean logs status wait \
-        seed test test-unit test-local test-rebuild bench bench-stress bench-flood bench-budget bench-semantic traffic \
+        seed test test-unit test-local test-rebuild test-semantic bench bench-stress bench-flood bench-budget bench-semantic traffic \
         smoke verify verify-strict offline-check report deck checkpoint \
-        demo demo-full demo-strict \
+        demo demo-ready demo-full demo-strict \
         keys mint-build token token-file reload-policy new-signature db-tidy doctor urls \
         jury scan policy-edit policy-apply signature evidence stop scale scale-check \
         ollama-up ollama-down \
@@ -77,7 +77,7 @@ up: ## Pelny stos + seed danych demo; czeka na gotowosc (VERBOSE=1 pokazuje budo
 	@if [ -n "$(VERBOSE)" ]; then \
 	  $(COMPOSE) up -d --build --remove-orphans --scale semantic-app=$(SEMANTIC_REPLICAS); \
 	else \
-	  if ! $(COMPOSE) up -d --build --remove-orphans > reports/log-up.txt 2>&1; then \
+	  if ! $(COMPOSE) up -d --build --remove-orphans --scale semantic-app=$(SEMANTIC_REPLICAS) > reports/log-up.txt 2>&1; then \
 	    echo "BLAD: nie udalo sie zbudowac lub uruchomic stosu. Ostatnie linie:"; tail -25 reports/log-up.txt; exit 1; \
 	  fi; \
 	  echo "  zbudowano i uruchomiono stos (pelny log: reports/log-up.txt)"; \
