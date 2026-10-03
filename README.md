@@ -24,8 +24,10 @@ do sprawdzenia reguł przed ich włączeniem.
 | Egzekwowanie kontroli w gatewayu | **nie zaimplementowane** | `withPolicy` na razie tylko loguje tożsamość i wersję polityki |
 | Kontrole semantyczne (Python) | działa jako usługa | `/v1/scan` i `/v1/scan/model` odpowiadają poprawnie; gateway jeszcze ich nie wywołuje |
 | Audyt i eksport SIEM | działa po stronie control plane | eksport CEF/JSON/CSV i panel działają; gateway nie wysyła jeszcze własnych zdarzeń, więc dziennik zawiera dane demonstracyjne z `make seed` |
+| Katalog sygnatur | działa | 7 reguł startowych z migracji `V2__Seed_default_signatures` + 5 wpisów z naszego feedu; dodawanie z panelu i przez `make new-signature PATTERN='...'` |
 | Metryki i alerty | częściowo | Prometheus zbiera `semantic-service` i `controlplane`; gateway nie wystawia jeszcze `/metrics` |
 | Testy e2e | 9 z 16 przechodzi | pozostałe 7 wymagają kontroli wymienionych wyżej; szczegóły w `reports/INDEX.md` |
+| Testy modułów | działają | `make test-unit` (Go, 4 pakiety) i `sudo make controlplane-test` (Java, 3 klasy w kontenerze, na osobnej bazie `noorpointer_test`) |
 
 Wniosek dla osób oceniających: działają mechanizmy wokół polityki (uwierzytelnianie, dystrybucja polityki,
 przeładowanie, audyt, panel, telemetria, testy), natomiast same kontrole w ścieżce żądania są w trakcie
