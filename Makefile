@@ -24,7 +24,7 @@ K6        = $(COMPOSE) run --rm -e GATEWAY_JWT="$$jwt" benchmarks run
 .PHONY: help \
         up dev-infra down restart build clean logs status wait \
         seed test test-unit test-local test-rebuild bench bench-flood bench-budget traffic \
-        smoke verify verify-strict offline-check report checkpoint \
+        smoke verify verify-strict offline-check report deck checkpoint \
         demo demo-full demo-strict \
         keys mint-build token token-file reload-policy new-signature db-tidy doctor urls \
         ollama-up ollama-down \
@@ -120,6 +120,9 @@ offline-check: ## Lint: brak pobierania/instalacji w runtime (finalny stage obra
 
 report: ## Zbiera dowody dla jury do reports/INDEX.md
 	./scripts/report.sh
+
+deck: ## Buduje prezentacje: deck/slajdy.md -> reports/deck (HTML + PDF, 10 slajdow)
+	./deck/build.sh
 
 checkpoint: ## Zero-prep dowod: doctor -> up -> testy (Go, e2e, Java) -> raport + adresy
 	-@./scripts/doctor.sh

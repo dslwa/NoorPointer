@@ -141,6 +141,7 @@ Elementy oznaczone `[w toku]` to zakres, który nie jest jeszcze włączony w ś
 | [`scripts/`](scripts) | DevOps | Sprawdzenia, seed, raporty, obsługa tokenów |
 | [`mock-llm/`](mock-llm) | DevOps | Mock modelu (format OpenAI i Ollama), domyślny upstream gatewaya |
 | [`proto/`](proto) | Python + Go | Wspólny kontrakt gRPC `semantic.v1` |
+| [`deck/`](deck/README.md) | DevOps | Prezentacja zgłoszeniowa (10 slajdów: źródło Markdown + build do PDF) |
 
 ## Kontrakty
 
