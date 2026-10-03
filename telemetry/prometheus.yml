@@ -19,6 +19,14 @@ scrape_configs:
           component: "semantic-service"
           tier: "ai-guardrails"
 
+  - job_name: "noorpointer-controlplane"
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["controlplane:8082"]
+        labels:
+          component: "controlplane"
+          tier: "management-plane"
+
   - job_name: "prometheus"
     static_configs:
       - targets: ["localhost:9090"]
