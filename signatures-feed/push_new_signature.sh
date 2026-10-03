@@ -1,39 +1,68 @@
 #!/usr/bin/env bash
-# Dodaje nowa sygnature do feedu, zeby pokazac aktualizacje reguly bez restartu kontenera.
-# Uruchamianie: ./signatures-feed/push_new_signature.sh
+# Dodaje nowa sygnature do feedu (regex), zeby pokazac aktualizacje regul bez restartu kontenera.
+#
+# Uzycie:
+#   ./signatures-feed/push_new_signature.sh
+#   PATTERN='(/etc/passwd|\.\./\.\./)' NAME='Path traversal' ./signatures-feed/push_new_signature.sh
+#   make new-signature PATTERN='...' NAME='...' ACTION=block
+#
+# Zmienne: PATTERN, NAME, ACTION (block|monitor), CATEGORY, TARGET_COMPONENT, CVE, DESCRIPTION, NEW_ID.
+# Wzorzec jest sprawdzany jako wyrazenie regularne Pythona - literowka nie trafi do feedu.
 set -euo pipefail
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SIG_FILE="$DIR/signatures.json"
-CONTROLPLANE_URL="${CONTROLPLANE_URL:-http://localhost:8082}"
 
-NEW_ID="SIG-$(date +%Y%m%d-%H%M%S)"
+PATTERN="${PATTERN:-HACKATHON_ZERO_DAY_PAYLOAD_TEST}"
+NAME="${NAME:-Zero-Day Live Injected Attack Pattern}"
+ACTION="${ACTION:-block}"
+CATEGORY="${CATEGORY:-LLM01: Prompt Injection}"
+TARGET_COMPONENT="${TARGET_COMPONENT:-prompt_filter}"
+CVE="${CVE:-CVE-LIVE-EMERGENCY}"
+DESCRIPTION="${DESCRIPTION:-Dynamicznie dodana regula podczas prezentacji dla jury.}"
+NEW_ID="${NEW_ID:-SIG-$(date +%Y%m%d-%H%M%S)}"
+
+case "$ACTION" in
+  block|monitor) ;;
+  *) echo "push_new_signature: ACTION musi byc 'block' albo 'monitor' (jest: $ACTION)" >&2; exit 1 ;;
+esac
+
 echo "Dodawanie sygnatury $NEW_ID do feedu."
 
-python3 - "$SIG_FILE" "$NEW_ID" <<'PY'
+python3 - "$SIG_FILE" "$NEW_ID" "$NAME" "$PATTERN" "$ACTION" "$CATEGORY" "$TARGET_COMPONENT" "$CVE" "$DESCRIPTION" <<'PY'
 import json
+import re
 import sys
 
-path, new_id = sys.argv[1], sys.argv[2]
-with open(path) as f:
-    data = json.load(f)
+path, new_id, name, pattern, action, category, component, cve, description = sys.argv[1:]
 
-data['signatures'].append({
-    'id': new_id,
-    'name': 'Zero-Day Live Injected Attack Pattern',
-    'cve': 'CVE-LIVE-EMERGENCY',
-    'owasp_category': 'LLM01: Prompt Injection',
-    'target_component': 'prompt_filter',
-    'pattern_type': 'regex',
-    'pattern': 'HACKATHON_ZERO_DAY_PAYLOAD_TEST',
-    'action': 'block',
-    'severity': 'CRITICAL',
-    'description': 'Dynamicznie dodana regula podczas prezentacji dla jury.',
+try:
+    re.compile(pattern)
+except re.error as error:
+    raise SystemExit(f"push_new_signature: wzorzec nie jest poprawnym wyrazeniem regularnym: {error}")
+
+with open(path) as handle:
+    data = json.load(handle)
+
+if any(entry.get("id") == new_id for entry in data.get("signatures", [])):
+    raise SystemExit(f"push_new_signature: sygnatura o ID {new_id} juz istnieje w feedzie")
+
+data["signatures"].append({
+    "id": new_id,
+    "name": name,
+    "cve": cve,
+    "owasp_category": category,
+    "target_component": component,
+    "pattern_type": "regex",
+    "pattern": pattern,
+    "action": action,
+    "severity": "CRITICAL" if action == "block" else "INFO",
+    "description": description,
 })
 
-with open(path, 'w') as f:
-    json.dump(data, f, indent=2)
-    f.write('\n')
+with open(path, "w") as handle:
+    json.dump(data, handle, indent=2)
+    handle.write("\n")
 PY
 
 echo "Sygnatura zapisana. Feed: http://localhost:8085/signatures.json (bez restartu kontenera)."

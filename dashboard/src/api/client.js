@@ -17,6 +17,7 @@ export function createApi(token) {
       error.status = response.status;
       throw error;
     }
+    if (response.status === 204) return null;
     return download ? response.blob() : response.json();
   };
 }

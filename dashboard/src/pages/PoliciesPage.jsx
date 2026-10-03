@@ -71,7 +71,7 @@ export default function PoliciesPage({ active, request, dashboard, refreshKey, r
             </div>
             <h3>{revision.name}</h3>
             <p>{formatDate(revision.created_at)}</p>
-            <div>
+            <div className="revision-actions">
               <button
                 className="button ghost small"
                 data-edit={revision.version}
@@ -106,6 +106,31 @@ export default function PoliciesPage({ active, request, dashboard, refreshKey, r
                 }
               >
                 Publish
+              </button>
+              <button
+                className="button danger small"
+                data-delete={revision.version}
+                disabled={!!pending || revision.version === activeVersion}
+                title={
+                  revision.version === activeVersion
+                    ? 'Publish another version before deleting this policy.'
+                    : `Delete version ${revision.version}`
+                }
+                onClick={() => {
+                  if (
+                    !window.confirm(
+                      `Delete version ${revision.version} (${revision.name})? This cannot be undone.`,
+                    )
+                  )
+                    return;
+                  run('delete', async () => {
+                    await request(paths.policyRevision(revision.version), { method: 'DELETE' });
+                    setListRevision((value) => value + 1);
+                    notify(`Deleted version ${revision.version}.`);
+                  });
+                }}
+              >
+                Delete
               </button>
             </div>
           </article>

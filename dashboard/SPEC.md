@@ -35,9 +35,13 @@ Odpowiada za wizualizację postury bezpieczeństwa, prezentację wykrytych incyd
 ---
 
 ## Interfejsy i komunikacja
-- **Port aplikacji:** `3000` (React / Vite / Next.js)
-- **Komunikacja:** REST API z `controlplane:8082`
-- **Technologia:** React / TypeScript + Tailwind CSS / shadcn/ui lub gotowe komponenty wykresów (Recharts / Chart.js / Tremor).
+- **Port aplikacji:** `3000` (React + Vite, serwowany przez Nginx)
+- **Komunikacja:** REST API z `controlplane:8082` przez proxy `/api` w Nginx
+- **Technologia:** React 19 + Vite (JSX), własne style CSS, bez frameworka UI i bez zewnętrznych bibliotek wykresów
+
+Dane w panelu pochodzą dziś z `make seed` (control plane), bo gateway nie wysyła jeszcze zdarzeń
+audytowych. Strony, które pokazujemy jurorom: incydenty i eksport, rewizje polityki, katalog sygnatur,
+zużycie budżetów.
 
 ---
 

@@ -10,6 +10,16 @@ Zbieranie metryk z działającego stosu, reguły alertów i gotowe pulpity w Gra
 Konfiguracja jest wersjonowana w tym katalogu i montowana do kontenerów, więc nie ma ręcznego
 klikania w interfejsach.
 
+## Zasada: żadnych wartości zastępczych
+
+Panele pokazują **wyłącznie metryki, które naprawdę są zbierane**. Zakazane są fallbacki typu
+`... or vector(3.8)`, które zamiast braku danych wyświetlają wymyśloną liczbę: juror techniczny
+zada pytanie o taki wykres i nie będziemy mieli czym odpowiedzieć. Gdy metryki jeszcze nie ma,
+panel ma pokazywać brak danych, a dokumentować to ma opis panelu i tabela „Stan na dziś”
+w głównym `README.md`. Historia: tablica `noorpointer-overview.json` miała sześć takich fallbacków
+(opóźnienie 3,8 ms, 14 zablokowanych żądań, 45 RPS), które zostały usunięte, a panel gatewaya
+zamieniony na tekst wyjaśniający, że `GET /metrics` jeszcze nie istnieje.
+
 ## Co jest zbierane
 
 | Źródło | Endpoint | Stan |

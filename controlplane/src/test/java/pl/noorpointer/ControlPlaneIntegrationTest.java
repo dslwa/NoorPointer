@@ -300,8 +300,86 @@ class ControlPlaneIntegrationTest {
             .andReturn()
             .getResponse()
             .getContentAsString();
-    assertThat(cef).contains("test\\|control").contains("msg=\\=SUM(1,2)\\nline\\=two");
+    assertThat(cef).contains("TEST\\|CONTROL").contains("msg=\\=SUM(1,2)\\nline\\=two");
     assertThat(cef.lines().count()).isEqualTo(1);
+  }
+
+  @Test
+  void siemExportsPreserveCorrelationFieldsAndUseDownloadHeaders() throws Exception {
+    var event = event("siem-event", "decision", "block");
+    event.put("control", "prompt_injection");
+    event.put("severity", "high");
+    event.put("category", "LLM01:2025");
+    event.put("request_id", "request-siem");
+    event.put("session_id", "session-siem");
+    event.put("policy_version", 2);
+    event.put("message", "Zażółć gęślą jaźń\nact=ALLOWED");
+    event.set(
+        "context",
+        mapper.createObjectNode().put("reason_code", "INJECTION_THRESHOLD").put("demo", true));
+    ingest(event);
+    ingest(event("other", "decision", "allow"));
+    JsonNode stored =
+        json(
+            mvc.perform(get("/api/v1/audit-events/siem-event").header("Authorization", ADMIN))
+                .andExpect(status().isOk())
+                .andReturn());
+
+    var exported =
+        mvc.perform(
+                get("/api/v1/audit-events/export")
+                    .header("Authorization", ADMIN)
+                    .param("format", "json")
+                    .param("action", "block"))
+            .andExpect(status().isOk())
+            .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+            .andExpect(
+                header()
+                    .string(
+                        "Content-Disposition", "attachment; filename=\"noorpointer-events.json\""))
+            .andExpect(header().string("Cache-Control", "no-store"))
+            .andReturn();
+    assertThat(json(exported)).hasSize(1);
+    assertThat(json(exported).get(0)).isEqualTo(stored);
+
+    String cef =
+        mvc.perform(
+                get("/api/v1/audit-events/export")
+                    .header("Authorization", ADMIN)
+                    .param("format", "cef")
+                    .param("action", "block"))
+            .andExpect(status().isOk())
+            .andExpect(content().contentType("text/plain;charset=UTF-8"))
+            .andExpect(
+                header()
+                    .string(
+                        "Content-Disposition", "attachment; filename=\"noorpointer-events.cef\""))
+            .andExpect(header().string("Cache-Control", "no-store"))
+            .andReturn()
+            .getResponse()
+            .getContentAsString(java.nio.charset.StandardCharsets.UTF_8);
+    assertThat(cef)
+        .startsWith("CEF:0|NoorPointer|Gateway|0.1.0|PROMPT_INJECTION|Prompt injection|8|")
+        .contains(
+            "act=BLOCKED",
+            "cat=LLM01:2025",
+            "cs1=finance-agent",
+            "cs2=finance",
+            "cs3=llama3.1:8b",
+            "cs4=request-siem",
+            "cs5=session-siem",
+            "cn2=2",
+            "flexNumber1=1",
+            "end=" + Instant.parse(stored.path("occurred_at").asText()).toEpochMilli(),
+            "rt=" + Instant.parse(stored.path("received_at").asText()).toEpochMilli(),
+            "msg=Zażółć gęślą jaźń\\nact\\=ALLOWED")
+        .doesNotContain("src=finance-agent");
+    assertThat(cef.lines()).hasSize(1);
+    mvc.perform(
+            get("/api/v1/audit-events/export")
+                .header("Authorization", ADMIN)
+                .param("format", "unsupported"))
+        .andExpect(status().isBadRequest());
   }
 
   @Test
@@ -555,6 +633,63 @@ class ControlPlaneIntegrationTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body))
         .andExpect(status().isMethodNotAllowed());
+  }
+
+  @Test
+  void deletingInactivePolicyRemovesTheVersionButKeepsAuditAndActivePolicy() throws Exception {
+    var revision =
+        json(
+            mvc.perform(
+                    post("/api/v1/policy-revisions")
+                        .header("Authorization", ADMIN)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(
+                            mapper.writeValueAsString(
+                                Map.of(
+                                    "name",
+                                    "delete-me",
+                                    "document",
+                                    documents.profile("strict").toString()))))
+                .andExpect(status().isCreated())
+                .andReturn());
+    long version = revision.path("version").asLong();
+    var event = event("historical-policy", "decision", "block");
+    event.put("policy_version", version);
+    ingest(event);
+    mvc.perform(delete("/api/v1/policy-revisions/" + version).header("Authorization", ADMIN))
+        .andExpect(status().isNoContent())
+        .andExpect(content().string(""));
+    mvc.perform(get("/api/v1/policy-revisions/" + version).header("Authorization", ADMIN))
+        .andExpect(status().isNotFound());
+    mvc.perform(delete("/api/v1/policy-revisions/" + version).header("Authorization", ADMIN))
+        .andExpect(status().isNotFound());
+    mvc.perform(get("/api/v1/policy-revisions").header("Authorization", ADMIN))
+        .andExpect(jsonPath("$.length()").value(3));
+    mvc.perform(get("/api/v1/active-policy/document").header("Authorization", GATEWAY))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.version").value(2));
+    mvc.perform(get("/api/v1/audit-events/historical-policy").header("Authorization", ADMIN))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.policy_version").value(version));
+  }
+
+  @Test
+  void deletingPoliciesRequiresAdminAndCannotRemoveTheActiveVersion() throws Exception {
+    mvc.perform(delete("/api/v1/policy-revisions/2")).andExpect(status().isUnauthorized());
+    mvc.perform(delete("/api/v1/policy-revisions/2").header("Authorization", GATEWAY))
+        .andExpect(status().isForbidden());
+    mvc.perform(delete("/api/v1/policy-revisions/2").header("Authorization", ADMIN))
+        .andExpect(status().isConflict())
+        .andExpect(
+            jsonPath("$.message")
+                .value("Publish another version before deleting the active policy"));
+    mvc.perform(delete("/api/v1/policy-revisions/999999").header("Authorization", ADMIN))
+        .andExpect(status().isNotFound());
+    mvc.perform(delete("/api/v1/policy-revisions/-1").header("Authorization", ADMIN))
+        .andExpect(status().isBadRequest());
+    mvc.perform(get("/api/v1/active-policy/document").header("Authorization", GATEWAY))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.version").value(2));
   }
 
   private ObjectNode event(String id, String kind, String action) {

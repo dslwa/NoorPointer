@@ -66,6 +66,14 @@ public class PolicyRepository {
         .findFirst();
   }
 
+  public int deleteInactive(long version) {
+    return jdbc.update(
+        "DELETE FROM policy_revision WHERE id = ? AND NOT EXISTS"
+            + " (SELECT 1 FROM active_policy WHERE revision_id = ?)",
+        version,
+        version);
+  }
+
   public Optional<ActivePolicyResponse> findActive() {
     return jdbc
         .query(

@@ -23,10 +23,10 @@ K6        = $(COMPOSE) run --rm -e GATEWAY_JWT="$$jwt" benchmarks run
 
 .PHONY: help \
         up dev-infra down restart build clean logs status wait \
-        seed test test-unit test-local test-rebuild bench bench-flood bench-budget \
+        seed test test-unit test-local test-rebuild bench bench-flood bench-budget traffic \
         smoke verify verify-strict offline-check report checkpoint \
         demo demo-full demo-strict \
-        keys mint-build token token-file reload-policy new-signature doctor urls \
+        keys mint-build token token-file reload-policy new-signature db-tidy doctor urls \
         ollama-up ollama-down \
         postgres-up postgres-test-up controlplane-run controlplane-test controlplane-build dashboard-dev
 
@@ -102,6 +102,9 @@ bench-flood: ## k6: zalew zlosliwych promptow
 bench-budget: ## k6: rownolegle zapytania jednego agenta (atomowosc budzetu)
 	@$(JWT_GUARD); $(K6) /benchmarks/benchmark_budget_concurrency.js
 
+traffic: ## Realny ruch na panele Grafany: zadania przez gateway + skany semantyczne (LICZNIK=3)
+	./scripts/traffic.sh
+
 smoke: ## Spiecie calego stosu (health + proxy + auth), zapis do reports/smoke.txt
 	@mkdir -p reports
 	./scripts/smoke.sh | tee reports/smoke.txt
@@ -118,11 +121,12 @@ offline-check: ## Lint: brak pobierania/instalacji w runtime (finalny stage obra
 report: ## Zbiera dowody dla jury do reports/INDEX.md
 	./scripts/report.sh
 
-checkpoint: ## Zero-prep dowod: doctor -> up -> test -> raport + adresy
+checkpoint: ## Zero-prep dowod: doctor -> up -> testy (Go, e2e, Java) -> raport + adresy
 	-@./scripts/doctor.sh
 	$(MAKE) --no-print-directory up
 	-$(MAKE) --no-print-directory test-unit
 	-$(MAKE) --no-print-directory test
+	-$(MAKE) --no-print-directory controlplane-test
 	./scripts/report.sh
 	@echo ""
 	@echo "== adresy =="
@@ -158,15 +162,20 @@ mint-build: ## Buduje gateway/bin/mint raz (token bez 'go run', dziala tez pod s
 token: ## Wypisuje swiezy JWT i tylko jego (bez tego nie nadaje sie do TOK=$(make token))
 	@./scripts/token.sh
 
-new-signature: ## Demo dla jury: dodaje sygnature do feedu i sprawdza, ze jest serwowana
-	./signatures-feed/push_new_signature.sh
+new-signature: ## Demo dla jury: dodaje sygnature do feedu (PATTERN=, NAME=, ACTION=) i sprawdza, ze jest serwowana
+	@PATTERN="$(PATTERN)" NAME="$(NAME)" ACTION="$(ACTION)" ./signatures-feed/push_new_signature.sh
 	@echo "--- kontrola feedu ---"
 	@curl -s -m 5 http://localhost:8085/signatures.json | python3 -c "import sys,json;d=json.load(sys.stdin);s=d['signatures'][-1];print('  sygnatur w feedzie:',len(d['signatures']),'| ostatnia:',s['id'],'/',s['pattern'])"
-	@$(JWT_GUARD); echo "--- proba uzycia wzorca z sygnatury ---"; \
-	code=$$(curl -s -o /dev/null -w '%{http_code}' -m 6 -X POST http://localhost:8080/v1/chat/completions \
-	  -H 'Content-Type: application/json' -H "Authorization: Bearer $$jwt" \
-	  -d '{"model":"llama3.2:1b","agent_id":"agent-zero-day","messages":[{"role":"user","content":"HACKATHON_ZERO_DAY_PAYLOAD_TEST"}]}'); \
-	echo "  HTTP $$code - gateway nie konsumuje jeszcze feedu, wiec 200 jest oczekiwane (403 po podlaczeniu sygnatur)"
+	@$(JWT_GUARD); \
+	 literal="$$(python3 -c 'import sys; p=sys.argv[1].strip(); p=p[1:-1] if p.startswith("(") and p.endswith(")") else p; print(p.split("|")[0].replace(chr(92),"").strip())' "$(PATTERN)")"; \
+	 echo "--- proba uzycia wzorca: $(PATTERN) ---"; \
+	 code=$$(curl -s -o /dev/null -w '%{http_code}' -m 6 -X POST http://localhost:8080/v1/chat/completions \
+	   -H 'Content-Type: application/json' -H "Authorization: Bearer $$jwt" \
+	   -d "{\"model\":\"llama3.2:1b\",\"agent_id\":\"agent-zero-day\",\"messages\":[{\"role\":\"user\",\"content\":\"$$literal\"}]}"); \
+	 echo "  HTTP $$code - gateway nie konsumuje jeszcze feedu, wiec 200 jest oczekiwane (403 po podlaczeniu sygnatur)"
+
+db-tidy: ## Porzadkuje dane demo: czysci audyt i usuwa zdublowane rewizje polityki (wymaga sudo)
+	./scripts/db-tidy.sh
 
 token-file: ## Zapisuje swiezy JWT do pliku 0600 (domyslnie /tmp/noorpointer-e2e.jwt); env GATEWAY_JWT jest preferowany
 	@f="$${TOKEN_FILE:-/tmp/noorpointer-e2e.jwt}"; umask 077; ./scripts/token.sh > "$$f"; \
@@ -216,11 +225,11 @@ postgres-test-up: postgres-up ## Osobna baza PostgreSQL dla testow Javy
 controlplane-run: postgres-up ## Uruchamia Jave (REST/panel) na :8082
 	cd controlplane && ./mvnw spring-boot:run
 
-controlplane-test: postgres-test-up ## Testy modulu Java na osobnej bazie
-	cd controlplane && ./mvnw test
+controlplane-test: postgres-test-up ## Testy modulu Java w kontenerze (bez Javy na hoscie)
+	$(COMPOSE) --profile java run --rm --build controlplane-tests
 
-controlplane-build: postgres-test-up ## Weryfikacja Javy + budowa JAR
-	cd controlplane && ./mvnw verify
+controlplane-build: postgres-test-up ## Weryfikacja Javy + budowa JAR (w kontenerze)
+	$(COMPOSE) --profile java run --rm --build controlplane-tests mvn -B -ntp -f controlplane/pom.xml verify -Dfrontend.skip=true
 
 dashboard-dev: ## React z hot reload na :5173 (API Javy musi dzialac na :8082)
 	cd dashboard && npm ci --no-audit --no-fund && npm run dev

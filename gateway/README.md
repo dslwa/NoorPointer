@@ -5,6 +5,20 @@
 
 ---
 
+## Stan implementacji
+
+Działa: reverse proxy `POST /v1/chat/completions` do upstreamu, walidacja JWT RS256 (`iss`, `aud`, `exp`)
+na wszystkich trasach poza `GET /healthz`, pobieranie dokumentu polityki z control plane
+(`GET /api/gateway/policy` z `Bearer $GATEWAY_TOKEN`, z `ETag` i odpytywaniem co 1 s) oraz
+`POST /admin/policy/reload` (Bearer `$GATEWAY_TOKEN`).
+
+Nie jest jeszcze zaimplementowane: kontrole z punktów 3–5 i 7 (PII, sekrety, prompt injection, sygnatury
+ataków, budżety, ogranicznik pętli, wywołania `semantic-service`), `GET /metrics` na porcie 9090 oraz
+wysyłanie zdarzeń audytu do control plane. Zmienne środowiskowe tych integracji są już zadeklarowane
+w `docker-compose.yaml`, więc nie trzeba ich dodawać.
+
+---
+
 ## Zakres
 Szybka ścieżka krytyczna (Data Plane). Komponent pośredniczący (Reverse Proxy) umieszczony pomiędzy klientami (aplikacjami, agentami AI) a modelami LLM (Ollama, OpenAI API) oraz serwerami narzędzi (MCP).
 Odpowiada za deterministyczne, natychmiastowe kontrole bezpieczeństwa (low-latency, cel < 10 ms), egzekwowanie limitów budżetowych oraz orkiestrację wywołań semantycznych.
@@ -30,7 +44,7 @@ Odpowiada za deterministyczne, natychmiastowe kontrole bezpieczeństwa (low-late
    - Zliczanie tokenów (input/output) oraz przeliczanie kosztu (USD dla API komercyjnych, GPU-seconds dla modeli lokalnych).
    - Blokowanie żądań po przekroczeniu limitu dla agenta, zespołu lub modelu.
 6. **Hot-reload polityki bezpieczeństwa**:
-   - Dynamiczne przeładowywanie konfiguracji (`policy.yaml`) bez restartu kontenera (przez `fsnotify` lub endpoint `/admin/policy/reload`).
+   - Dynamiczne przeładowywanie dokumentu polityki z control plane, bez restartu kontenera: odpytywanie co `refresh_s` oraz ręcznie przez `POST /admin/policy/reload` (Bearer `$GATEWAY_TOKEN`).
 7. **Orkiestracja kontroli semantycznych**:
    - Odpytywanie `semantic-service` (gRPC/HTTP) z twardym timeoutem (np. 300 ms).
    - Obsługa strategii `fail_open` lub `fail_closed` w przypadku przekroczenia czasu.
@@ -43,7 +57,7 @@ Odpowiada za deterministyczne, natychmiastowe kontrole bezpieczeństwa (low-late
 - **Port wejściowy:** `8080` (HTTP API proxy)
 - **Port metryk:** `9090` (Prometheus `/metrics`)
 - **Komunikacja wychodząca:**
-  - `upstream LLM` (np. `http://ollama:11434` lub API komercyjne)
+  - `upstream LLM` (`http://mock-llm:11434` w domyślnej konfiguracji; `make ollama-up` przełącza na prawdziwą Ollamę)
   - `semantic-service` (gRPC `semantic-service:50051` lub HTTP)
   - `redis` (pamięć podręczna budżetów i liczników)
   - `postgres` / audit stream (zapis zdarzeń audytowych)
@@ -54,4 +68,4 @@ Odpowiada za deterministyczne, natychmiastowe kontrole bezpieczeństwa (low-late
 - [ ] Zmiana `OPENAI_BASE_URL` w agencie na adres Gatewaya działa w pełni transparentnie.
 - [ ] Wykrycie numeru karty kredytowej lub klucza API natychmiast maskuje lub blokuje żądanie (< 5 ms).
 - [ ] Przekroczenie budżetu tokenów w Redis zwraca błąd `429 Too Many Requests / Budget Exceeded`.
-- [ ] Zmiana pliku `policy.yaml` jest uwzględniana w locie w trakcie testów jury.
+- [ ] Zmiana rewizji polityki w control plane jest uwzględniana w locie, bez restartu kontenera (także przez `make reload-policy`).

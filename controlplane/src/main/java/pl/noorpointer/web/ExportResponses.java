@@ -11,6 +11,7 @@ public final class ExportResponses {
 
   public static ResponseEntity<String> of(AuditExport export) {
     return ResponseEntity.ok()
+        .header(HttpHeaders.CACHE_CONTROL, "no-store")
         .contentType(MediaType.parseMediaType(export.contentType()))
         .header(
             HttpHeaders.CONTENT_DISPOSITION,

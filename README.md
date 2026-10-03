@@ -24,8 +24,10 @@ do sprawdzenia reguł przed ich włączeniem.
 | Egzekwowanie kontroli w gatewayu | **nie zaimplementowane** | `withPolicy` na razie tylko loguje tożsamość i wersję polityki |
 | Kontrole semantyczne (Python) | działa jako usługa | `/v1/scan` i `/v1/scan/model` odpowiadają poprawnie; gateway jeszcze ich nie wywołuje |
 | Audyt i eksport SIEM | działa po stronie control plane | eksport CEF/JSON/CSV i panel działają; gateway nie wysyła jeszcze własnych zdarzeń, więc dziennik zawiera dane demonstracyjne z `make seed` |
+| Katalog sygnatur | działa | 7 reguł startowych z migracji `V2__Seed_default_signatures` + 5 wpisów z naszego feedu; dodawanie z panelu i przez `make new-signature PATTERN='...'` |
 | Metryki i alerty | częściowo | Prometheus zbiera `semantic-service` i `controlplane`; gateway nie wystawia jeszcze `/metrics` |
 | Testy e2e | 9 z 16 przechodzi | pozostałe 7 wymagają kontroli wymienionych wyżej; szczegóły w `reports/INDEX.md` |
+| Testy modułów | działają | `make test-unit` (Go, 4 pakiety) i `sudo make controlplane-test` (Java, 3 klasy w kontenerze, na osobnej bazie `noorpointer_test`) |
 
 Wniosek dla osób oceniających: działają mechanizmy wokół polityki (uwierzytelnianie, dystrybucja polityki,
 przeładowanie, audyt, panel, telemetria, testy), natomiast same kontrole w ścieżce żądania są w trakcie
@@ -52,9 +54,12 @@ sudo make checkpoint # wszystko powyżej + reports/INDEX.md + lista adresów
 sudo make bench            # k6: narzut przy typowym ruchu
 sudo make bench-flood      # k6: duży ruch z próbami ataku
 sudo make bench-budget     # k6: równoległe żądania jednego agenta
+sudo make controlplane-test  # testy modułu Java w kontenerze (nie wymaga Javy na hoście)
 sudo make demo-full        # scenariusze demonstracyjne agenta
 make reload-policy         # natychmiastowe przeładowanie polityki w gatewayu
 make new-signature         # demo: dodanie sygnatury ataku do feedu w trakcie działania
+make new-signature PATTERN='(/etc/passwd|\.\./)' NAME='Path traversal'   # wzorzec podany przez jury
+sudo make db-tidy          # reset danych demo: audyt, katalog sygnatur, zdublowane rewizje polityki
 make urls                  # adresy usług i dane logowania
 ```
 
@@ -134,6 +139,8 @@ Elementy oznaczone `[w toku]` to zakres, który nie jest jeszcze włączony w ś
 | [`agent-demo/`](agent-demo/README.md) | DevOps + Devs | Scenariusze demonstracyjne agenta |
 | [`signatures-feed/`](signatures-feed/README.md) | DevOps + Python | Feed sygnatur znanych ataków |
 | [`scripts/`](scripts) | DevOps | Sprawdzenia, seed, raporty, obsługa tokenów |
+| [`mock-llm/`](mock-llm) | DevOps | Mock modelu (format OpenAI i Ollama), domyślny upstream gatewaya |
+| [`proto/`](proto) | Python + Go | Wspólny kontrakt gRPC `semantic.v1` |
 
 ## Kontrakty
 
@@ -190,8 +197,8 @@ Eksport dla narzędzi SIEM (wymaga `ADMIN_TOKEN`): `GET /api/v1/audit/export?for
 ### 4. Polityka
 
 Gateway pobiera ją z `GET {CONTROLPLANE_URL}/api/gateway/policy` (nagłówek `Authorization: Bearer $GATEWAY_TOKEN`).
-Kształt dokumentu (`config/policy.yaml` w repozytorium jest starszym plikiem prototypowym i nie jest tym,
-co widzi gateway):
+Prototypowy `config/policy.yaml` został usunięty z repozytorium: nie był czytany przez żaden komponent,
+a jego format różnił się od poniższego. Kształt dokumentu, który widzi gateway:
 
 ```json
 {
@@ -243,8 +250,8 @@ błędach uwierzytelniania. Odpowiedź po redakcji pozostaje `200`, a informacj�
 zredagowane, niesie nagłówek `X-NoorPointer-Redactions` (np. `pii_ner`); nie zmienia to tego,
 czego oczekują testy.
 
-Podmiot budżetu rozstrzygamy od najbardziej szczegółowego: `agent:<agent_id>` z ciała żądania →
-`team:<team>` z tokenu JWT → `model:<model>` z ciała. Okna: `daily_tokens` resetują się o 00:00 UTC,
+Podmiot budżetu rozstrzygamy od najbardziej szczegółowego: `agent:<agent_id>` z ciała żądania ->
+`team:<team>` z tokenu JWT -> `model:<model>` z ciała. Okna: `daily_tokens` resetują się o 00:00 UTC,
 `monthly_usd` obowiązuje w miesiącu kalendarzowym, `gpu_seconds_per_hour` co godzinę. Liczniki
 trzymamy w Redisie pod kluczem `budget:<subject>:<okno>`, zwiększanym atomowo (`INCRBY` + `EXPIRE`).
 Przekroczenie daje `429` z nagłówkiem `Retry-After` w sekundach do końca okna. Gdy Redis nie
@@ -278,10 +285,15 @@ repozytorium):
 5. `make reload-policy` — żywa zmiana konfiguracji, odpowiedź `{"status":"reloaded","version":N}`.
 6. `make new-signature` — dodanie sygnatury ataku w trakcie działania: wpis pojawia się w feedzie
    i w katalogu w panelu (po pokazie: `git checkout -- signatures-feed/signatures.json && make seed`).
-7. Panel `http://localhost:3000` (login `local-dev-admin`) — incydenty, rewizje polityki, katalog sygnatur.
-8. Grafana `http://localhost:3001` (admin/admin) — alerty oraz metryki usługi semantycznej i kontrolera.
-9. `sudo make test` — pakiet testów, `reports/test_report.html` i `reports/INDEX.md` z listą
-   otwartych pozycji wraz z właścicielami.
+7. `make traffic` — realny ruch na panele: zadania przez gateway oraz skany semantyczne, które
+   oznaczają próbę prompt injection i dane osobowe. Bez tego kroku panele usługi semantycznej są puste,
+   bo gateway nie wywołuje jej jeszcze w ścieżce żądania.
+8. Panel `http://localhost:3000` (login `local-dev-admin`) — incydenty, rewizje polityki, katalog sygnatur.
+9. Grafana `http://localhost:3001` (admin/admin) — dostępność usług, kontrole semantyczne, ruch
+   w control plane i alerty. Panel gatewaya jest tam opisany jako pusty do czasu `GET /metrics`.
+10. `sudo make test` — pakiet testów, `reports/test_report.html` i `reports/INDEX.md` z listą
+    otwartych pozycji wraz z właścicielami; `sudo make controlplane-test` uruchamia dodatkowo testy
+    modułu Java w kontenerze.
 
 Stan testów na dziś: **9 z 16 przechodzi**. Sześć czerwonych to kontrole, których gateway jeszcze nie
 egzekwuje (sekrety, redakcja PII, prompt injection, sygnatury, budżety, ogranicznik pętli), a jedna to

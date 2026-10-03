@@ -5,6 +5,7 @@
 **/data
 **/__pycache__
 **/.venv
+.venv-tests
 reports
 .env
 **/node_modules

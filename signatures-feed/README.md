@@ -59,12 +59,25 @@ Stan obecny (działa):
 
 - **Gateway** czyta ten plik pod `SIGNATURES_FEED_URL` i skompiluje wyrażenia regularne
   (`refresh_s` w polityce). Na razie nie konsumuje sygnatur.
-- **Panel (control plane)** jest zasilany przez `scripts/import-signatures.sh`
-  (wywoływany przez `make seed`): dla każdego wpisu bierze **pierwszą alternatywę** wzorca jako
-  wartość dosłowną, mapuje `target_component` na pole `target`, a pełny wzorzec zachowuje w `description`.
-  Katalog jest podmieniany w całości, więc operacja jest powtarzalna i idempotentna.
-- Konwerter **preferuje jawne pole `match`**, jeśli wpis je ma — czyli po przejściu na wspólny
-  format nie wymaga zmian.
+- **Control plane** ma własny katalog sygnatur i dwa sposoby jego zapełniania:
+  - migracja `V2__Seed_default_signatures` wgrywa 7 reguł startowych z
+    `controlplane/src/main/resources/signatures/defaults.json` (frazy prompt injection, EN i PL,
+    `action: monitor`), przy pierwszym starcie, nie nadpisując istniejących ID;
+  - `POST /api/v1/signatures` dodaje **pojedynczy** wpis (409, gdy ID już istnieje), a panel ma do tego
+    formularz (JSON albo wklejony dokument tekstowy/YAML);
+  - `PUT /api/v1/signature-feed` podmienia **cały** katalog — panel używa go w przycisku
+    „Replace feed”, który jest świadomą operacją zbiorczą.
+- **`scripts/import-signatures.sh`** (wywoływany przez `make seed`) dokłada brakujące wpisy **addytywnie**:
+  importuje najpierw reguły startowe aplikacji, potem ten feed, i nie kasuje niczego, co dodano z panelu.
+  Dla wpisów z feedu bierze pierwszą alternatywę wzorca jako wartość dosłowną, mapuje `target_component`
+  na pole `target`, a pełny wzorzec zachowuje w `description`. Powtórne uruchomienie kończy się na
+  „juz bylo”, więc operacja jest idempotentna.
+- Konwerter **preferuje jawne pola kontraktu** (`match`, `source`, `category`, `target`, `description`),
+  jeśli wpis je ma — czyli wpisy zgodne z kontraktem control plane przechodzą bez zmian.
+
+**Historia: pierwsza wersja importu używała `PUT /api/v1/signature-feed`, czyli podmiany całości.
+Po dołożeniu przez backend reguł startowych i formularza w panelu takie zachowanie kasowałoby ich wpisy,
+dlatego `make seed` korzysta wyłącznie ze ścieżki addytywnej.**
 
 Docelowo (zadanie dla części Java, około 15 minut): rozszerzyć kontrakt control plane tak, aby
 przyjmował wyrażenia regularne:
@@ -82,10 +95,19 @@ wpisy z tego feedu można przenosić do katalogu bez konwersji.
 
 Skrypt `push_new_signature.sh` dopisuje wpis do pliku i odświeża katalog w panelu tym samym
 konwerterem, więc demonstracja „dodaj sygnaturę w trakcie działania" działa dla obu odbiorców.
+Wzorzec można podać z zewnątrz — przydaje się, gdy juror podyktuje własną regułę, a skrypt sprawdza,
+czy jest poprawnym wyrażeniem regularnym, zanim trafi do feedu:
 
-Po demonstracji wróć do stanu z repozytorium, żeby wpis testowy nie został w materiałach końcowych:
+```bash
+make new-signature                                              # wzorzec demonstracyjny
+make new-signature PATTERN='(/etc/passwd|\.\./\.\./)' NAME='Path traversal' ACTION=block
+```
+
+Po demonstracji wróć do stanu z repozytorium, żeby wpisy testowe nie zostały w materiałach końcowych.
+Katalog w panelu jest uzupełniany **addytywnie**, więc sam `git checkout` go nie wyczyści:
 
 ```bash
 git checkout -- signatures-feed/signatures.json
-make seed                      # odświeża katalog w panelu do pięciu sygnatur z repo
+sudo make db-tidy              # usuwa wpisy demo z katalogu (i czyści audyt, patrz scripts/db-tidy.sh)
+make seed                      # odtwarza czystą porcję danych: 12 sygnatur i 30 zdarzeń audytu
 ```

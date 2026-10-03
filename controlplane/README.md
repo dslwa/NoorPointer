@@ -78,6 +78,7 @@ API wymaga `Authorization: Bearer <token>`. Endpointy panelu mają wspólny pref
 | `GET /api/v1/policy-revisions` | Wersje, najnowsze pierwsze |
 | `POST /api/v1/policy-revisions` | Zapis `{ "name": "…", "description": "…", "document": "JSON lub YAML" }`; `201 Created` i `Location` |
 | `GET /api/v1/policy-revisions/{version}` | Szczegóły niezmiennej wersji |
+| `DELETE /api/v1/policy-revisions/{version}` | Usunięcie nieaktywnej wersji; `204`, aktywna wersja: `409` |
 | `GET /api/v1/active-policy` | Aktywna wersja i czas publikacji |
 | `PUT /api/v1/active-policy` | Publikacja/rollback: `{ "version": 3 }`; ponowienie tej samej wersji zachowuje czas publikacji |
 | `GET /api/v1/active-policy/document` | Dokument dla gateway’a, ETag/304 |
@@ -85,6 +86,8 @@ API wymaga `Authorization: Bearer <token>`. Endpointy panelu mają wspólny pref
 | `GET /api/v1/policy-profiles/{name}` | `permissive`, `balanced`, `strict` |
 | `GET /api/v1/schemas/{name}` | JSON Schema: `policy`, `audit`, `signatures` |
 | `GET /api/v1/signature-feed` | Bieżący feed, ETag/304 |
+| `POST /api/v1/signatures` | Dodaje pojedynczą sygnaturę bez usuwania pozostałych; `201 Created` i `Location`. Powtórzone ID lub przekroczenie 1000 reguł: `409 Conflict` |
+| `GET /api/v1/signatures/{id}` | Szczegóły sygnatury; brak ID: `404 Not Found` |
 | `PUT /api/v1/signature-feed` | `{ "document": "JSON lub YAML" }`; atomowo zastępuje cały feed, zwraca `{ "signatures": [...] }` |
 | `POST /api/v1/audit-events` | Jeden event; `201 Created` i `Location` przy nowym ID, `200 OK` przy ponowieniu |
 | `GET /api/v1/audit-events` | Filtry `action`, `category`, `agent`, `from`, `to`; `page`, `size` |
@@ -92,9 +95,15 @@ API wymaga `Authorization: Bearer <token>`. Endpointy panelu mają wspólny pref
 | `GET /api/v1/audit-events/export?format=json` | `json`, `csv`, `cef`; te same filtry |
 | `POST /api/v1/demo-batches` | Nowa partia demo: `201`, ID partii i liczba zdarzeń; jeśli demo jest włączone |
 | `GET /actuator/health` | Healthcheck |
+
+Migracja V2 instaluje siedem domyślnych sygnatur z `src/main/resources/signatures/defaults.json` jednorazowo, także przy aktualizacji istniejącej bazy. Zachowuje istniejące ID i respektuje limit 1000 reguł; przy pełnym feedzie nie dokłada kolejnych. Późniejsze zmiany i usunięcia nie są cofane po restarcie. Reguły to własne przykłady inspirowane OWASP, domyślnie w trybie `monitor`.
+
+`POST /api/v1/signatures` przyjmuje obiekt w `application/json`, a także wklejony JSON/YAML jako `text/plain`, `application/yaml` lub `application/x-yaml`. Wklejaj pojedynczą sygnaturę (bez opakowania `signatures`). Każda ścieżka wykonuje tę samą walidację i dopisuje regułę transakcyjnie.
 | `GET /actuator/prometheus` | Metryki Spring/Micrometer, token administratora |
 
 Zapis tworzy nową wersję przez `POST`; wersje są niezmienne. Zmiana pojedynczego zasobu aktywnej polityki i zastąpienie feedu używają `PUT`. Błędy zwracają jednolity JSON: `status`, `message`, `path`, `timestamp`, z odpowiednim kodem HTTP (`400`, `401`, `403`, `404`, `405`, `409`, `415`, `500`).
+
+Przycisk **Delete** przy wersji polityki usuwa nieaktywną wersję po potwierdzeniu. Dla aktywnej wersji jest wyłączony; API również blokuje jej usunięcie. Zdarzenia audytowe i zapisany w nich numer wersji pozostają zachowane.
 
 Starsze ścieżki integracyjne gateway’a pozostają w `controller/compatibility/`: `GET /api/gateway/policy`, `GET /api/gateway/signatures`, `POST /api/gateway/events`, `GET /api/contracts/{name}`, `GET /api/v1/policies`, `POST /api/v1/audit/events` i `GET /api/v1/audit/export`. Panel korzysta z nowego API. Starsze endpointy zarządzania `/api/policies`, `/api/events`, `/api/signatures/import` i `/api/demo/events` zostały zastąpione ścieżkami z tabeli.
 
@@ -127,6 +136,8 @@ curl http://localhost:8082/api/v1/audit-events \
 Wysyłaj jedną końcową `decision` na żądanie. Zużycie raportuj osobnym eventem `kind: "usage"`, z własnym unikalnym `id`, tym samym `request_id` i polami `tokens`, `cost_usd`, `gpu_seconds`. Tylko `usage` zasila koszty i budżety. Powtórzenie `id` zwraca `accepted: false` i zachowuje pierwszy zapis, również przy innej ponowionej treści. Gateway odpowiada za stabilne ID przy retry i kontekst zredagowany bez sekretów.
 
 Filtry czasu: ISO-8601 UTC, `from` włącznie, `to` wyłącznie. Strona: domyślnie 20, maksymalnie 100 elementów. Eksport: maksymalnie 10 000 zdarzeń, potem trzeba zawęzić filtry. Budżety dzienne/miesięczne: UTC; GPU: ruchome okno ostatnich 3600 sekund. `*` w podmiocie budżetu dopasowuje dowolny fragment identyfikatora.
+
+Eksport CEF zawiera akcję, kategorię OWASP, czasy zdarzenia i odbioru, dane agenta, żądania, sesji, modelu, zespołu, wersję polityki i metryki. JSON zachowuje pełny kontekst. Mapowanie pól, przykłady pobrania i wymagania importu do SIEM opisano w [SIEM.md](SIEM.md).
 
 ## Testy i budowanie
 
@@ -168,4 +179,4 @@ Kontrolery delegują do serwisów, a serwisy do repozytoriów. Wstrzykiwanie zal
 - `GET /api/v1/audit/export` jest aliasem eksportu, wymaga tokenu administratora.
 - `GET /api/v1/policies` zwraca aktualny dokument w formacie **Java JSON Schema**, tak samo jak `/api/gateway/policy`.
 
-`config/policy.yaml` pochodzi z prototypu Go i ma starszy format niż kontrakt Java (`defaults`, `models`, `controls`, `budgets`). Zachowano go dla pracy zespołu. Obecny gateway (`gateway/api/server.go`) jest reverse proxy do upstreamu. Nie egzekwuje jeszcze kontroli, nie pobiera polityki ani nie wysyła audytu — publikacja w Javie nie zmienia jego zachowania. Następny krok po stronie Go to pobieranie i instalowanie polityki z API według `src/main/resources/contracts/policy.schema.json`. Starszy feed regex z `signatures-feed/` również wymaga adaptera do importu w Javie; obecny importer przyjmuje format opisany w kontrakcie `signatures`.
+Prototypowy `config/policy.yaml` (starszy format niż kontrakt Java) został usunięty z repozytorium: nie był czytany przez żaden komponent, a jedynym źródłem polityki jest dokument publikowany przez ten serwis. Obecny gateway (`gateway/api/server.go`) jest reverse proxy do upstreamu. Nie egzekwuje jeszcze kontroli, nie pobiera polityki ani nie wysyła audytu — publikacja w Javie nie zmienia jego zachowania. Następny krok po stronie Go to pobieranie i instalowanie polityki z API według `src/main/resources/contracts/policy.schema.json`. Starszy feed regex z `signatures-feed/` również wymaga adaptera do importu w Javie; obecny importer przyjmuje format opisany w kontrakcie `signatures`.

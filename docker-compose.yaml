@@ -25,11 +25,9 @@ services:
       - CONTROLPLANE_URL=http://controlplane:8082
       - GATEWAY_TOKEN=${GATEWAY_TOKEN:-local-dev-gateway}
       - UPSTREAM_LLM_URL=http://mock-llm:11434
-      - POLICY_FILE=/app/config/policy.yaml
       - SIGNATURES_FEED_URL=http://signatures-feed:8085/signatures.json
       - JWT_PUBLIC_KEY=/app/keys/jwt.pub
     volumes:
-      - ./config/policy.yaml:/app/config/policy.yaml:ro,z
       - ./gateway/keys/jwt.pub:/app/keys/jwt.pub:ro,z
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:8080/healthz"]
@@ -151,7 +149,6 @@ services:
       POSTGRES_DB: noorpointer
     volumes:
       - postgres-data:/var/lib/postgresql/data
-      - ./config/init-db.sql:/docker-entrypoint-initdb.d/init.sql:ro,z
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U noor -d noorpointer"]
       interval: 3s
@@ -251,6 +248,34 @@ services:
       - TARGET_URL=http://gateway:8080
     profiles:
       - bench
+    networks: [noorpointer-net]
+
+  # Testy modulu Java. Uruchamiamy je w obrazie uzywanym do budowy control plane (etap `build` ma juz
+  # pobrane zaleznosci Mavena, wiec nie trzeba instalowac Javy na hoscie). Baza testowa pochodzi
+  # z `make postgres-test-up`: postgres-test-up tworzy ja, ten serwis tylko sie do niej podlacza.
+  controlplane-tests:
+    build:
+      context: .
+      dockerfile: controlplane/Dockerfile
+      target: build
+    working_dir: /workspace
+    command:
+      - mvn
+      - -B
+      - -ntp
+      - -f
+      - controlplane/pom.xml
+      - test
+      - -Dfrontend.skip=true
+    environment:
+      - TEST_DATABASE_URL=jdbc:postgresql://postgres:5432/noorpointer_test?currentSchema=controlplane_test
+      - TEST_DATABASE_USER=noor
+      - TEST_DATABASE_PASSWORD=noorpass
+    depends_on:
+      postgres:
+        condition: service_healthy
+    profiles:
+      - java
     networks: [noorpointer-net]
 
 networks:

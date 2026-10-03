@@ -35,25 +35,40 @@ Zgodnie z wymaganiem formalnym 6 i wytycznymi weryfikacji: *"Judges will execute
      - *Pozytywny:* Agent wykonujący 2 różne wywołania narzędzi -> przepuszczone.
      - *Negatywny:* Agent wysyłający 3 identyczne wywołania narzędzia pod rząd -> połączenie zerwane lub zablokowane.
    - **Test 7: Dynamiczny hot-reload polityki (test dla jury)**:
-     - Weryfikacja, że po zmianie pliku `policy.yaml` (np. zmiana akcji z `redact` na `block` lub podniesienie progu `threshold`) system natychmiast zmienia zachowanie bez restartu kontenera.
+     - Weryfikacja, że po opublikowaniu nowej rewizji polityki w control plane (np. zmiana akcji z `redact` na `block` lub podniesienie progu `threshold`) gateway uwzględnia ją natychmiast, bez restartu kontenera (`make reload-policy`).
    - **Test 8: Skaner modeli (Pickle RCE)**:
      - Próba załadowania bezpiecznego pliku modelu vs sfabrykowanego pliku zawierającego złośliwy kod operacji deserializacji.
 2. **Generowanie raportu dla jury**:
    - Wygenerowanie raportu HTML (`pytest-html`) w katalogu `/reports/test_report.html`.
    - Raport zawiera tabelę z czasem wykonania każdego testu, kategorią OWASP oraz statusem PASSED/FAILED.
 3. **Uruchomienie jednym poleceniem**:
-   - `make test` lub `./run_tests.sh`.
+   - `make test` — pakiet w kontenerze (`docker compose run --rm tests`), raport HTML w `reports/`.
 
 ---
 
 ## Jak uruchomić testy?
 ```bash
-# Uruchomienie lokalne z poziomu roota projektu
+# Kontener + raport HTML (reports/test_report.html); token GATEWAY_JWT podstawiany automatycznie
 make test
 
-# Lub bezpośrednio przez pytest w kontenerze:
-docker compose run --rm test-runner pytest -v --html=/reports/test_report.html --self-contained-html
+# To samo bez Dockera, na opublikowanych portach (pętla kilkusekundowa dla pracy nad testami)
+make test-local
+
+# Bezpośrednio pytestem w kontenerze (nazwa usługi to `tests`, token trzeba podać samemu)
+docker compose run --rm -e GATEWAY_JWT="$(./scripts/token.sh)" tests
 ```
+
+## Stan obecny
+
+Przechodzi **9 z 16** testów. Czerwone i ich przyczyny:
+
+| Testy | Przyczyna | Właściciel |
+| :--- | :--- | :--- |
+| `test_pii_pesel_redacted`, `test_secrets_api_key_blocked`, `test_prompt_injection_jailbreak_blocked`, `test_historical_exploit_shadowray_cve_blocked`, `test_budget_exceeded_rate_limited`, `test_loop_breaker_repeated_calls_terminated` | gateway nie egzekwuje jeszcze kontroli: sekrety, redakcja PII, prompt injection, sygnatury ataków, budżety, ogranicznik pętli | Go Developer |
+| `test_policy_hot_reload` | `POST /admin/policy/reload` wymaga `Bearer $GATEWAY_TOKEN`, a test wysyła token gatewaya | Python Developer |
+
+Testy wymagają tokenu w zmiennej `GATEWAY_JWT`. `make test` i `make test-local` wstrzykują go same,
+a jego brak przerywa pakiet czytelnym komunikatem zamiast serii odpowiedzi 401.
 
 ---
 
