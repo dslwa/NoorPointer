@@ -9,5 +9,6 @@ export const paths = {
   auditEvent: (id) => `/audit-events/${encodeURIComponent(id)}`,
   auditExport: '/audit-events/export',
   signatureFeed: '/signature-feed',
+  signatures: '/signatures',
   demoBatches: '/demo-batches',
 };

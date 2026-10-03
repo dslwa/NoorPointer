@@ -75,6 +75,15 @@ public class PolicyService {
   }
 
   @Transactional
+  public void delete(long version) {
+    if (repository.deleteInactive(version) == 0) {
+      get(version);
+      throw new ResponseStatusException(
+          HttpStatus.CONFLICT, "Publish another version before deleting the active policy");
+    }
+  }
+
+  @Transactional
   public ActivePolicyResponse publish(long version) {
     get(version);
     if (active().revision().version() != version) repository.publish(version);

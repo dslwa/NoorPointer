@@ -27,7 +27,8 @@ W Docker Compose panel jest dostępny na **http://localhost:3000**. Obraz buduje
 - Overview: statystyki, wykres, kategorie blokad i budżety.
 - Policies: profile, przełączniki kontroli, próg prompt injection, edytor JSON/YAML, walidacja, wersje i publikacja.
 - Events: filtry, stronicowanie, szczegóły i eksport JSON/CSV/CEF.
-- Signatures: ręczny import JSON/YAML i zastąpienie feedu.
+- Signatures: siedem reguł domyślnych jest instalowanych jednorazowo przez migrację bazy. Istniejące reguły o tym samym ID pozostają niezmienione; restart nie przywraca usuniętych reguł. Zestaw w `../controlplane/src/main/resources/signatures/defaults.json` zawiera własne przykłady NoorPointer inspirowane scenariuszami OWASP (LLM01/02/07), z linkami do źródeł; nie jest oficjalnym feedem OWASP. Domyślna akcja to `monitor`. Dopasowanie jest dosłowne i może oznaczyć cytaty edukacyjne; reguły nie zastępują kontroli semantycznych ani ochrony wyjścia. Brak automatycznej synchronizacji z OWASP.
+- **Add signature → Paste JSON / YAML** pozwala wkleić pojedynczy obiekt sygnatury. **Load example** pokazuje wymagany format. **Save signature** dopisuje regułę bez usuwania pozostałych; backend sprawdza poprawność i unikalność ID. **Use form** pozwala wypełnić pola ręcznie. W sekcji **Replace entire feed** można zaimportować cały JSON/YAML; zastąpienie usuwa reguły nieobecne w dokumencie.
 - Token API w `sessionStorage`, odświeżanie danych co 15 sekund w Overview i Events. Niezapisane zmiany edytorów pozostają przy przełączaniu widoków i odświeżaniu danych.
 
 ## Struktura i build
