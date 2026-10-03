@@ -124,6 +124,10 @@ report: ## Zbiera dowody dla jury do reports/INDEX.md
 deck: ## Buduje prezentacje: deck/slajdy.md -> reports/deck (HTML + PDF, 10 slajdow)
 	./deck/build.sh
 
+demo-ready: ## Przygotowanie pokazu: start stosu (z danymi demo) i ruch na panele (wymaga sudo)
+	$(MAKE) --no-print-directory up
+	./scripts/traffic.sh
+
 checkpoint: ## Zero-prep dowod: doctor -> up -> testy (Go, e2e, Java) -> raport + adresy
 	-@./scripts/doctor.sh
 	$(MAKE) --no-print-directory up
