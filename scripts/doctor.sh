@@ -30,6 +30,20 @@ echo "== konfiguracja compose =="
 # Bez --profile polecenie docker compose config pomija serwisy z profilami (tests, benchmarks).
 if docker compose --profile tests --profile bench config --quiet 2>/dev/null; then ok "docker compose config" "poprawna (z profilami)"; else no "docker compose config" "niepoprawna - uruchom: docker compose --profile tests config"; fi
 
+echo "== sekrety lokalne =="
+if [[ -f .env ]]; then
+  if grep -qE '^[A-Z_]*(API_KEY|TOKEN|SECRET)=sk-[A-Za-z0-9_-]{20,}' .env 2>/dev/null; then
+    wn ".env" "zawiera klucz API (sk-...). Git go ignoruje i nigdy nie byl commitowany, ale ZIP lub kopia katalogu zabierze go ze soba - usun klucz albo trzymaj plik poza repo"
+  else
+    ok ".env" "obecny, bez rozpoznanego klucza API"
+  fi
+else
+  ok ".env" "brak - uzywane sa wartosci domyslne z docker-compose"
+fi
+if git ls-files --error-unmatch .env >/dev/null 2>&1; then no ".env w git" "plik JEST sledzony - usun go z repozytorium i uniewaznij klucze"
+else ok ".env w git" "nie jest sledzony"; fi
+
+
 echo "== token =="
 if [[ -f gateway/keys/jwt.key ]] && command -v go >/dev/null; then
   tok="$(./scripts/token.sh 2>/dev/null || true)"

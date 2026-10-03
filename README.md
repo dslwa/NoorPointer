@@ -54,6 +54,7 @@ sudo make bench-flood      # k6: duży ruch z próbami ataku
 sudo make bench-budget     # k6: równoległe żądania jednego agenta
 sudo make demo-full        # scenariusze demonstracyjne agenta
 make reload-policy         # natychmiastowe przeładowanie polityki w gatewayu
+make new-signature         # demo: dodanie sygnatury ataku do feedu w trakcie działania
 make urls                  # adresy usług i dane logowania
 ```
 
