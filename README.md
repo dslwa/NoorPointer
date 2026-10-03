@@ -74,7 +74,7 @@ make urls                  # adresy usług i dane logowania
 | Gateway | Go | 8080 | `http://localhost:8080/v1/chat/completions` (wymaga JWT: `make token`) |
 | Dashboard | React + Nginx | 3000 | `http://localhost:3000` (logowanie tokenem `local-dev-admin`) |
 | Control Plane | Java / Spring Boot | 8082 | `http://localhost:8082/api/v1`, eksport `?format=cef` |
-| Semantic Service | Python | 8001 / 50051 | `http://localhost:8001` (HTTP) i `:50051` (gRPC) |
+| Semantic Service | Python | 8001 / 50051 | `http://localhost:8001` (HTTP) i `:50051` (gRPC); działa w replikach za load balancerem `semantic-lb` — patrz „Skalowanie" niżej |
 | Prometheus | Prometheus 2.54 | 9091 | `http://localhost:9091/targets`, `/alerts` |
 | Grafana | Grafana 11 | 3001 | `http://localhost:3001` (admin / admin, logowanie wyłączone) |
 | Feed sygnatur | Nginx | 8085 | `http://localhost:8085/signatures.json` |
@@ -308,15 +308,53 @@ Stan testów na dziś: **10 z 16 przechodzi**. Sześć czerwonych to kontrole, k
 egzekwuje (sekrety, redakcja PII, prompt injection, sygnatury, budżety, ogranicznik pętli). Mówimy o tym
 wprost i pokazujemy `reports/INDEX.md` — nie obiecujemy kontroli, których jeszcze nie ma.
 
+## Skalowanie usługi semantycznej
+
+Najcięższa część systemu (modele AI) działa w replikach za load balancerem, a nie w jednym kontenerze.
+
+Jak to jest zrobione i dlaczego właśnie tak:
+
+- Samo `--scale` **nie wystarcza**: Docker DNS zwraca adresy wszystkich replik, ale klient HTTP
+  rozwiązuje nazwę raz i trzyma połączenie z jedną repliką. Wtedy zwiększenie liczby replik nic nie daje.
+- Dlatego przed replikami stoi `semantic-lb` (nginx): pyta Dockera o adresy **przy każdym żądaniu**
+  (`resolver 127.0.0.11`), więc ruch rozkłada się na wszystkie repliki, a nowe repliki wchodzą do gry
+  w ciągu 5 sekund.
+- Load balancer **dziedziczy nazwę `semantic-service`**, więc brama, panel („Prompt check"), testy e2e
+  i skrypty nadal rozmawiają z `semantic-service:8001` — nie trzeba było zmieniać niczyjego kodu.
+- gRPC (`:50051`) przechodzi przez tę samą barierę jako przekazanie TCP: każde nowe połączenie trafia
+  do kolejnej repliki (jedna sesja klienta pracuje z jedną repliką — tak działa multipleksowanie gRPC).
+- Prometheus nie ma już wpisanego adresu na sztywno: używa `dns_sd_configs`, więc zbiera metryki
+  z **każdej** repliki osobno. Dzięki temu wykresy i alerty nie „skaczą" między kontenerami.
+- Alerty rozróżniają dwa przypadki: `SemanticReplicaLost` (część replik padła — ruch idzie dalej)
+  i `SemanticDown` (żadna nie odpowiada).
+
+```bash
+make bench-semantic              # przepustowość przy 1 replice: punkt odniesienia
+sudo make scale REPLIKI=3        # 3 repliki usługi semantycznej
+sudo make scale-check            # dowód: licznik kontroli przyrasta w każdej replice
+make bench-semantic              # ten sam pomiar po skalowaniu
+sudo make scale REPLIKI=1        # powrót do jednej repliki
+```
+
+`make scale-check` czyta licznik wykonanych kontroli z każdego kontenera osobno i pokazuje przyrosty.
+Trzy linie po ~33% znaczą, że load balancing działa; jedna linia z 100% znaczyłaby, że cały ruch idzie
+do jednego kontenera i skalowanie jest pozorne.
+
+Uczciwa uwaga o koszcie: każda replika to osobna kopia modeli w pamięci (kilka GB RAM łącznie przy
+trzech replikach). Skalowanie jest poziome, więc liniowo rośnie też zużycie pamięci — to normalny
+kompromis, ale trzeba go mieć świadomie.
+
 ## Jak odnosimy się do kryteriów oceny
+
+Wagi i nazwy kryteriów są przepisane z regulaminu konkursu.
 
 | Kryterium | Nasz materiał |
 | :--- | :--- |
-| Kontrole i odporność (30%) | Kontrole deterministyczne i semantyczne są opisane i częściowo wdrożone (usługa semantyczna działa i jest testowana). Brakujące elementy są wymienione w `reports/INDEX.md` i widoczne w wynikach testów. |
-| Architektura i wydajność (20%) | Jasny podział na płaszczyznę danych (Go) i usługi pomocnicze, pomiar narzutu przez `make bench`, wyniki w Grafanie i w `reports/`. |
-| Raportowanie bezpieczeństwa (20%) | Panel z widokiem zdarzeń i eksport CEF/JSON/CSV; dziennik zasilany obecnie danymi demonstracyjnymi. |
-| Kompletność testów (15%) | 16 testów e2e w parach dozwolone/blokowane, uruchamiane jednym poleceniem, z raportem HTML. 9 przechodzi, 7 czeka na kontrole w gatewayu. |
-| Wdrożenie i skalowanie (15%) | Start całego stosu jedną komendą, brak pobierania czegokolwiek w czasie działania (`make offline-check`), podmiana modelu bez zmian w kodzie. |
+| Kontrole i odporność (30%) | Kontrole deterministyczne i semantyczne: 4 detektory AI, skaner plików modeli, 12 sygnatur ataków, zasady jako dane z przeładowaniem bez restartu. Kontrole działają w usłudze semantycznej i są testowane (168 testów); egzekwowanie ich w bramie jest w toku — brakujące elementy są wypisane w `reports/INDEX.md`. |
+| Architektura i wydajność (20%) | Rozdzielone płaszczyzny: brama (Go), zasady i audyt (Java), kontrole AI (Python w replikach), panel i telemetria. Pomiary: `make bench` (k6, p95 2,28 ms przy 50 klientach) oraz `make bench-semantic` (przepustowość kontroli AI i efekt skalowania). |
+| Raportowanie bezpieczeństwa (20%) | Panel z incydentami, wersjami zasad, katalogiem sygnatur i budżetami; eksport CEF/JSON/CSV do SIEM z filtrami; 9 reguł alertów i tablice Grafany. Dziennik jest zasilany danymi demonstracyjnymi (oznaczonymi jako `synthetic`), bo brama nie wysyła jeszcze własnych zdarzeń. |
+| Kompletność pakietu testów (20%) | 168 testów usługi semantycznej, 37 modułu Java, 31 testów panelu, 4 pakiety Go, 16 przypadków e2e (10 przechodzi), 3 scenariusze obciążeniowe, 16 sprawdzeń stosu, 12 kontroli przed startem, 9 sprawdzeń trybu offline. Wszystko uruchamiane z `make`, a ścieżka dla osoby oceniającej jest jedną komendą: `sudo make jury`. |
+| Wdrożenie i skalowanie (10%) | Start całego stosu jedną komendą, brak pobierania czegokolwiek w czasie działania (`make offline-check`), podmiana modelu bez zmian w kodzie oraz skalowanie poziome usługi semantycznej z dowodem rozkładu ruchu (`make scale`, `make scale-check`). |
 
 ## Zasady pracy w zespole
 

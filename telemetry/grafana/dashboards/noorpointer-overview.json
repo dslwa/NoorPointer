@@ -17,30 +17,50 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "red", "value": null },
-              { "color": "green", "value": 1 }
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
             ]
           }
         }
       },
-      "gridPos": { "h": 4, "w": 8, "x": 0, "y": 0 },
+      "gridPos": {
+        "h": 4,
+        "w": 8,
+        "x": 0,
+        "y": 0
+      },
       "id": 1,
-      "options": { "colorMode": "background", "graphMode": "none", "textMode": "value_and_name" },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value_and_name"
+      },
       "targets": [
         {
           "datasource": "Prometheus",
           "expr": "up",
           "format": "time_series",
-          "legendFormat": "{{job}}"
+          "legendFormat": "{{instance}}"
         }
       ],
-      "title": "Usługi odpowiadają (up)",
+      "title": "Usługi i repliki odpowiadają (up)",
       "type": "stat"
     },
     {
       "collapsed": false,
       "datasource": "Prometheus",
-      "gridPos": { "h": 4, "w": 8, "x": 8, "y": 0 },
+      "gridPos": {
+        "h": 4,
+        "w": 8,
+        "x": 8,
+        "y": 0
+      },
       "id": 2,
       "targets": [
         {
@@ -56,7 +76,12 @@
     {
       "collapsed": false,
       "datasource": "Prometheus",
-      "gridPos": { "h": 4, "w": 8, "x": 16, "y": 0 },
+      "gridPos": {
+        "h": 4,
+        "w": 8,
+        "x": 16,
+        "y": 0
+      },
       "id": 3,
       "targets": [
         {
@@ -72,8 +97,17 @@
     {
       "collapsed": false,
       "datasource": "Prometheus",
-      "fieldConfig": { "defaults": { "unit": "ms" } },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 4
+      },
       "id": 4,
       "targets": [
         {
@@ -88,7 +122,12 @@
     {
       "collapsed": false,
       "datasource": "Prometheus",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 4
+      },
       "id": 5,
       "targets": [
         {
@@ -103,7 +142,12 @@
     {
       "collapsed": false,
       "datasource": "Prometheus",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 12
+      },
       "id": 6,
       "targets": [
         {
@@ -118,7 +162,12 @@
     {
       "collapsed": false,
       "datasource": "Prometheus",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 12
+      },
       "id": 7,
       "targets": [
         {
@@ -132,7 +181,12 @@
     },
     {
       "collapsed": false,
-      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 20 },
+      "gridPos": {
+        "h": 6,
+        "w": 24,
+        "x": 0,
+        "y": 20
+      },
       "id": 8,
       "options": {
         "mode": "markdown",
@@ -143,7 +197,10 @@
     }
   ],
   "schemaVersion": 39,
-  "tags": ["noorpointer", "hackathon"],
+  "tags": [
+    "noorpointer",
+    "hackathon"
+  ],
   "time": {
     "from": "now-15m",
     "to": "now"

@@ -13,6 +13,7 @@
 
 # --- narzedzia i zmienne wspolne -------------------------------------------------------------------
 COMPOSE         ?= docker compose
+SEMANTIC_REPLICAS ?= 1  # liczba replik uslugi semantycznej (make up); zmien: make scale REPLIKI=3
 COMPOSE_ALL      = $(COMPOSE) --profile tests --profile bench
 OLLAMA_COMPOSE   = $(COMPOSE) -f docker-compose.yaml -f docker-compose.ollama.yaml
 
@@ -27,7 +28,7 @@ K6        = $(COMPOSE) run --rm -e GATEWAY_JWT="$$jwt" benchmarks run
         smoke verify verify-strict offline-check report deck checkpoint \
         demo demo-full demo-strict \
         keys mint-build token token-file reload-policy new-signature db-tidy doctor urls \
-        jury scan policy-edit policy-apply signature evidence stop \
+        jury scan policy-edit policy-apply signature evidence stop scale scale-check \
         ollama-up ollama-down \
         postgres-up postgres-test-up controlplane-run controlplane-test controlplane-build dashboard-dev dashboard-test
 
@@ -58,13 +59,23 @@ evidence: ## Zbiera dowody do katalogu dowody/ (widoczne na GitHubie bez urucham
 stop: ## Zatrzymuje stos (dane i wolumeny zostaja, wracasz przez: make up)
 	@$(MAKE) --no-print-directory down
 
+scale: ## Ustaw liczbe replik uslugi semantycznej: sudo make scale REPLIKI=3 (domyslnie 3)
+	@$(COMPOSE) run --rm --no-deps --entrypoint nginx semantic-lb -t >/dev/null 2>&1 || { echo "scale: blad w konfiguracji load balancera - uruchom: $(COMPOSE) run --rm --no-deps --entrypoint nginx semantic-lb -t"; exit 1; }
+	@echo "  konfiguracja load balancera poprawna"
+	@$(COMPOSE) up -d --scale semantic-app=$(or $(REPLIKI),3) --no-recreate 2>&1 | tail -4
+	@./scripts/wait-ready.sh
+	@$(COMPOSE) ps --format '  {{.Name}}  {{.Status}}' | grep semantic || true
+
+scale-check: ## Sprawdza, czy ruch rozklada sie na repliki (mierzy licznik w kazdym kontenerze)
+	./scripts/check-balance.sh
+
 ##@ Stos
 
 up: ## Pelny stos + seed danych demo; czeka na gotowosc (VERBOSE=1 pokazuje budowanie)
 	@test -f gateway/keys/jwt.pub || $(MAKE) --no-print-directory keys
 	@mkdir -p reports
 	@if [ -n "$(VERBOSE)" ]; then \
-	  $(COMPOSE) up -d --build --remove-orphans; \
+	  $(COMPOSE) up -d --build --remove-orphans --scale semantic-app=$(SEMANTIC_REPLICAS); \
 	else \
 	  if ! $(COMPOSE) up -d --build --remove-orphans > reports/log-up.txt 2>&1; then \
 	    echo "BLAD: nie udalo sie zbudowac lub uruchomic stosu. Ostatnie linie:"; tail -25 reports/log-up.txt; exit 1; \

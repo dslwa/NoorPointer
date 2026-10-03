@@ -96,6 +96,25 @@ i `sudo SKIP_AUDIT=1 make db-tidy`.
 - Grafana: <http://localhost:3001> (logowanie wyłączone) — dostępność usług, kontrole semantyczne, ruch,
 - Prometheus: <http://localhost:9091/targets> i `/alerts`.
 
+**5. Skalowanie — sprawdź, że naprawdę działa, a nie tylko „da się ustawić liczbę":**
+
+Usługa semantyczna działa za load balancerem (`semantic-lb`), który dziedziczy nazwę
+`semantic-service`, więc brama, panel i testy nie wymagały żadnych zmian. Load balancer pyta Dockera
+o adresy przy każdym żądaniu, dzięki czemu po dodaniu replik ruch rozkłada się na wszystkie.
+
+```bash
+make bench-semantic              # przepustowość przy 1 replice (punkt odniesienia)
+sudo make scale REPLIKI=3        # 3 repliki usługi semantycznej
+sudo make scale-check            # dowód: licznik kontroli przyrasta w KAŻDEJ replice
+make bench-semantic              # ten sam pomiar po skalowaniu
+sudo make scale REPLIKI=1        # powrót do jednej repliki
+```
+
+Czego szukać w `make scale-check`: trzy linie „replika … +N kontroli (33%)". Jeśli cały ruch
+poszedłby do jednego kontenera, zobaczylibyśmy jedną linię z 100% — to jest właśnie ten błąd,
+którego chcemy uniknąć. Każda replika to osobna kopia modelu w pamięci, więc liczba replik
+przekłada się na zużycie RAM (na tej maszynie bezpiecznie mieści się ich kilka).
+
 ## Czego jeszcze nie ma (mówimy wprost)
 
 1. **Brama nie wykonuje jeszcze zasad bezpieczeństwa** — zostało dokończyć sześć kontroli. Dlatego
