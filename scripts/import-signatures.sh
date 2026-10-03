@@ -128,5 +128,5 @@ while IFS= read -r signature; do
   esac
 done <"$payload"
 
-echo "import-signatures: dodano $created, juz bylo $existing, bledy $failed (nic nie usunieto)"
+[[ "${QUIET:-0}" == "1" ]] || echo "import-signatures: dodano $created, juz bylo $existing, bledy $failed (nic nie usunieto)"
 [[ "$failed" -eq 0 ]]

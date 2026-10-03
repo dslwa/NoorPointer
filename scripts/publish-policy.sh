@@ -84,4 +84,4 @@ if [[ "$code" != "200" ]]; then
   exit 1
 fi
 
-echo "publish-policy: aktywna rewizja $version (models.allowed: ${required_models[*]}, budzet: $budget_fixture)"
+[[ "${QUIET:-0}" == "1" ]] || echo "publish-policy: aktywna rewizja $version (models.allowed: ${required_models[*]}, budzet: $budget_fixture)"

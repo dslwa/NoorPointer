@@ -60,10 +60,19 @@ stop: ## Zatrzymuje stos (dane i wolumeny zostaja, wracasz przez: make up)
 
 ##@ Stos
 
-up: ## Pelny stos + seed danych demo; czeka na gotowosc (semantic laduje modele ~2 min)
+up: ## Pelny stos + seed danych demo; czeka na gotowosc (VERBOSE=1 pokazuje budowanie)
 	@test -f gateway/keys/jwt.pub || $(MAKE) --no-print-directory keys
-	$(COMPOSE) up -d --build --remove-orphans
+	@mkdir -p reports
+	@if [ -n "$(VERBOSE)" ]; then \
+	  $(COMPOSE) up -d --build --remove-orphans; \
+	else \
+	  if ! $(COMPOSE) up -d --build --remove-orphans > reports/log-up.txt 2>&1; then \
+	    echo "BLAD: nie udalo sie zbudowac lub uruchomic stosu. Ostatnie linie:"; tail -25 reports/log-up.txt; exit 1; \
+	  fi; \
+	  echo "  zbudowano i uruchomiono stos (pelny log: reports/log-up.txt)"; \
+	fi
 	@./scripts/wait-ready.sh
+	@printf '  uslugi dzialajace: %s\n' "$$($(COMPOSE) ps --services --filter status=running 2>/dev/null | wc -l)"
 	-@./scripts/seed.sh
 
 wait: ## Czeka, az wszystkie uslugi odpowiedza (WAIT_TIMEOUT=sekundy, domyslnie 180)
@@ -94,8 +103,8 @@ seed: ## Wypelnia baze audytu danymi demo (potrzebne dla eksportu CEF)
 
 ##@ Testy i dowody
 
-test: seed ## e2e (seed + raport HTML); --build, bo obraz testow wpieka kod testow
-	@$(JWT_GUARD); $(COMPOSE) run --rm --build -e GATEWAY_JWT="$$jwt" tests; rc=$$?; \
+test: seed ## e2e (seed + raport HTML); --tb=no ukrywa tracebacki, pelne sa w raporcie
+	@$(JWT_GUARD); $(COMPOSE) run --rm --build -e GATEWAY_JWT="$$jwt" -e PYTEST_ADDOPTS="$${PYTEST_ADDOPTS:---tb=no}" tests; rc=$$?; \
 	chown -R "$$(stat -c '%u:%g' .)" reports 2>/dev/null || true; exit $$rc
 
 test-unit: ## Testy jednostkowe modulow (Go teraz; nie wymagaja dzialajacego stosu)
@@ -256,8 +265,11 @@ postgres-test-up: postgres-up ## Osobna baza PostgreSQL dla testow Javy
 controlplane-run: postgres-up ## Uruchamia Jave (REST/panel) na :8082
 	cd controlplane && ./mvnw spring-boot:run
 
-controlplane-test: postgres-test-up ## Testy modulu Java w kontenerze (bez Javy na hoscie)
-	$(COMPOSE) --profile java run --rm --build controlplane-tests
+controlplane-test: postgres-test-up ## Testy modulu Java w kontenerze (pelny log: reports/log-java-test.txt)
+	@mkdir -p reports
+	@$(COMPOSE) --profile java run --rm --build controlplane-tests > reports/log-java-test.txt 2>&1; rc=$$?; \
+	grep -E "Tests run:|BUILD (SUCCESS|FAILURE)|^\[ERROR\]" reports/log-java-test.txt || true; \
+	[ $$rc -eq 0 ] || echo "  szczegoly bledu: reports/log-java-test.txt"; exit $$rc
 
 controlplane-build: postgres-test-up ## Weryfikacja Javy + budowa JAR (w kontenerze)
 	$(COMPOSE) --profile java run --rm --build controlplane-tests mvn -B -ntp -f controlplane/pom.xml verify -Dfrontend.skip=true

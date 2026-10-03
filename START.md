@@ -23,7 +23,10 @@ Co się dzieje po kolei (i ile to trwa):
 | 5 | wysyła realny ruch, żeby wykresy miały dane | kilkanaście sekund |
 | 6 | zbiera dowody do katalogu `dowody/` | kilka sekund |
 
-Na końcu wypisuje adresy, cztery rzeczy do wypróbowania i to, czego jeszcze nie ma.
+Konsola pokazuje **wyniki, a nie pracę**: budowanie obrazów, logi Mavena i Springa oraz pełne wyjście
+testów trafiają do plików w `reports/`. Na końcu widzisz podsumowanie: ile usług działa, wyniki testów
+Go, Java i e2e, listę adresów, cztery rzeczy do wypróbowania i to, czego jeszcze nie ma.
+Jeśli chcesz zobaczyć wszystko (budowanie, logi, szczegóły testów), użyj `sudo make jury VERBOSE=1`.
 
 Wymagania: Docker z Compose v2, uprawnienia `sudo` (albo członkostwo w grupie `docker`), kilka GB
 miejsca na obrazy z modelami i wolne porty 3000, 3001, 5432, 6379, 8001, 8080, 8082, 8085, 9091, 11434.
