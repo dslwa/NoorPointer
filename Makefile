@@ -140,9 +140,10 @@ mint-build: ## Buduje gateway/bin/mint raz (token bez 'go run', dziala tez pod s
 token: ## Wypisuje swiezy JWT i tylko jego (bez tego nie nadaje sie do TOK=$(make token))
 	@./scripts/token.sh
 
-token-file: ## Zapisuje swiezy JWT do pliku (domyslnie /tmp/noorpointer-e2e.jwt) dla recznych curl-i
-	@f="$${TOKEN_FILE:-/tmp/noorpointer-e2e.jwt}"; ./scripts/token.sh > "$$f"; \
-	  echo "zapisano token do $$f"; \
+token-file: ## Zapisuje swiezy JWT do pliku 0600 (domyslnie /tmp/noorpointer-e2e.jwt); env GATEWAY_JWT jest preferowany
+	@f="$${TOKEN_FILE:-/tmp/noorpointer-e2e.jwt}"; umask 077; ./scripts/token.sh > "$$f"; \
+	  echo "zapisano token do $$f (uprawnienia 0600)"; \
+	  echo "preferowany sposob przekazania tokenu to zmienna srodowiskowa: TOK=\$$(make token)"; \
 	  echo "uzycie:"; \
 	  echo "  curl -s localhost:8080/v1/chat/completions -H \"Authorization: Bearer \$$(cat $$f)\" -H \"Content-Type: application/json\" -d '{\"model\":\"llama3.2:1b\",\"messages\":[{\"role\":\"user\",\"content\":\"test\"}]}'"
 

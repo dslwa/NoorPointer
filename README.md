@@ -147,6 +147,23 @@ Content-Type: application/json
 {"model": "mock-llm", "agent_id": "agent-sales-01", "messages": [{"role": "user", "content": "..."}]}
 ```
 
+Każda trasa poza `GET /healthz` wymaga tokenu JWT (RS256, `iss=noorpointer-cp`, `aud=noorpointer-gateway`,
+`exp` obowiązuje). Token wystawia się lokalnie kluczem z `gateway/keys/jwt.key` (katalog nie jest
+wersjonowany; generuje go `make keys`):
+
+```bash
+TOK="$(make token)"                 # wypisuje tylko token, nadaje się do $(...)
+make token-file                     # to samo, zapisane do pliku z uprawnieniami 0600
+export GATEWAY_JWT="$(make token)"  # sposób, którego używają skrypty, testy i benchmarki
+```
+
+Skrypty, benchmarki i testy czytają token ze zmiennej `GATEWAY_JWT` — wewnątrz kontenera plik
+z katalogu `/tmp` hosta nie istnieje (to inny system plików), a `make test` sam wstrzykuje tę zmienną
+i przerywa z czytelnym komunikatem, gdy tokenu brakuje. Domyślny czas życia tokenu to 24 godziny.
+Po ponownym wygenerowaniu kluczy trzeba odtworzyć kontener gatewaya
+(`sudo docker compose up -d --force-recreate gateway`), bo klucz publiczny jest czytany tylko przy
+starcie; `make doctor` sprawdza, czy dzialajacy gateway przyjmuje świeżo wystawiony token.
+
 ### 2. Gateway do usługi semantycznej
 
 ```http

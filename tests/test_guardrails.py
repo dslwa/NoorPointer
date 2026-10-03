@@ -11,6 +11,15 @@ SEMANTIC_URL = os.getenv("SEMANTIC_URL", "http://localhost:8001")
 CONTROLPLANE_URL = os.getenv("CONTROLPLANE_URL", "http://localhost:8082")
 ADMIN_TOKEN = os.getenv("ADMIN_TOKEN", "local-dev-admin")
 
+# Bez tokenu kazde zadanie do gatewaya zwroci 401, a komunikat testu nie powie dlaczego.
+# Uruchamiaj przez "make test" (wstrzykuje GATEWAY_JWT) albo ustaw recznie:
+# export GATEWAY_JWT="$(./scripts/token.sh)"
+if not GATEWAY_JWT:
+    raise RuntimeError(
+        "GATEWAY_JWT jest pusty - kazde zadanie do gatewaya zwroci 401. "
+        'Uruchom testy przez "make test" albo ustaw: export GATEWAY_JWT="$(./scripts/token.sh)"'
+    )
+
 def gw_headers(extra: dict | None = None) -> dict:
     headers = {"Content-Type": "application/json"}
     if GATEWAY_JWT:
