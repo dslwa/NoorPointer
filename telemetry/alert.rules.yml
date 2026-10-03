@@ -49,3 +49,26 @@ groups:
         labels: { severity: info }
         annotations:
           summary: "Blocked requests spike (>5/s)"
+
+      # --- "we don't know" signals ------------------------------------------------------------------------
+      # An absent metric and a metric that never fires look identical in the alert list (both inactive).
+      # These two make the silent-gap case explicit.
+      - alert: SemanticNoTraffic
+        # Counter exists (exported by prometheus_client) but nothing increased it: service up, no scans.
+        expr: sum(increase(semantic_check_latency_seconds_count[5m])) == 0
+        for: 10m
+        labels: { severity: info }
+        annotations:
+          summary: "Semantic gets no traffic"
+          description: "Semantic is scrapeable but no check ran in the last 5m - is the gateway calling /v1/scan?"
+
+      - alert: GatewayMetricsMissing
+        # Fires because the metric does not exist at all: the gateway has no /metrics yet (known gap).
+        # It goes inactive by itself the moment the gateway exposes gateway_requests_total.
+        expr: absent(gateway_requests_total)
+        for: 5m
+        labels: { severity: info }
+        annotations:
+          summary: "Gateway exposes no /metrics (known gap)"
+          description: "No gateway_requests_total series; re-enable the scrape job in prometheus.yml once /metrics exists."
+
