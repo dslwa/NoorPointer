@@ -95,10 +95,19 @@ wpisy z tego feedu można przenosić do katalogu bez konwersji.
 
 Skrypt `push_new_signature.sh` dopisuje wpis do pliku i odświeża katalog w panelu tym samym
 konwerterem, więc demonstracja „dodaj sygnaturę w trakcie działania" działa dla obu odbiorców.
+Wzorzec można podać z zewnątrz — przydaje się, gdy juror podyktuje własną regułę, a skrypt sprawdza,
+czy jest poprawnym wyrażeniem regularnym, zanim trafi do feedu:
 
-Po demonstracji wróć do stanu z repozytorium, żeby wpis testowy nie został w materiałach końcowych:
+```bash
+make new-signature                                              # wzorzec demonstracyjny
+make new-signature PATTERN='(/etc/passwd|\.\./\.\./)' NAME='Path traversal' ACTION=block
+```
+
+Po demonstracji wróć do stanu z repozytorium, żeby wpisy testowe nie zostały w materiałach końcowych.
+Katalog w panelu jest uzupełniany **addytywnie**, więc sam `git checkout` go nie wyczyści:
 
 ```bash
 git checkout -- signatures-feed/signatures.json
-make seed                      # odświeża katalog w panelu do pięciu sygnatur z repo
+sudo make db-tidy              # usuwa wpisy demo z katalogu (i czyści audyt, patrz scripts/db-tidy.sh)
+make seed                      # odtwarza czystą porcję danych: 12 sygnatur i 30 zdarzeń audytu
 ```

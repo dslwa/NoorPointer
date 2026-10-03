@@ -56,6 +56,8 @@ sudo make controlplane-test  # testy modułu Java w kontenerze (nie wymaga Javy 
 sudo make demo-full        # scenariusze demonstracyjne agenta
 make reload-policy         # natychmiastowe przeładowanie polityki w gatewayu
 make new-signature         # demo: dodanie sygnatury ataku do feedu w trakcie działania
+make new-signature PATTERN='(/etc/passwd|\.\./)' NAME='Path traversal'   # wzorzec podany przez jury
+sudo make db-tidy          # reset danych demo: audyt, katalog sygnatur, zdublowane rewizje polityki
 make urls                  # adresy usług i dane logowania
 ```
 
