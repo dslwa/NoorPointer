@@ -10,6 +10,7 @@ dev-infra: ## Uruchamia TYLKO bazy i telemetrię (Postgres, Redis, mock LLM, Thr
 up: ## Uruchamia WSZYSTKIE serwisy w kontenerach (pełny stos demonstracyjny dla Jury)
 	@test -f gateway/keys/jwt.pub || $(MAKE) keys
 	docker compose up -d --build
+	-@./scripts/seed.sh
 
 down: ## Zatrzymuje całe środowisko
 	docker compose down
@@ -34,7 +35,8 @@ test: seed ## Uruchamia automatyczny pakiet testów e2e (seed + raport HTML)
 bench: ## Uruchamia benchmarki wydajnościowe k6 (narzut p95)
 	docker compose run --rm -e GATEWAY_JWT="$$(./scripts/token.sh)" benchmarks run /benchmarks/benchmark_baseline.js
 
-demo: ## Uruchamia scenariusze demonstracyjne agenta
+demo: ## Uruchamia scenariusze demonstracyjne agenta (z seedem danych demo)
+	-@./scripts/seed.sh
 	GATEWAY_JWT="$$(./scripts/token.sh)" ./agent-demo/run.sh all
 
 clean: ## Czyści wolumeny i nieużywane obrazy Dockera
@@ -74,11 +76,13 @@ offline-check: ## Lint: brak instalacji/pobierania w runtime (finalny stage obra
 report: ## Zbiera dowody dla jury do reports/INDEX.md
 	./scripts/report.sh
 
-demo-full: ## Pełne demo: run.sh (5 scenariuszy) + scenariusze zaawansowane (PENDING dozwolone)
+demo-full: ## Pełne demo: seed + run.sh (5 scenariuszy) + scenariusze zaawansowane (PENDING dozwolone)
+	-@./scripts/seed.sh
 	GATEWAY_JWT="$$(./scripts/token.sh)" ./agent-demo/run.sh all
 	./agent-demo/scenarios.sh
 
 demo-strict: ## Jak demo-full, ale PENDING (gateway bez guardraili) liczy się jako FAIL
+	-@./scripts/seed.sh
 	GATEWAY_JWT="$$(./scripts/token.sh)" ./agent-demo/run.sh all
 	./agent-demo/scenarios.sh --strict
 
