@@ -4,8 +4,8 @@ help: ## Pokazuje dostępne komendy
 	@echo "🛡️ NoorPointer Hackathon Commands:"
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2}'
 
-dev-infra: ## Uruchamia TYLKO bazy i telemetrię (Postgres, Redis, Ollama, Threat Feed, Prometheus, Grafana) dla pracy lokalnej
-	docker compose up -d postgres redis ollama signatures-feed prometheus grafana
+dev-infra: ## Uruchamia TYLKO bazy i telemetrię (Postgres, Redis, mock LLM, Threat Feed, Prometheus, Grafana) dla pracy lokalnej
+	docker compose up -d postgres redis mock-llm signatures-feed prometheus grafana
 
 up: ## Uruchamia WSZYSTKIE serwisy w kontenerach (pełny stos demonstracyjny dla Jury)
 	docker compose up -d --build
