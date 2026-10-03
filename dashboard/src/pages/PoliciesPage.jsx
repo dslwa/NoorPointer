@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { formatDate } from '../utils/formatters.js';
-import { labels } from '../constants/controls.js';
+import { labels, piiTypes } from '../constants/controls.js';
 import { useAction } from '../hooks/useAction.js';
 import { useResource } from '../hooks/useResource.js';
 import { paths } from '../api/paths.js';
@@ -227,6 +227,35 @@ export default function PoliciesPage({ active, request, dashboard, refreshKey, r
               </p>
             )}
           </div>
+          {hasQuickControls && Array.isArray(controls.pii_regex?.types) && (
+            <fieldset className="pii-types" disabled={!!pending}>
+              <legend>Personal data types</legend>
+              <div className="pii-type-options">
+                {Object.entries(piiTypes).map(([type, label]) => (
+                  <label key={type}>
+                    <input
+                      type="checkbox"
+                      checked={controls.pii_regex.types.includes(type)}
+                      onChange={(event) =>
+                        updateControl(
+                          'pii_regex',
+                          'types',
+                          event.target.checked
+                            ? [...controls.pii_regex.types, type]
+                            : controls.pii_regex.types.filter((value) => value !== type),
+                        )
+                      }
+                    />
+                    {label}
+                  </label>
+                ))}
+              </div>
+              <p className="help">
+                Save and publish a new version to update the policy. Detection of names, birth dates
+                and postal codes is not yet available in the gateway.
+              </p>
+            </fieldset>
+          )}
           <details>
             <summary>Full JSON / YAML configuration</summary>
             <textarea

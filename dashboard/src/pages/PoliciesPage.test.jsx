@@ -9,7 +9,7 @@ const revisions = [
   { version: 1, name: 'Previous policy', created_at: '2026-10-02T10:00:00Z', document },
 ];
 
-function setup({ rejectDelete = false } = {}) {
+function setup({ rejectDelete = false, policyDocument = document } = {}) {
   let current = [...revisions];
   const request = vi.fn(async (path, options = {}) => {
     if (options.method === 'DELETE') {
@@ -17,13 +17,14 @@ function setup({ rejectDelete = false } = {}) {
       current = current.filter((revision) => path !== `/policy-revisions/${revision.version}`);
       return null;
     }
+    if (path === '/policy-revisions' && options.method === 'POST') return { version: 3 };
     if (path === '/policy-revisions') return current;
     throw new Error(`Unexpected request: ${path}`);
   });
   const props = {
     active: true,
     request,
-    dashboard: { active_policy: { revision: revisions[0] } },
+    dashboard: { active_policy: { revision: { ...revisions[0], document: policyDocument } } },
     refreshKey: 0,
     refresh: vi.fn(),
     notify: vi.fn(),
@@ -37,6 +38,47 @@ async function card(name) {
 }
 
 describe('Policies', () => {
+  it('saves selected personal data types without changing other controls or the active policy', async () => {
+    const policyDocument = {
+      defaults: { mode: 'enforce' },
+      models: { allowed: ['mock-llm'] },
+      controls: {
+        ...document.controls,
+        pii_regex: { enabled: true, action: 'redact', types: ['email', 'phone'] },
+      },
+    };
+    const { user, request, rerender, props } = setup({ policyDocument });
+    await screen.findByRole('checkbox', { name: 'Email' });
+    for (const name of [
+      'First name',
+      'Last name',
+      'Full name',
+      'Date of birth',
+      'Polish postal code',
+    ]) {
+      await user.click(screen.getByRole('checkbox', { name }));
+    }
+    await user.click(screen.getByRole('checkbox', { name: 'Phone' }));
+    rerender(<PoliciesPage {...props} refreshKey={1} />);
+    expect(screen.getByRole('checkbox', { name: 'First name' }).checked).toBe(true);
+    await user.click(screen.getByRole('button', { name: 'Save new version' }));
+    await waitFor(() =>
+      expect(request.mock.calls.some(([, options]) => options?.method === 'POST')).toBe(true),
+    );
+    const [, options] = request.mock.calls.find(([, options]) => options?.method === 'POST');
+    const saved = JSON.parse(JSON.parse(options.body).document);
+    expect(saved.controls.pii_regex).toEqual({
+      enabled: true,
+      action: 'redact',
+      types: ['email', 'first_name', 'last_name', 'full_name', 'date_of_birth', 'postal_code'],
+    });
+    expect(saved.controls.secrets).toEqual(policyDocument.controls.secrets);
+    expect(saved.models).toEqual(policyDocument.models);
+    expect(saved.defaults).toEqual(policyDocument.defaults);
+    expect(policyDocument.controls.pii_regex.types).toEqual(['email', 'phone']);
+    expect(request.mock.calls.some(([, options]) => options?.method === 'PUT')).toBe(false);
+  });
+
   it('protects the active revision from deletion and publication', async () => {
     const { user, request } = setup();
     const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);

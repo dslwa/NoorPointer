@@ -8,3 +8,16 @@ export const labels = {
   agent_loops: 'Agent loops',
   mcp_tools: 'MCP tools',
 };
+
+export const piiTypes = {
+  email: 'Email',
+  pesel: 'PESEL',
+  iban: 'IBAN',
+  card: 'Payment card',
+  phone: 'Phone',
+  first_name: 'First name',
+  last_name: 'Last name',
+  full_name: 'Full name',
+  date_of_birth: 'Date of birth',
+  postal_code: 'Polish postal code',
+};

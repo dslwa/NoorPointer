@@ -95,7 +95,12 @@
                   "pesel",
                   "iban",
                   "card",
-                  "phone"
+                  "phone",
+                  "first_name",
+                  "last_name",
+                  "full_name",
+                  "date_of_birth",
+                  "postal_code"
                 ]
               }
             }
