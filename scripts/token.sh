@@ -1,10 +1,9 @@
 #!/usr/bin/env bash
-# Mint a gateway JWT (RS256, iss=noorpointer-cp, aud=noorpointer-gateway). Prints only the token.
-# Usage: ./scripts/token.sh   (env: AGENT, TEAM, TTL, JWT_PRIVATE_KEY)
+# Wystawia token JWT dla gatewaya (RS256, iss=noorpointer-cp, aud=noorpointer-gateway). Wypisuje sam token.
+# Uruchamianie: ./scripts/token.sh   (zmienne: AGENT, TEAM, TTL, JWT_PRIVATE_KEY)
 #
-# Fails LOUDLY: an empty token makes every gateway call return 401, and in a Makefile
-# $(...) an empty result looks like a normal value - that is exactly how a token problem
-# once looked like 13 broken auth tests.
+# Przy bledzie konczy sie niezerowym kodem i komunikatem. Pusty token powoduje odpowiedz 401 na kazdym
+# zadaniu do gatewaya, a w Makefile wynik $(...) wyglada wtedy jak poprawna, pusta wartosc.
 set -euo pipefail
 repo="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$repo/gateway"

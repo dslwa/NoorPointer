@@ -231,9 +231,8 @@ services:
       - GATEWAY_TOKEN=${GATEWAY_TOKEN:-local-dev-gateway}
       - SEMANTIC_URL=http://semantic-service:8001
     volumes:
-      # Test source is live-mounted: the image also COPYs it, and a stale image once made
-      # a fixed test file look like 13 broken auth tests. Mounting keeps edits effective
-      # without a rebuild (requirements changes still need: make test-rebuild).
+      # Kod testow jest montowany rownolegle do kopii w obrazie, zeby zmiany w pliku testow
+      # dzialaly bez przebudowy obrazu. Zmiany w requirements.txt nadal wymagaja: make test-rebuild.
       - ./tests/test_guardrails.py:/app/test_guardrails.py:ro,z
       - ./reports:/app/reports:z
     profiles:

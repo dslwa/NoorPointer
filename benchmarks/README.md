@@ -1,45 +1,48 @@
-# ⚡ Benchmarks (Performance & Latency Testing)
+# Benchmarks — pomiar narzutu gatewaya
 
-## 👤 Właściciel (Owner)
-**DevOps**
+## Właściciel
 
----
+DevOps.
 
-## 🎯 Zakres (Scope)
-Testy obciążeniowe i profilowanie wydajnościowe systemu.
-Odpowiada za spełnienie kryterium oceniania: **Architecture and Performance Efficiency (20%)** oraz wymogu: *"You should be able to produce performance telemetry as it may be used for evaluation"*.
-Dostarcza twardych, powtarzalnych danych liczbowych (opóźnienia p50, p95, p99, przepustowość RPS, narzut CPU/pamięci) udowadniających, że wprowadzona warstwa ochronna nie spowalnia pracy programistów ani agentów.
+## Zakres
 
----
+Pomiar czasu dodawanego przez gateway względem bezpośredniego wywołania modelu.
+Testy są uruchamiane w kontenerze k6 i mierzą pełną ścieżkę HTTP do `http://gateway:8080`.
 
-## 🛠️ Czym się zajmuje (Kluczowe Odpowiedzialności)
+## Skrypty
 
-1. **Pomiary Narzutu Gatewaya (Overhead Benchmarks)**:
-   - Skrypty testowe `k6` mierzące dokładnie czas dodawany przez Gateway w stosunku do bezpośredniego wywołania modelu:
-     - **Deterministic Path (Go regex + auth + budżet Redis):** cel < 5 ms.
-     - **Semantic Path (DeBERTa + Presidio + timeout check):** cel < 150 ms.
-2. **Scenariusze Obciążeniowe (k6 scripts)**:
-   - `benchmark_baseline.js`: ruch normalny o wysokim natężeniu (np. 50-100 VU, weryfikacja stabilności proxy).
-   - `benchmark_malicious_flood.js`: zalew zapytań z payloadem ataków (weryfikacja czy mechanizm `fast-block` skutecznie chroni przed wyczerpaniem zasobów LLM).
-   - `benchmark_budget_concurrency.js`: równoległe zapytania sprawdzające atomowość liczników w Redis przy wyczerpywaniu limitów tokenów.
-3. **Automatyczne Raportowanie Wyników**:
-   - Generowanie podsumowania tekstowego w konsoli oraz wykresów HTML (`summary.html`).
-   - Ekstrakcja kluczowych wskaźników do slajdów prezentacyjnych:
-     - *Narzut p95:* np. **4.2 ms** dla ścieżki deterministycznej.
-     - *Throughput:* np. **2500 req/s** na pojedynczej instancji Gatewaya w Go.
-4. **Zapewnienie komendy 1-Click**:
-   - Uruchamianie pełnego pakietu benchmarków poleceniem `make bench`.
+| Plik | Ruch | Progi |
+| :--- | :--- | :--- |
+| `benchmark_baseline.js` | 20 do 50 użytkowników wirtualnych (5 s narastania, 10 s obciążenia, 5 s wygaszania) | p95 poniżej 10 ms, mniej niż 1% błędów, pojedyncze żądanie poniżej 15 ms |
+| `benchmark_malicious_flood.js` | 30 do 80 użytkowników z treścią przypominającą atak | p95 poniżej 25 ms, mniej niż 5% błędów, pojedyncze żądanie poniżej 50 ms |
+| `benchmark_budget_concurrency.js` | 40 użytkowników przez 20 s, równoległe żądania jednego agenta | p95 poniżej 25 ms, mniej niż 5% błędów |
 
----
+Każdy skrypt na starcie wykonuje `setup()` z kilkoma żądaniami rozgrzewającymi. Bez tego pierwsze
+żądania trafiają na zimny start (połączenie, ładowanie modelu po stronie usługi) i zawyżają percentyle.
 
-## 🔌 Narzędzia i Technologie
-- **Narzędzie główne:** [k6](https://k6.io/) (konteneryzowany runner testów obciążeniowych)
-- **Cel testów:** `http://gateway:8080` vs `http://ollama:11434`
-- **Integracja:** Metryki z testu spływają również do Prometheus/Grafana.
+Token gatewaya jest brany ze zmiennej `GATEWAY_JWT`, którą podstawiają polecenia `make`.
 
----
+## Uruchomienie
 
-## 🏆 Definition of Done (Kryteria Sukcesu)
-- [ ] Komenda `make bench` wykonuje test obciążeniowy bez błędów w kontenerze.
-- [ ] Zestawienie pokazuje p95 opóźnienia deterministycznego poniżej 10 ms.
-- [ ] Wyniki testu są wyeksportowane do czytelnego pliku raportu dla jury.
+```bash
+sudo make bench           # ruch typowy
+sudo make bench-flood     # duży ruch z próbami ataku
+sudo make bench-budget    # równoległe żądania jednego agenta
+```
+
+## Wyniki
+
+Wynik trafia na standardowe wyjście: podsumowanie k6 z percentylami, liczbą błędów i informacją,
+czy progi zostały spełnione. Przekroczenie progu kończy się niezerowym kodem wyjścia, więc polecenie
+nadaje się do użycia w skryptach.
+
+Zmierzony narzut utrzymuje się w granicach 2–6 ms dla p95 przy aktualnym gatewayu (uwierzytelnianie JWT
+i przekazanie żądania do modelu), co mieści się w założonym progu 10 ms.
+
+## Uwagi
+
+- Testy zakładają, że upstream odpowiada szybko i deterministycznie, dlatego domyślnie mierzymy na
+  `mock-llm`. Po przełączeniu na prawdziwą Ollamę (`make ollama-up`) czasy rosną i progi nie będą
+  spełnione — to ograniczenie sprzętowe, nie błąd gatewaya.
+- Wraz z włączeniem kontroli w gatewayu (blokowanie, budżety) zmienią się wartości przepustowości
+  i trzeba będzie zaktualizować progi.

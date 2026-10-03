@@ -1,20 +1,25 @@
 #!/usr/bin/env bash
-set -e
+# Dodaje nowa sygnature do feedu, zeby pokazac aktualizacje reguly bez restartu kontenera.
+# Uruchamianie: ./signatures-feed/push_new_signature.sh
+set -euo pipefail
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SIG_FILE="$DIR/signatures.json"
+CONTROLPLANE_URL="${CONTROLPLANE_URL:-http://localhost:8082}"
 
 NEW_ID="SIG-$(date +%Y%m%d-%H%M%S)"
-echo "🚀 Adding live zero-day signature [$NEW_ID] to feed..."
+echo "Dodawanie sygnatury $NEW_ID do feedu."
 
-# Append new signature to signatures.json using python helper
-python3 -c "
+python3 - "$SIG_FILE" "$NEW_ID" <<'PY'
 import json
-with open('$SIG_FILE', 'r') as f:
+import sys
+
+path, new_id = sys.argv[1], sys.argv[2]
+with open(path) as f:
     data = json.load(f)
 
-new_sig = {
-    'id': '$NEW_ID',
+data['signatures'].append({
+    'id': new_id,
     'name': 'Zero-Day Live Injected Attack Pattern',
     'cve': 'CVE-LIVE-EMERGENCY',
     'owasp_category': 'LLM01: Prompt Injection',
@@ -23,14 +28,22 @@ new_sig = {
     'pattern': 'HACKATHON_ZERO_DAY_PAYLOAD_TEST',
     'action': 'block',
     'severity': 'CRITICAL',
-    'description': 'Dynamicznie dodana reguła podczas prezentacji dla jury.'
-}
+    'description': 'Dynamicznie dodana regula podczas prezentacji dla jury.',
+})
 
-data['signatures'].append(new_sig)
-with open('$SIG_FILE', 'w') as f:
+with open(path, 'w') as f:
     json.dump(data, f, indent=2)
-"
+    f.write('\n')
+PY
 
-echo "✅ Signature added to feed. Triggering Control Plane / Gateway sync..."
-curl -s -X POST "http://localhost:8082/api/v1/signatures/sync" || echo "Note: Control Plane not responding yet, signature available at feed:8085."
-echo "🎉 Done! New attack signature is now live."
+echo "Sygnatura zapisana. Feed: http://localhost:8085/signatures.json (bez restartu kontenera)."
+
+# Import po stronie control plane nie jest jeszcze podlaczony: obecny kontrakt wymaga innego
+# formatu sygnatur, a ten endpoint nie istnieje. Raportujemy kod odpowiedzi, zeby nie bylo
+# watpliwosci, czy import sie powiodl.
+code="$(curl -s -o /dev/null -w '%{http_code}' -m 5 -X POST "$CONTROLPLANE_URL/api/v1/signatures/sync" || true)"
+case "${code:-000}" in
+  200|201|204) echo "Control plane: HTTP $code (import wykonany)." ;;
+  000)         echo "Control plane: brak odpowiedzi pod $CONTROLPLANE_URL." ;;
+  401|403)     echo "Control plane: HTTP $code - endpoint wymaga tokenu administratora, a import tego formatu nie jest podlaczony (patrz README)." ;;
+esac

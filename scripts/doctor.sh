@@ -1,34 +1,34 @@
 #!/usr/bin/env bash
-# Pre-flight / troubleshooting check. Usage: make doctor
-# Verifies tooling, JWT keys (and the docker bind-mount footgun), compose config, token minting and
-# whether the running gateway actually enforces auth. Never touches the stack.
+# Sprawdzenie stanu srodowiska. Uruchamianie: make doctor
+# Weryfikuje narzedzia, klucze JWT, konfiguracje compose, wystawianie tokenu oraz to, czy dzialajacy
+# gateway odrzuca ruch bez tokenu i przyjmuje token poprawny. Nie zmienia stanu stosu.
 set -uo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"; cd "$ROOT"
 
 pass=0; warn=0; fail=0
 ok(){ printf '  OK    %-32s %s\n' "$1" "$2"; pass=$((pass+1)); }
-wn(){ printf '  WARN  %-32s %s\n' "$1" "$2"; warn=$((warn+1)); }
-no(){ printf '  FAIL  %-32s %s\n' "$1" "$2"; fail=$((fail+1)); }
+wn(){ printf '  OSTRZ %-32s %s\n' "$1" "$2"; warn=$((warn+1)); }
+no(){ printf '  BLAD  %-32s %s\n' "$1" "$2"; fail=$((fail+1)); }
 
-echo "== tooling =="
-command -v docker  >/dev/null && ok "docker"  "$(docker --version 2>/dev/null | cut -d, -f1)" || no "docker" "not found"
-command -v go      >/dev/null && ok "go"      "$(go version 2>/dev/null | awk '{print $3}')" || wn "go" "not found - scripts/token.sh needs it"
-command -v openssl >/dev/null && ok "openssl" "$(openssl version 2>/dev/null | awk '{print $1, $2}')" || wn "openssl" "not found - make keys needs it"
+echo "== narzedzia =="
+command -v docker  >/dev/null && ok "docker"  "$(docker --version 2>/dev/null | cut -d, -f1)" || no "docker" "nie znaleziono"
+command -v go      >/dev/null && ok "go"      "$(go version 2>/dev/null | awk '{print $3}')" || wn "go" "nie znaleziono - potrzebne dla scripts/token.sh"
+command -v openssl >/dev/null && ok "openssl" "$(openssl version 2>/dev/null | awk '{print $1, $2}')" || wn "openssl" "nie znaleziono - potrzebne dla make keys"
 
-echo "== JWT keys =="
+echo "== klucze JWT =="
 for f in gateway/keys/jwt.key gateway/keys/jwt.pub; do
-  if   [[ -f "$f" ]]; then ok "$f" "regular file"
-  elif [[ -d "$f" ]]; then no "$f" "DIRECTORY (docker bind-mount footgun): rm -rf $f && make keys"
-  else                     no "$f" "missing - run: make keys"
+  if   [[ -f "$f" ]]; then ok "$f" "plik klucza"
+  elif [[ -d "$f" ]]; then no "$f" "katalog zamiast pliku (docker tworzy go, gdy montuje nieistniejacy plik): rm -rf $f && make keys"
+  else                     no "$f" "brak - uruchom: make keys"
   fi
 done
 
-if [[ -x gateway/bin/mint ]]; then ok "gateway/bin/mint" "prebuilt (token minting works under sudo)"
-else wn "gateway/bin/mint" "missing - run: make mint-build (fallback: go run with /tmp caches)"; fi
+if [[ -x gateway/bin/mint ]]; then ok "gateway/bin/mint" "zbudowany (wystawianie tokenu dziala tez pod sudo)"
+else wn "gateway/bin/mint" "brak - uruchom: make mint-build (bez tego wymagane jest go)"; fi
 
-echo "== compose =="
-# Without --profile, docker compose config silently SKIPS profiled services (tests, benchmarks).
-if docker compose --profile tests --profile bench config --quiet 2>/dev/null; then ok "docker compose config" "valid (profiles rendered)"; else no "docker compose config" "invalid - run: docker compose --profile tests config"; fi
+echo "== konfiguracja compose =="
+# Bez --profile polecenie docker compose config pomija serwisy z profilami (tests, benchmarks).
+if docker compose --profile tests --profile bench config --quiet 2>/dev/null; then ok "docker compose config" "poprawna (z profilami)"; else no "docker compose config" "niepoprawna - uruchom: docker compose --profile tests config"; fi
 
 echo "== token =="
 if [[ -f gateway/keys/jwt.key ]] && command -v go >/dev/null; then
@@ -39,45 +39,45 @@ if [[ -f gateway/keys/jwt.key ]] && command -v go >/dev/null; then
     [[ $pad -gt 0 ]] && payload+="$(printf '=%.0s' $(seq 1 $pad))"
     claims="$(printf '%s' "$payload" | base64 -d 2>/dev/null || true)"
     if [[ -n "$claims" ]]; then
-      ok "token minted" "$(sed -nE 's/.*"iss":"([^"]+)".*/iss=\1/p; s/.*"sub":"([^"]+)".*/sub=\1/p' <<<"$claims" | tr '\n' ' ')"
+      ok "wystawianie tokenu" "$(sed -nE 's/.*"iss":"([^"]+)".*/iss=\1/p; s/.*"sub":"([^"]+)".*/sub=\1/p' <<<"$claims" | tr '\n' ' ')"
     else
-      wn "token minted" "minted but claims not decodable"
+      wn "wystawianie tokenu" "token powstaje, ale nie udalo sie odczytac jego zawartosci"
     fi
   else
-    no "token minted" "scripts/token.sh failed"
+    no "wystawianie tokenu" "scripts/token.sh zakonczyl sie bledem"
   fi
 else
-  wn "token minted" "skipped (no jwt.key or go)"
+  wn "wystawianie tokenu" "pominiete (brak klucza lub brak go)"
 fi
 
-echo "== running gateway =="
+echo "== dzialajacy gateway =="
 code="$(curl -s -o /dev/null -w '%{http_code}' -m 5 -X POST http://localhost:8080/v1/chat/completions \
   -H 'Content-Type: application/json' -d '{"model":"mock-llm","messages":[]}' 2>/dev/null)"
 case "${code:-000}" in
-  401|403) ok "auth enforced (no token)" "$code" ;;
-  000)     wn "gateway reachable" "not running: sudo docker compose up -d gateway" ;;
-  200)     wn "auth enforced (no token)" "200 - running build predates JWT; rebuild: sudo docker compose up -d --build gateway" ;;
-  *)       wn "auth enforced (no token)" "unexpected $code" ;;
+  401|403) ok "ruch bez tokenu odrzucony" "$code" ;;
+  000)     wn "osiagalnosc gatewaya" "nie dziala: sudo docker compose up -d gateway" ;;
+  200)     wn "ruch bez tokenu odrzucony" "200 - uruchomiona wersja nie wymaga jeszcze tokenu, przebuduj: sudo docker compose up -d --build gateway" ;;
+  *)       wn "ruch bez tokenu odrzucony" "nieoczekiwany kod $code" ;;
 esac
 
-# A valid token must be accepted. This is the check that catches a stale in-memory jwt.pub
-# (keys regenerated after the container started) - it used to look like "broken auth tests".
+# Token poprawny musi byc przyjety. Ten test wykrywa przypadek, w ktorym dzialajacy kontener ma inny
+# klucz publiczny niz biezacy plik gateway/keys/jwt.pub (na przyklad po ponownym wygenerowaniu kluczy).
 tok="$(./scripts/token.sh 2>/dev/null || true)"
 if [[ -z "$tok" ]]; then
-  wn "token accepted by gateway" "skipped (could not mint a token)"
+  wn "token przyjety przez gateway" "pominiete (nie udalo sie wystawic tokenu)"
 else
   acc="$(curl -s -o /dev/null -w '%{http_code}' -m 5 -X POST http://localhost:8080/v1/chat/completions \
     -H 'Content-Type: application/json' -H "Authorization: Bearer $tok" \
     -d '{"model":"mock-llm","messages":[{"role":"user","content":"doctor"}]}' 2>/dev/null)"
   case "${acc:-000}" in
-    200)     ok "token accepted by gateway" "200" ;;
-    401|403) no "token accepted by gateway" "$acc - STALE jwt.pub in the running gateway: sudo docker compose up -d --force-recreate gateway" ;;
-    503)     wn "token accepted by gateway" "503 - policy not loaded from control plane" ;;
-    000)     wn "token accepted by gateway" "gateway not reachable" ;;
-    *)       wn "token accepted by gateway" "unexpected $acc" ;;
+    200)     ok "token przyjety przez gateway" "200" ;;
+    401|403) no "token przyjety przez gateway" "$acc - dzialajacy gateway ma inny klucz publiczny niz gateway/keys/jwt.pub; uruchom: sudo docker compose up -d --force-recreate gateway" ;;
+    503)     wn "token przyjety przez gateway" "503 - polityka nie zostala wczytana z control plane" ;;
+    000)     wn "token przyjety przez gateway" "gateway nieosiagalny" ;;
+    *)       wn "token przyjety przez gateway" "nieoczekiwany kod $acc" ;;
   esac
 fi
 
 echo
-echo "doctor: $pass ok, $warn warn, $fail fail"
+echo "doctor: $pass ok, $warn ostrzezen, $fail bledow"
 [[ "$fail" -eq 0 ]]
