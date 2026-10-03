@@ -1,4 +1,7 @@
+import collections
 import os
+import pickle
+
 import requests
 import pytest
 
@@ -108,18 +111,29 @@ def test_loop_breaker_repeated_calls_terminated():
 # ============================================================================
 # 7. Skaner Modeli Pickle RCE (Supply Chain Security: Pozytywny / Negatywny)
 # ============================================================================
+class _RcePayload:
+    """Pickles to a call of os.system on load: the classic malicious-model payload. It is only pickled
+    (never unpickled) here; the scanner must flag it without executing it."""
+    def __reduce__(self):
+        return (os.system, ("echo pwned",))
+
+def _scan_model_file(filename: str, content: bytes):
+    return requests.post(f"{SEMANTIC_URL}/v1/scan/model", files={"file": (filename, content)}, timeout=30)
+
 def test_model_scanner_safe_weights():
-    """Pozytywny: bezpieczny plik modelu przechodzi audyt"""
-    resp = requests.post(f"{SEMANTIC_URL}/v1/scan/model", json={"file_path": "model_safe.bin"}, timeout=3)
+    """Pozytywny: bezpieczny plik modelu (prawdziwy pickle z wagami) przechodzi audyt"""
+    weights = pickle.dumps(collections.OrderedDict(layer1=[0.1, 0.2], layer2=[0.3]), protocol=4)
+    resp = _scan_model_file("model_safe.bin", weights)
     assert resp.status_code == 200
     assert resp.json().get("safe") is True
 
 def test_model_scanner_malicious_pickle_blocked():
     """Negatywny: plik modelu zawierający szkodliwy ładunek os.system / RCE jest wykrywany"""
-    resp = requests.post(f"{SEMANTIC_URL}/v1/scan/model", json={"file_path": "malicious_posix.system_model.bin"}, timeout=3)
+    resp = _scan_model_file("model.bin", pickle.dumps(_RcePayload(), protocol=2))
     assert resp.status_code == 200
     assert resp.json().get("safe") is False
-    assert len(resp.json().get("dangerous_opcodes")) > 0
+    assert resp.json().get("verdict") == "dangerous"
+    assert "posix.system" in resp.json().get("dangerous_imports")
 
 # ============================================================================
 # 8. Hot-Reload & SIEM Audit Export (Wymogi 1 & 5)
