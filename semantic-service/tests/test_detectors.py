@@ -270,6 +270,18 @@ def test_mask_numbers(text, masked):
     assert mask_numbers(text) == masked
 
 
+@pytest.mark.parametrize("text, masked", [
+    ("PESEL [REDACTED:pesel]", "PESEL ***"),
+    ("Mój PESEL to [REDACTED:pesel], tel [REDACTED:phone].", "Mój PESEL to ***, tel ***."),
+    ("key [REDACTED:aws_key] here", "key *** here"),
+    ("[REDACTED]", "[REDACTED]"),  # only the gateway's marker format
+])
+def test_mask_redactions(text, masked):
+    from app.detectors.prompt_injection import mask_redactions
+
+    assert mask_redactions(text) == masked
+
+
 def test_sentences_join_back_to_the_text():
     from app.language import sentences
 

@@ -13,6 +13,18 @@ BATCH = 16
 # A run of digits, possibly grouped by spaces, dashes, dots or slashes: PESEL, card and account numbers, dates.
 DIGIT_RUN = re.compile(r"\d(?:[\d \-./]*\d)?")
 MIN_MASKED_DIGITS = 4
+# The gateway redacts PII before sending text here, e.g. "PESEL [REDACTED:pesel]".
+REDACTED = re.compile(r"\[REDACTED:[a-z_]+\]")
+
+
+def mask_redactions(text: str) -> str:
+    """Replace the gateway's "[REDACTED:kind]" markers with "***" before classification.
+
+    The classifier reads the marker as an attack when it dominates a short text: "PESEL [REDACTED:pesel]"
+    scored 0.9996 and "tel [REDACTED:phone]" 0.9997, so redacted PII was blocked as prompt injection. With
+    "***" they score 0.0, in Polish too ("Mój PESEL to ***." 0.0003), and attacks keep their 1.0. Applied in
+    every language. "***" rather than "N": "konto N, mail N" scored 0.995."""
+    return REDACTED.sub("***", text)
 
 
 def mask_numbers(text: str) -> str:
@@ -86,7 +98,7 @@ class PromptInjectionDetector(Detector):
 
     def _score(self, text: str, deadline: float | None, budget_s: float | None) -> tuple[float, int, int]:
         had_time = deadline is None or time.monotonic() < deadline
-        enc = self._encode(mask_numbers(text))
+        enc = self._encode(mask_numbers(mask_redactions(text)))
         windows, seq_len = enc["input_ids"].shape
         what = f"prompt-injection scan of {windows} windows"
         if deadline is not None and had_time and windows > 1 and time.monotonic() >= deadline - COST_MARGIN_S:
