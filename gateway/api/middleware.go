@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/dslwa/NoorPointer/gateway/config"
+	pb "github.com/dslwa/NoorPointer/gateway/gen/semanticv1"
 	"github.com/dslwa/NoorPointer/gateway/scan"
 	"github.com/dslwa/NoorPointer/gateway/types"
 	"github.com/golang-jwt/jwt/v5"
@@ -44,17 +45,8 @@ func (s *Server) withPolicy(next http.Handler) http.Handler {
 		log.Printf("request sub=%s team=%s policy=%d %s %s", claims.Subject, claims.Team, p.Version, r.Method, r.URL.Path)
 
 		if r.Method == http.MethodPost {
-			// Decode straight from the capped stream: no raw copy of the body,
-			// and a 30 MB upload stops being read at maxBodyBytes.
-			dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxBodyBytes))
-			dec.UseNumber()
-			var doc map[string]any
-			if err := dec.Decode(&doc); err != nil {
-				if _, tooBig := errors.AsType[*http.MaxBytesError](err); tooBig {
-					WriteJSON(w, http.StatusRequestEntityTooLarge, APIError{Error: "request body too large"})
-					return
-				}
-				WriteJSON(w, http.StatusBadRequest, APIError{Error: "invalid JSON body"})
+			doc, ok := decodeBody(w, r)
+			if !ok {
 				return
 			}
 			model, _ := doc["model"].(string)
@@ -62,18 +54,7 @@ func (s *Server) withPolicy(next http.Handler) http.Handler {
 				s.deny(w, p, http.StatusForbidden, "MODEL_NOT_ALLOWED", fmt.Sprintf("model %q is not allowed", model)) {
 				return
 			}
-
-			var found []scan.Finding
-			walkStrings(doc, func(text string) string { return scan.Text(p, text, &found) })
-			for _, f := range found {
-				log.Printf("%s: %s %s detected", f.Action, f.Control, f.Kind)
-			}
-			if i := slices.IndexFunc(found, func(f scan.Finding) bool { return f.Action == "block" }); i >= 0 &&
-				s.deny(w, p, http.StatusForbidden, blockCodes[found[i].Control], fmt.Sprintf("%s detected: %s", found[i].Control, found[i].Kind)) {
-				return
-			}
-
-			if v := s.semantic(r, p, doc); v.code != "" && s.deny(w, p, v.status, v.code, v.msg) {
+			if v, _, _ := s.check(r, claims.Subject, p, doc); v.code != "" && s.deny(w, p, v.status, v.code, v.msg) {
 				return
 			}
 
@@ -91,6 +72,38 @@ func (s *Server) withPolicy(next http.Handler) http.Handler {
 
 		next.ServeHTTP(w, r)
 	})
+}
+
+// Decode straight from the capped stream: no raw copy of the body, and a
+// 30 MB upload stops being read at maxBodyBytes.
+func decodeBody(w http.ResponseWriter, r *http.Request) (map[string]any, bool) {
+	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxBodyBytes))
+	dec.UseNumber()
+	var doc map[string]any
+	if err := dec.Decode(&doc); err != nil {
+		if _, tooBig := errors.AsType[*http.MaxBytesError](err); tooBig {
+			WriteJSON(w, http.StatusRequestEntityTooLarge, APIError{Error: "request body too large"})
+		} else {
+			WriteJSON(w, http.StatusBadRequest, APIError{Error: "invalid JSON body"})
+		}
+		return nil, false
+	}
+	return doc, true
+}
+
+// Shared by the proxy and the dashboard's dry run, so both decide alike.
+// doc is redacted in place: Python and the upstream see the masked text.
+func (s *Server) check(r *http.Request, agent string, p *config.Policy, doc map[string]any) (verdict, []scan.Finding, []*pb.CheckResult) {
+	var found []scan.Finding
+	walkStrings(doc, func(text string) string { return scan.Text(p, text, &found) })
+	for _, f := range found {
+		log.Printf("%s: %s %s detected", f.Action, f.Control, f.Kind)
+	}
+	if i := slices.IndexFunc(found, func(f scan.Finding) bool { return f.Action == "block" }); i >= 0 {
+		return verdict{http.StatusForbidden, blockCodes[found[i].Control], fmt.Sprintf("%s detected: %s", found[i].Control, found[i].Kind)}, found, nil
+	}
+	v, results := s.semantic(r, agent, p, doc)
+	return v, found, results
 }
 
 func (s *Server) deny(w http.ResponseWriter, p *config.Policy, status int, code, msg string) bool {

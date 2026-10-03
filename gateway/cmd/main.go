@@ -36,6 +36,7 @@ func run() error {
 
 	server, err := api.NewServer(":"+env("PORT", "8080"), env("UPSTREAM_LLM_URL", "http://localhost:11434"), pubKey,
 		env("CONTROLPLANE_URL", "http://localhost:8082"), env("GATEWAY_TOKEN", "local-dev-gateway"),
+		env("ADMIN_TOKEN", "local-dev-admin"),
 		pb.NewSemanticServiceClient(conn))
 	if err != nil {
 		return err

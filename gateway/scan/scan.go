@@ -8,7 +8,9 @@ import (
 )
 
 type Finding struct {
-	Control, Kind, Action string
+	Control string `json:"control"`
+	Kind    string `json:"kind"`
+	Action  string `json:"action"`
 }
 
 func actionFor(p *config.Policy, r rule) string {

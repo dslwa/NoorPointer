@@ -31,7 +31,6 @@ var (
 	findPhone = starts(matchPhone)
 )
 
-// digits returns i plus the run of up to max digits at i.
 func digits(s string, i, max int) int {
 	j := i
 	for j < len(s) && j-i < max && isDigit(s[j]) {
@@ -40,8 +39,7 @@ func digits(s string, i, max int) int {
 	return j
 }
 
-// group matches one byte of seps (none when seps is empty), then min..max
-// digits, greedy; it returns the end or -1, and passes -1 through.
+// group passes -1 through, so a failed group fails the whole chain.
 func group(s string, i int, seps string, min, max int) int {
 	if i < 0 {
 		return -1

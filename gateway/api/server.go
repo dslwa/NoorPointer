@@ -23,6 +23,7 @@ type Server struct {
 
 	controlPlaneURL string
 	gatewayToken    string
+	adminToken      string
 	controlPlane    *http.Client
 
 	semanticClient pb.SemanticServiceClient
@@ -32,19 +33,19 @@ type Server struct {
 	policyETag string
 }
 
-func NewServer(listenAddr, upstream string, pubKey *rsa.PublicKey, controlPlaneURL, gatewayToken string, semanticClient pb.SemanticServiceClient) (*Server, error) {
+func NewServer(listenAddr, upstream string, pubKey *rsa.PublicKey, controlPlaneURL, gatewayToken, adminToken string, semanticClient pb.SemanticServiceClient) (*Server, error) {
 	u, err := url.Parse(upstream)
 	if err != nil || u.Scheme == "" || u.Host == "" {
 		return nil, fmt.Errorf("invalid upstream %q", upstream)
 	}
-	if gatewayToken == "" {
-		return nil, errors.New("gateway token is empty")
+	if gatewayToken == "" || adminToken == "" {
+		return nil, errors.New("gateway or admin token is empty")
 	}
 
 	transport := http.DefaultTransport.(*http.Transport).Clone()
 	transport.MaxIdleConnsPerHost = 100
 
-	// -1 disable response buffering and flush data
+	// -1 flushes every write, so streamed tokens reach the agent as they come.
 	proxy := httputil.NewSingleHostReverseProxy(u)
 	proxy.FlushInterval = -1
 	proxy.Transport = transport
@@ -55,6 +56,7 @@ func NewServer(listenAddr, upstream string, pubKey *rsa.PublicKey, controlPlaneU
 		pubKey:          pubKey,
 		controlPlaneURL: controlPlaneURL,
 		gatewayToken:    gatewayToken,
+		adminToken:      adminToken,
 		controlPlane:    &http.Client{Timeout: 3 * time.Second},
 		semanticClient:  semanticClient,
 	}, nil
@@ -78,6 +80,7 @@ func (s *Server) routes() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", makeHTTPHandleFunc(s.handleHealth))
 	mux.HandleFunc("POST /admin/policy/reload", makeHTTPHandleFunc(s.handlePolicyReload))
+	mux.HandleFunc("POST /admin/check", makeHTTPHandleFunc(s.handleCheck))
 	mux.Handle("/v1/", s.withJWTAuth(s.withPolicy(s.proxy)))
 	return mux
 }

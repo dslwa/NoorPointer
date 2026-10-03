@@ -71,8 +71,7 @@ func (s *Server) policyVersion() int64 {
 }
 
 func (s *Server) handlePolicyReload(w http.ResponseWriter, r *http.Request) error {
-	want := []byte("Bearer " + s.gatewayToken)
-	if subtle.ConstantTimeCompare([]byte(r.Header.Get("Authorization")), want) != 1 {
+	if !bearer(r, s.gatewayToken) {
 		return WriteJSON(w, http.StatusUnauthorized, APIError{Error: "unauthorized"})
 	}
 	if err := s.refreshPolicy(r.Context()); err != nil {
@@ -80,4 +79,8 @@ func (s *Server) handlePolicyReload(w http.ResponseWriter, r *http.Request) erro
 		return WriteJSON(w, http.StatusBadGateway, APIError{Error: "policy reload failed"})
 	}
 	return WriteJSON(w, http.StatusOK, map[string]any{"status": "reloaded", "version": s.policyVersion()})
+}
+
+func bearer(r *http.Request, token string) bool {
+	return subtle.ConstantTimeCompare([]byte(r.Header.Get("Authorization")), []byte("Bearer "+token)) == 1
 }

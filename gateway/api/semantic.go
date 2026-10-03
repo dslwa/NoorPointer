@@ -13,15 +13,13 @@ import (
 	pb "github.com/dslwa/NoorPointer/gateway/gen/semanticv1"
 )
 
-// verdict is a semantic block; a zero verdict lets the request through.
 type verdict struct {
 	status    int
 	code, msg string
 }
 
-// semantic sends the chat messages to the Python checks and decides on the
-// scores here: Python only scores, the policy thresholds live in the gateway.
-func (s *Server) semantic(r *http.Request, p *config.Policy, doc map[string]any) verdict {
+// Python only scores; the thresholds live in the policy, so the gateway decides.
+func (s *Server) semantic(r *http.Request, agent string, p *config.Policy, doc map[string]any) (verdict, []*pb.CheckResult) {
 	pi, cs := p.Controls.PromptInjection, p.Controls.ContentSafety
 	var checks []*pb.CheckSpec
 	timeout := uint32(p.Defaults.SemanticTimeoutMs)
@@ -34,21 +32,21 @@ func (s *Server) semantic(r *http.Request, p *config.Policy, doc map[string]any)
 	msgs := chatMessages(doc)
 	// ponytail: nil client only in tests that don't exercise semantic checks
 	if s.semanticClient == nil || len(checks) == 0 || len(msgs) == 0 {
-		return verdict{}
+		return verdict{}, nil
 	}
 
 	ctx, cancel := context.WithTimeout(r.Context(), time.Duration(p.Defaults.SemanticTimeoutMs)*time.Millisecond)
 	defer cancel()
 	resp, err := s.semanticClient.Analyze(ctx, &pb.AnalyzeRequest{
 		RequestId: r.Header.Get("X-Request-Id"),
-		AgentId:   claimsFor(r).Subject,
+		AgentId:   agent,
 		Direction: pb.Direction_DIRECTION_INPUT,
 		Messages:  msgs,
 		Checks:    checks,
 	})
 	if err != nil {
 		log.Printf("semantic: %v", err)
-		return unavailable(p, err.Error())
+		return unavailable(p, err.Error()), nil
 	}
 
 	for _, res := range resp.Results {
@@ -56,7 +54,7 @@ func (s *Server) semantic(r *http.Request, p *config.Policy, doc map[string]any)
 		switch {
 		case res.Status == pb.Status_STATUS_REJECTED:
 			// The caller can trigger a hard limit at will, so this never fails open.
-			return verdict{http.StatusForbidden, "SEMANTIC_INPUT_REJECTED", res.Error}
+			return verdict{http.StatusForbidden, "SEMANTIC_INPUT_REJECTED", res.Error}, resp.Results
 		case res.Status != pb.Status_STATUS_OK:
 			log.Printf("semantic: %s %s: %s", res.Check, res.Status, res.Error)
 			v = unavailable(p, res.Error)
@@ -68,13 +66,12 @@ func (s *Server) semantic(r *http.Request, p *config.Policy, doc map[string]any)
 			v = act(cs.Control, "UNSAFE_CONTENT_DETECTED", fmt.Sprintf("unsafe content %v", res.Categories))
 		}
 		if v.code != "" {
-			return v
+			return v, resp.Results
 		}
 	}
-	return verdict{}
+	return verdict{}, resp.Results
 }
 
-// act blocks only for action "block"; anything else just logs the hit.
 func act(c config.Control, code, msg string) verdict {
 	if c.Action != "block" {
 		log.Printf("%s: %s", c.Action, msg)
@@ -90,8 +87,6 @@ func unavailable(p *config.Policy, msg string) verdict {
 	return verdict{}
 }
 
-// chatMessages takes messages[] with string content or OpenAI content
-// parts, each text part as its own message.
 func chatMessages(doc map[string]any) []*pb.Message {
 	var out []*pb.Message
 	add := func(role, text string) {

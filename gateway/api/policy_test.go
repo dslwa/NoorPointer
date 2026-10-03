@@ -35,7 +35,7 @@ func TestRefreshPolicyETag(t *testing.T) {
 	}))
 	defer cp.Close()
 
-	s, err := NewServer(":0", "http://upstream", nil, cp.URL, "test-token", nil)
+	s, err := NewServer(":0", "http://upstream", nil, cp.URL, "test-token", "admin-token", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -57,7 +57,7 @@ func TestPolicyReloadEndpoint(t *testing.T) {
 		w.Write([]byte(`{"version":7,"defaults":{"mode":"enforce","semantic_timeout_ms":300,"on_semantic_timeout":"fail_closed"},"models":{"allowed":["mock-llm"]},"controls":{}}`))
 	}))
 	defer cp.Close()
-	s, _ := NewServer(":0", "http://upstream", nil, cp.URL, "test-token", nil)
+	s, _ := NewServer(":0", "http://upstream", nil, cp.URL, "test-token", "admin-token", nil)
 	h := s.routes()
 
 	if rec := do(h, http.MethodPost, "/admin/policy/reload", ""); rec.Code != http.StatusUnauthorized {
@@ -74,7 +74,7 @@ func TestPolicyReloadEndpoint(t *testing.T) {
 
 func TestNoPolicyIs503(t *testing.T) {
 	key := newKey(t)
-	s, _ := NewServer(":0", "http://upstream", &key.PublicKey, "http://unused", "test-token", nil)
+	s, _ := NewServer(":0", "http://upstream", &key.PublicKey, "http://unused", "test-token", "admin-token", nil)
 	rec := do(s.routes(), http.MethodPost, "/v1/chat/completions", "Bearer "+sign(t, jwt.SigningMethodRS256, validClaims(), key))
 	if rec.Code != http.StatusServiceUnavailable {
 		t.Fatalf("got %d, want 503", rec.Code)
@@ -98,7 +98,7 @@ func TestRefreshPolicyErrorsKeepLastGood(t *testing.T) {
 	}))
 	defer cp.Close()
 
-	s, _ := NewServer(":0", "http://upstream", nil, cp.URL, "test-token", nil)
+	s, _ := NewServer(":0", "http://upstream", nil, cp.URL, "test-token", "admin-token", nil)
 	last := &config.Policy{Version: 9}
 	s.policy.Store(last)
 
@@ -124,7 +124,7 @@ func TestRefreshPolicyTransportErrors(t *testing.T) {
 		"unreachable": closed.URL,
 	} {
 		t.Run(name, func(t *testing.T) {
-			s, _ := NewServer(":0", "http://upstream", nil, url, "test-token", nil)
+			s, _ := NewServer(":0", "http://upstream", nil, url, "test-token", "admin-token", nil)
 			if err := s.refreshPolicy(t.Context()); err == nil {
 				t.Fatal("expected error")
 			}
@@ -137,7 +137,7 @@ func TestPolicyReloadFailureIs502(t *testing.T) {
 		w.WriteHeader(http.StatusInternalServerError)
 	}))
 	defer cp.Close()
-	s, _ := NewServer(":0", "http://upstream", nil, cp.URL, "test-token", nil)
+	s, _ := NewServer(":0", "http://upstream", nil, cp.URL, "test-token", "admin-token", nil)
 
 	rec := do(s.routes(), http.MethodPost, "/admin/policy/reload", "Bearer test-token")
 	if rec.Code != http.StatusBadGateway {
@@ -155,7 +155,7 @@ func TestWatchPolicyLogsFailure(t *testing.T) {
 		w.WriteHeader(http.StatusInternalServerError)
 	}))
 	defer cp.Close()
-	s, _ := NewServer(":0", "http://upstream", nil, cp.URL, "test-token", nil)
+	s, _ := NewServer(":0", "http://upstream", nil, cp.URL, "test-token", "admin-token", nil)
 
 	go s.watchPolicy(time.Hour)
 	for calls.Load() == 0 {
