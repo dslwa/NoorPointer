@@ -195,9 +195,9 @@ co widzi gateway):
 
 ```json
 {
-  "version": 2,
+  "version": 4,
   "defaults": {"mode": "enforce", "semantic_timeout_ms": 300, "on_semantic_timeout": "fail_closed"},
-  "models": {"allowed": ["llama3.1:8b", "qwen2.5:7b"]},
+  "models": {"allowed": ["llama3.1:8b", "llama3.2:1b", "mock-llm", "qwen2.5:7b"]},
   "controls": {
     "pii_regex": {"enabled": true, "action": "redact", "types": ["email", "pesel", "iban", "card"]},
     "secrets": {"enabled": true, "action": "block"},
@@ -209,15 +209,53 @@ co widzi gateway):
   },
   "budgets": [
     {"subject": "team:finance", "monthly_usd": 50, "daily_tokens": 200000, "on_exceed": "block"},
-    {"subject": "model:local/*", "gpu_seconds_per_hour": 600, "on_exceed": "block"}
+    {"subject": "model:local/*", "gpu_seconds_per_hour": 600, "on_exceed": "block"},
+    {"subject": "agent:agent-budget-exhausted", "daily_tokens": 0, "on_exceed": "block"}
   ]
 }
 ```
 
+Aktywna rewizja to `balanced-demo` (`v4`): zawiera modele używane w testach, benchmarkach i demo
+(`mock-llm`, `llama3.2:1b`) oraz deterministyczny wpis budżetowy opisany niżej. Publikuje ją
+`scripts/publish-policy.sh`, wywoływany przez `make seed` — skrypt jest powtarzalny, więc nie tworzy
+kolejnej rewizji, gdy polityka już spełnia wymagania. Nową rewizję tworzy
+`POST /api/v1/policy-revisions` (dokument jako string), a aktywuje `PUT /api/v1/active-policy`
+z numerem wersji.
+
 Parser w gatewayu odrzuca dokument z nieznanymi polami, więc każda zmiana kształtu polityki wymaga
 uzgodnienia obu stron.
 
-### 5. Opcjonalny prawdziwy model (Ollama)
+### 5. Kody błędów i budżety (zamrożone)
+
+Te napisy są kryterium akceptacji w `tests/test_guardrails.py`. Zmiana nazwy po stronie gatewaya
+oznacza czerwony test mimo działającej funkcji, dlatego traktujemy je jako zamrożony kontrakt.
+
+| Kontrola | Kod | Napis w ciele odpowiedzi |
+|---|---|---|
+| Wyciek sekretów | 403 | `SECRET_LEAKAGE_DETECTED` |
+| Prompt injection | 403 | `PROMPT_INJECTION_DETECTED` |
+| Sygnatura znanego ataku | 403 | `HISTORICAL_EXPLOIT_SIGNATURE_MATCHED` |
+| Przekroczony budżet | 429 | `BUDGET_EXCEEDED` |
+| Ogranicznik pętli | 403 | `RUNAWAY_LOOP_DETECTED` |
+
+Ciało odpowiedzi: `{"error": "<NAZWA>", "detail": "<krótki opis>"}` — taki sam kształt jak przy
+błędach uwierzytelniania. Odpowiedź po redakcji pozostaje `200`, a informację o tym, co zostało
+zredagowane, niesie nagłówek `X-NoorPointer-Redactions` (np. `pii_ner`); nie zmienia to tego,
+czego oczekują testy.
+
+Podmiot budżetu rozstrzygamy od najbardziej szczegółowego: `agent:<agent_id>` z ciała żądania →
+`team:<team>` z tokenu JWT → `model:<model>` z ciała. Okna: `daily_tokens` resetują się o 00:00 UTC,
+`monthly_usd` obowiązuje w miesiącu kalendarzowym, `gpu_seconds_per_hour` co godzinę. Liczniki
+trzymamy w Redisie pod kluczem `budget:<subject>:<okno>`, zwiększanym atomowo (`INCRBY` + `EXPIRE`).
+Przekroczenie daje `429` z nagłówkiem `Retry-After` w sekundach do końca okna. Gdy Redis nie
+odpowiada, budżet działa fail-open (kontroluje koszty, nie jest kontrolą bezpieczeństwa), natomiast
+kontrole bezpieczeństwa pozostają fail-closed. Tryb `monitor` liczy i zapisuje zdarzenie, ale nie blokuje.
+
+Wpis `{"subject": "agent:agent-budget-exhausted", "daily_tokens": 0}` jest świadomym przypadkiem
+testowym: limit 0 oznacza budżet przekroczony od pierwszego żądania, dzięki czemu test
+`test_budget_exceeded_rate_limited` nie zależy od wcześniejszego ruchu ani od stanu liczników.
+
+### 6. Opcjonalny prawdziwy model (Ollama)
 
 ```bash
 sudo make ollama-up     # start Ollamy, pobranie llama3.2:1b, przełączenie gatewaya na nią
@@ -227,6 +265,28 @@ sudo make ollama-down   # powrót na mock-llm (potrzebny do testów oczekującyc
 Konfiguracja `docker-compose.ollama.yaml` nie publikuje portu Ollamy na hoście, więc nie koliduje
 z `mock-llm`. Pierwsza odpowiedź trwa dłużej (ładowanie modelu na CPU), a nazwa modelu musi być wpisana
 na liście `models.allowed` w polityce.
+
+## Scenariusz prezentacji
+
+Kolejność, w której pokazujemy działanie systemu (wszystkie polecenia działają na obecnym stanie
+repozytorium):
+
+1. `make doctor` — narzędzia, klucze, konfiguracja, działające uwierzytelnianie.
+2. `make smoke` — 16 sprawdzeń spójności stosu.
+3. `make verify` — smoke + kontrola braku zależności sieciowych w runtime + scenariusze agenta.
+4. `make demo` — pięć scenariuszy agenta przez gateway.
+5. `make reload-policy` — żywa zmiana konfiguracji, odpowiedź `{"status":"reloaded","version":N}`.
+6. `make new-signature` — dodanie sygnatury ataku w trakcie działania: wpis pojawia się w feedzie
+   i w katalogu w panelu (po pokazie: `git checkout -- signatures-feed/signatures.json && make seed`).
+7. Panel `http://localhost:3000` (login `local-dev-admin`) — incydenty, rewizje polityki, katalog sygnatur.
+8. Grafana `http://localhost:3001` (admin/admin) — alerty oraz metryki usługi semantycznej i kontrolera.
+9. `sudo make test` — pakiet testów, `reports/test_report.html` i `reports/INDEX.md` z listą
+   otwartych pozycji wraz z właścicielami.
+
+Stan testów na dziś: **9 z 16 przechodzi**. Sześć czerwonych to kontrole, których gateway jeszcze nie
+egzekwuje (sekrety, redakcja PII, prompt injection, sygnatury, budżety, ogranicznik pętli), a jedna to
+`test_policy_hot_reload`, który wysyła token gatewaya zamiast tokenu serwisowego. Mówimy o tym wprost
+i pokazujemy `reports/INDEX.md` — nie obiecujemy kontroli, których jeszcze nie ma.
 
 ## Jak odnosimy się do kryteriów oceny
 

@@ -21,7 +21,8 @@ for i in $(seq 1 "$ATTEMPTS"); do
   case "${code:-000}" in
     200|201)
       echo "seed: zdarzenia audytu, HTTP $code ${payload:0:180}"
-      # Katalog sygnatur jest niezalezny od audytu, wiec jego blad nie przerywa seeda.
+      # Katalog sygnatur i polityka demo sa niezalezne od audytu, wiec ich blad nie przerywa seeda.
+      ./scripts/publish-policy.sh || echo "seed: nie udalo sie ustawic polityki demo (patrz komunikat wyzej)" >&2
       ./scripts/import-signatures.sh || echo "seed: import sygnatur nie powiodl sie (patrz komunikat wyzej)" >&2
       exit 0
       ;;
