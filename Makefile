@@ -1,4 +1,4 @@
-.PHONY: help up dev-infra down restart logs status build test bench demo clean postgres-up postgres-test-up controlplane-run controlplane-test controlplane-build smoke bench-flood bench-budget offline-check report demo-full demo-strict
+.PHONY: help up dev-infra down restart logs status build test bench demo clean postgres-up postgres-test-up controlplane-run controlplane-test controlplane-build smoke bench-flood bench-budget offline-check report demo-full demo-strict verify verify-strict
 
 help: ## Pokazuje dostępne komendy
 	@echo "🛡️ NoorPointer Hackathon Commands:"
@@ -73,4 +73,14 @@ demo-full: ## Pełne demo: run.sh (5 scenariuszy) + scenariusze zaawansowane (PE
 
 demo-strict: ## Jak demo-full, ale PENDING (gateway bez guardraili) liczy się jako FAIL
 	./agent-demo/run.sh all
+	./agent-demo/scenarios.sh --strict
+
+verify: ## Zero-prep: smoke + offline-check + scenariusze demo (PENDING dozwolone)
+	./scripts/smoke.sh
+	./scripts/offline-check.sh
+	./agent-demo/scenarios.sh
+
+verify-strict: ## Jak verify, ale PENDING liczy się jako FAIL (po guardrailach gatewaya)
+	./scripts/smoke.sh
+	./scripts/offline-check.sh
 	./agent-demo/scenarios.sh --strict
