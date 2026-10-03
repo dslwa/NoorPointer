@@ -67,6 +67,11 @@ judge() { # judge <name> <ok_codes> <marker_regex>
   fi
 }
 
+# ZNANY FALSE POSITIVE (do naprawy po stronie semantic-service): ten payload nie ma cyfr, wiec
+# mask_numbers() go nie tlumi, a DeBERTa klasyfikuje go jako prompt injection (score ~0.9957).
+# W praktyce brama zwraca 403 PROMPT_INJECTION_DETECTED, wiec scenariusz konczy sie FAIL zamiast
+# PENDING i `make verify` jest czerwony. Szczegoly i pomiar: komentarz w
+# semantic-service/app/detectors/prompt_injection.py.
 scenario_runaway_loop() {
   request -H 'Content-Type: application/json' -H 'X-Tool-Call-Repeat: 3' \
     -d '{"model":"mock-llm","agent_id":"agent-runaway-loop","messages":[{"role":"user","content":"LOOP_TRIGGER_TEST repeat the same tool call again"}]}' \

@@ -313,17 +313,21 @@ postgres-test-up: postgres-up ## Osobna baza PostgreSQL dla testow Javy
 controlplane-run: postgres-up ## Uruchamia Jave (REST/panel) na :8082
 	cd controlplane && ./mvnw spring-boot:run
 
-test-semantic: ## Testy modulu semantycznego (117 przypadkow) w kontenerze z pytest
-	@mkdir -p reports
-	@$(COMPOSE) --profile semantic run --rm semantic-tests > reports/log-semantic-test.txt 2>&1; rc=$$?; \
-	grep -E "[0-9]+ (passed|failed)|^(FAILED|ERROR)|error" reports/log-semantic-test.txt | tail -18; \
-	[ $$rc -eq 0 ] || echo "  szczegoly: reports/log-semantic-test.txt"; exit $$rc
+test-semantic: ## Testy modulu semantycznego w kontenerze z pytest (--build: kod z repo, nie stary obraz)
+	@mkdir -p reports 2>/dev/null || true
+	@log=reports/log-semantic-test.txt; \
+	: > "$$log" 2>/dev/null || { log="$${TMPDIR:-/tmp}/noorpointer-log-semantic-test.txt"; echo "uwaga: nie moge pisac do reports/ (wlasciciel root?) - log: $$log"; echo "  napraw: sudo chown -R \"$$(id -u):$$(id -g)\" reports"; }; \
+	$(COMPOSE) --profile semantic run --rm --build semantic-tests > "$$log" 2>&1; rc=$$?; \
+	grep -E "[0-9]+ (passed|failed)|^(FAILED|ERROR)|error" "$$log" | tail -18; \
+	[ $$rc -eq 0 ] || echo "  szczegoly: $$log"; exit $$rc
 
 controlplane-test: postgres-test-up ## Testy modulu Java w kontenerze (pelny log: reports/log-java-test.txt)
-	@mkdir -p reports
-	@$(COMPOSE) --profile java run --rm --build controlplane-tests > reports/log-java-test.txt 2>&1; rc=$$?; \
-	grep -E "Tests run:|BUILD (SUCCESS|FAILURE)|^\[ERROR\]" reports/log-java-test.txt || true; \
-	[ $$rc -eq 0 ] || echo "  szczegoly bledu: reports/log-java-test.txt"; exit $$rc
+	@mkdir -p reports 2>/dev/null || true
+	@log=reports/log-java-test.txt; \
+	: > "$$log" 2>/dev/null || { log="$${TMPDIR:-/tmp}/noorpointer-log-java-test.txt"; echo "uwaga: nie moge pisac do reports/ (wlasciciel root?) - log: $$log"; echo "  napraw: sudo chown -R \"$$(id -u):$$(id -g)\" reports"; }; \
+	$(COMPOSE) --profile java run --rm --build controlplane-tests > "$$log" 2>&1; rc=$$?; \
+	grep -E "Tests run:|BUILD (SUCCESS|FAILURE)|^\[ERROR\]" "$$log" || true; \
+	[ $$rc -eq 0 ] || echo "  szczegoly bledu: $$log"; exit $$rc
 
 controlplane-build: postgres-test-up ## Weryfikacja Javy + budowa JAR (w kontenerze)
 	$(COMPOSE) --profile java run --rm --build controlplane-tests mvn -B -ntp -f controlplane/pom.xml verify -Dfrontend.skip=true

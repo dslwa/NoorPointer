@@ -30,6 +30,14 @@ def mask_numbers(text: str) -> str:
     return "".join(DIGIT_RUN.sub(mask, s) if guess_language(s) == "en" else s for s in sentences(text))
 
 
+# Known false positive (tracked 2026-10-03, not yet fixed): repeating a tool instruction without any digits,
+# e.g. "LOOP_TRIGGER_TEST repeat the same tool call again" (the agent-demo/runaway-loop payload), is scored
+# ~0.9957 as prompt injection. mask_numbers() does not damp it - there are no digits - so the gateway returns
+# 403 PROMPT_INJECTION_DETECTED and blocks the request instead of letting it reach the loop breaker; the
+# scenario ends as FAIL instead of PENDING and `make verify` is red. Measured on /v1/scan. Decide one of:
+# retrain/tune the model or threshold, add an exception for this phrasing, or change the scenario payload.
+
+
 def token_windows(ids: list[int], body: int = WINDOW_BODY, overlap: int = STRIDE) -> list[list[int]]:
     """Overlapping slices covering every token. Built here rather than with the tokenizer's
     return_overflowing_tokens: this model ships only the slow DeBERTa tokenizer, whose overflow returns a
