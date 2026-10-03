@@ -37,21 +37,19 @@ now=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
 
   echo "## Znane luki (stan na $now)"
   echo
-  echo "- **Gateway (Go)**: kontrole w ścieżce żądania nie są jeszcze włączone (dane osobowe, sekrety,"
-  echo "  sygnatury ataków, ogranicznik pętli, budżety), brakuje \`GET /metrics\` oraz wysyłania zdarzeń"
-  echo "  audytowych do \`POST /api/v1/audit/events\`. Z tego powodu 6 z 16 testów e2e nie przechodzi,"
-  echo "  a pulpit gatewaya w Grafanie pozostaje pusty."
-  echo "- **Kontrole semantyczne nie są w ścieżce żądania**: gateway nie wywołuje jeszcze \`/v1/scan\`."
-  echo "  Osobny alert \`SemanticNoTraffic\` sygnalizuje brak ruchu do tej usługi."
-  echo "- **Dwa formaty sygnatur**: feed Nginx (\`signatures-feed/signatures.json\`, wyrażenia regularne)"
-  echo "  i kontrakt control plane (dopasowanie dosłowne oraz pola \`source\`/\`category\`/\`target\`) to dwa"
-  echo "  różne kontrakty. Katalog w panelu zawiera reguły startowe aplikacji (migracja V2) oraz wpisy"
-  echo "  z naszego feedu, dodawane pojedynczo przez \`scripts/import-signatures.sh\` (pierwsza alternatywa"
-  echo "  wzorca jako wartość dosłowna); gateway jeszcze nie konsumuje sygnatur."
-  echo "- **Dane audytu są demonstracyjne**: panel pokazuje wpisy utworzone przez \`make seed\`,"
-  echo "  a nie rzeczywiste decyzje gatewaya."
-  echo "- **Metryki gatewaya**: alert \`GatewayMetricsMissing\` (waga info) sygnalizuje brak \`/metrics\`."
-  echo "  Po dodaniu endpointu trzeba odkomentować zadanie zbierające w \`telemetry/prometheus.yml\`."
+  echo "- **Brama egzekwuje część kontroli**: działają allowlista modeli, sekrety, redakcja danych osobowych"
+  echo "  oraz kontrole semantyczne (prompt injection, content safety) przez gRPC. Otwarte pozostają:"
+  echo "  sygnatury ataków, budżety, ogranicznik pętli i lista narzędzi MCP."
+  echo "- **Brak \`GET /metrics\` w bramie** (port 9090). Alert \`GatewayMetricsMissing\` (waga info) to"
+  echo "  sygnalizuje; po dodaniu endpointu odkomentuj zadanie zbierające w \`telemetry/prometheus.yml\`."
+  echo "- **Brama nie wysyła zdarzeń audytowych** do \`POST /api/v1/audit/events\` — dziennik w panelu"
+  echo "  zasilają dane demonstracyjne z \`make seed\` (oznaczone jako \`synthetic\`)."
+  echo "- **PII w wolnym tekście i wyciek systemowego promptu** (\`pii_ner\`, \`leakage\`) działają w usłudze"
+  echo "  semantycznej, ale brama woła na razie tylko prompt injection i content safety."
+  echo "- **Dwa formaty sygnatur**: feed Nginx (regex) i kontrakt control plane (dopasowanie dosłowne +"
+  echo "  pola \`source\`/\`category\`/\`target\`) to dwa różne kontrakty; gateway nie konsumuje sygnatur."
+  echo "- **Testy e2e**: \`tests/test_guardrails.py\` ma 25 przypadków; pełny wynik tego przebiegu jest"
+  echo "  w raporcie HTML z \`sudo make test\` (PENDING = kontroli jeszcze nie ma, FAIL = kontrola nie działa)."
   echo
 
   echo "## Jak to odtworzyć"
@@ -69,4 +67,6 @@ now=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
 } > reports/INDEX.md
 
 echo "zapisano reports/INDEX.md"
+# Po przebiegu pod sudo raport zostaje root-owned - przywroc wlasciciela repo (jak w make test).
+chown -R "$(stat -c '%u:%g' .)" reports 2>/dev/null || true
 ls -1 reports/
