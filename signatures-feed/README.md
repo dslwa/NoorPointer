@@ -46,20 +46,46 @@ Format wpisu (obecnie używany, oparty na wyrażeniach regularnych):
 Skrypt dopisuje nowy wpis do `signatures.json`; plik jest widoczny w feedzie natychmiast, bez restartu
 kontenera. Wykorzystujemy to w demonstracji dla jury.
 
-## Dwa formaty sygnatur (stan obecny)
+## Decyzja o formatach sygnatur
 
-Feed używa wyrażeń regularnych (`pattern_type: regex`, `pattern`), natomiast kontrakt control plane
-(`controlplane/src/main/resources/contracts/signatures.schema.json`) dopuszcza wyłącznie dopasowanie
-dosłowne (`match.type: "literal"`) i wymaga pól `source`, `category`, `target`. To dwa różne kontrakty,
-więc nie da się ich wprost zamienić. Stan na dziś:
+**Rozstrzygnięcie: jedno źródło prawdy — ten plik. Katalog w panelu jest z niego wyprowadzany,
+a docelowo kontrakt control plane dostaje obsługę wyrażeń regularnych.**
 
-- **Panel (control plane)** jest zasilany: `scripts/import-signatures.sh`
-  (wywoływany przez `make seed`) czyta ten plik i zapisuje sygnatury do katalogu control plane,
-  biorąc z każdego wzorca **pierwszą alternatywę** jako wartość dosłowną oraz mapując
-  `target_component` na pole `target`. Katalog jest podmieniany w całości, więc operacja jest powtarzalna.
-- **Gateway** jeszcze nie konsumuje sygnatur — docelowo czyta ten plik pod `SIGNATURES_FEED_URL`
-  i kompiluje wyrażenia regularne (`refresh_s` w polityce).
-- **Ujednolicenie** formatu (wyrażenia regularne w kontrakcie control plane) jest zadaniem otwartym.
+Uzasadnienie: wzorce regex są potrzebne w gatewayu (np. ShadowRay to alternatywa dwóch wzorców,
+której nie da się zapisać jako dopasowanie dosłowne), a panel potrzebuje listy sygnatur. Zamiast
+utrzymywać dwa ręcznie pisane dokumenty, mamy jeden plik i konwerter.
+
+Stan obecny (działa):
+
+- **Gateway** czyta ten plik pod `SIGNATURES_FEED_URL` i skompiluje wyrażenia regularne
+  (`refresh_s` w polityce). Na razie nie konsumuje sygnatur.
+- **Panel (control plane)** jest zasilany przez `scripts/import-signatures.sh`
+  (wywoływany przez `make seed`): dla każdego wpisu bierze **pierwszą alternatywę** wzorca jako
+  wartość dosłowną, mapuje `target_component` na pole `target`, a pełny wzorzec zachowuje w `description`.
+  Katalog jest podmieniany w całości, więc operacja jest powtarzalna i idempotentna.
+- Konwerter **preferuje jawne pole `match`**, jeśli wpis je ma — czyli po przejściu na wspólny
+  format nie wymaga zmian.
+
+Docelowo (zadanie dla części Java, około 15 minut): rozszerzyć kontrakt control plane tak, aby
+przyjmował wyrażenia regularne:
+
+```json
+"match": {
+  "type":  { "enum": ["literal", "regex"] },
+  "value": { "type": "string", "minLength": 1, "maxLength": 2000 }
+}
+```
+
+oraz w miejscu dopasowania: gdy `type == "regex"`, kompilować `value` jako wyrażenie regularne
+i przy błędnym wzorcu odrzucać sygnaturę (fail-closed), a nie przepuszczać ruch. Po tej zmianie
+wpisy z tego feedu można przenosić do katalogu bez konwersji.
 
 Skrypt `push_new_signature.sh` dopisuje wpis do pliku i odświeża katalog w panelu tym samym
 konwerterem, więc demonstracja „dodaj sygnaturę w trakcie działania" działa dla obu odbiorców.
+
+Po demonstracji wróć do stanu z repozytorium, żeby wpis testowy nie został w materiałach końcowych:
+
+```bash
+git checkout -- signatures-feed/signatures.json
+make seed                      # odświeża katalog w panelu do pięciu sygnatur z repo
+```

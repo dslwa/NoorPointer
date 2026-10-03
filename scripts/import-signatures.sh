@@ -78,14 +78,19 @@ for entry in feed.get("signatures", []):
             f"wzorzec regex: {entry.get('pattern', '')}",
         ) if part
     )[:2000]
+    # Jesli wpis w feedzie ma juz jawne pole match (docelowy, wspolny format), uzywamy go bez zmian;
+    # w przeciwnym razie wyprowadzamy wartosc doslowna z wyrazenia regularnego.
+    match = entry.get("match")
+    if not (isinstance(match, dict) and match.get("type") and match.get("value")):
+        match = {"type": "literal", "value": literal_of(entry.get("pattern", ""))[:2000]}
     signatures.append({
         "id": identifier,
         "name": (entry.get("name") or identifier)[:200],
-        "source": source_of(entry),
-        "category": (entry.get("owasp_category") or "unclassified")[:80],
+        "source": entry.get("source") or source_of(entry),
+        "category": (entry.get("category") or entry.get("owasp_category") or "unclassified")[:80],
         "action": "block" if entry.get("action") == "block" else "monitor",
-        "target": target_of(entry.get("target_component", "")),
-        "match": {"type": "literal", "value": literal_of(entry.get("pattern", ""))[:2000]},
+        "target": entry.get("target") or target_of(entry.get("target_component", "")),
+        "match": match,
         "description": description,
         "enabled": True,
     })
