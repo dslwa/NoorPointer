@@ -52,6 +52,7 @@ sudo make checkpoint # wszystko powyżej + reports/INDEX.md + lista adresów
 sudo make bench            # k6: narzut przy typowym ruchu
 sudo make bench-flood      # k6: duży ruch z próbami ataku
 sudo make bench-budget     # k6: równoległe żądania jednego agenta
+sudo make controlplane-test  # testy modułu Java w kontenerze (nie wymaga Javy na hoście)
 sudo make demo-full        # scenariusze demonstracyjne agenta
 make reload-policy         # natychmiastowe przeładowanie polityki w gatewayu
 make new-signature         # demo: dodanie sygnatury ataku do feedu w trakcie działania

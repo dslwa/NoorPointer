@@ -216,11 +216,11 @@ postgres-test-up: postgres-up ## Osobna baza PostgreSQL dla testow Javy
 controlplane-run: postgres-up ## Uruchamia Jave (REST/panel) na :8082
 	cd controlplane && ./mvnw spring-boot:run
 
-controlplane-test: postgres-test-up ## Testy modulu Java na osobnej bazie
-	cd controlplane && ./mvnw test
+controlplane-test: postgres-test-up ## Testy modulu Java w kontenerze (bez Javy na hoscie)
+	$(COMPOSE) --profile java run --rm --build controlplane-tests
 
-controlplane-build: postgres-test-up ## Weryfikacja Javy + budowa JAR
-	cd controlplane && ./mvnw verify
+controlplane-build: postgres-test-up ## Weryfikacja Javy + budowa JAR (w kontenerze)
+	$(COMPOSE) --profile java run --rm --build controlplane-tests mvn -B -ntp -f controlplane/pom.xml verify -Dfrontend.skip=true
 
 dashboard-dev: ## React z hot reload na :5173 (API Javy musi dzialac na :8082)
 	cd dashboard && npm ci --no-audit --no-fund && npm run dev
