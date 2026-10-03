@@ -364,12 +364,6 @@ Co z tego wynika — trzy wnioski, wszystkie oparte na pomiarze:
    więc dostają 5,4 żądań/s, czyli 2,5× mniej niż jedna replika używająca ośmiu wątków. Dokładanie
    replik z tymi samymi ustawieniami nie mnoży mocy, dopóki nie dołożymy rdzeni (osobne maszyny, węzły).
 
-Zasada, którą stosujemy przy strojeniu, żeby nie wejść w ten trzeci przypadek:
-
-```
-repliki × PI_WORKERS × TORCH_THREADS  ≤  liczba wątków CPU
-```
-
 Zasada, którą stosujemy przy strojeniu:
 
 ```
