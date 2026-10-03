@@ -23,8 +23,8 @@ services:
       - SIGNATURES_FEED_URL=http://signatures-feed:8085/signatures.json
       - JWT_PUBLIC_KEY=/app/keys/jwt.pub
     volumes:
-      - ./config/policy.yaml:/app/config/policy.yaml:ro
-      - ./gateway/keys/jwt.pub:/app/keys/jwt.pub:ro
+      - ./config/policy.yaml:/app/config/policy.yaml:ro,z
+      - ./gateway/keys/jwt.pub:/app/keys/jwt.pub:ro,z
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:8080/healthz"]
       interval: 10s
@@ -115,7 +115,7 @@ services:
       controlplane:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:3000/"]
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:3000/"]
       interval: 10s
       timeout: 3s
       retries: 5
@@ -133,8 +133,8 @@ services:
     ports:
       - "8085:8085"
     volumes:
-      - ./singatures-feed:/usr/share/nginx/html:ro
-      - ./singatures-feed/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./singatures-feed:/usr/share/nginx/html:ro,z
+      - ./singatures-feed/nginx.conf:/etc/nginx/conf.d/default.conf:ro,z
     restart: unless-stopped
     networks:
       - noorpointer-net
@@ -153,7 +153,7 @@ services:
       POSTGRES_DB: noorpointer
     volumes:
       - postgres-data:/var/lib/postgresql/data
-      - ./config/init-db.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - ./config/init-db.sql:/docker-entrypoint-initdb.d/init.sql:ro,z
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U noor -d noorpointer"]
       interval: 3s
@@ -201,8 +201,8 @@ services:
     ports:
       - "9091:9090" # Zewnętrzny 9091 (unikamy konfliktu z gateway:9090)
     volumes:
-      - ./telemetry/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - ./telemetry/alert.rules.yml:/etc/prometheus/alert.rules.yml:ro
+      - ./telemetry/prometheus.yml:/etc/prometheus/prometheus.yml:ro,z
+      - ./telemetry/alert.rules.yml:/etc/prometheus/alert.rules.yml:ro,z
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
       - "--storage.tsdb.path=/prometheus"
@@ -222,8 +222,8 @@ services:
       - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
       - GF_AUTH_DISABLE_LOGIN_FORM=true
     volumes:
-      - ./telemetry/grafana/provisioning:/etc/grafana/provisioning:ro
-      - ./telemetry/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - ./telemetry/grafana/provisioning:/etc/grafana/provisioning:ro,z
+      - ./telemetry/grafana/dashboards:/var/lib/grafana/dashboards:ro,z
     depends_on:
       - prometheus
     restart: unless-stopped
@@ -244,7 +244,7 @@ services:
       - ADMIN_TOKEN=${ADMIN_TOKEN:-local-dev-admin}
       - SEMANTIC_URL=http://semantic-service:8001
     volumes:
-      - ./reports:/app/reports
+      - ./reports:/app/reports:z
     profiles:
       - tests
     networks:
@@ -254,8 +254,8 @@ services:
     image: grafana/k6:latest
     container_name: noorpointer-benchmarks
     volumes:
-      - ./benchmarks:/benchmarks
-      - ./reports:/reports
+      - ./benchmarks:/benchmarks:z
+      - ./reports:/reports:z
     environment:
       - TARGET_URL=http://gateway:8080
     profiles:

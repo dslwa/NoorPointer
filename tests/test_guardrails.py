@@ -6,9 +6,18 @@ import requests
 import pytest
 
 GATEWAY_URL = os.getenv("GATEWAY_URL", "http://localhost:8080")
+GATEWAY_JWT = os.getenv("GATEWAY_JWT", "")
 SEMANTIC_URL = os.getenv("SEMANTIC_URL", "http://localhost:8001")
 CONTROLPLANE_URL = os.getenv("CONTROLPLANE_URL", "http://localhost:8082")
 ADMIN_TOKEN = os.getenv("ADMIN_TOKEN", "local-dev-admin")
+
+def gw_headers(extra: dict | None = None) -> dict:
+    headers = {"Content-Type": "application/json"}
+    if GATEWAY_JWT:
+        headers["Authorization"] = f"Bearer {GATEWAY_JWT}"
+    if extra:
+        headers.update(extra)
+    return headers
 
 def send_chat_completion(content: str, agent_id: str = "agent-test-01", headers: dict = None):
     url = f"{GATEWAY_URL}/v1/chat/completions"
@@ -19,10 +28,7 @@ def send_chat_completion(content: str, agent_id: str = "agent-test-01", headers:
             {"role": "user", "content": content}
         ]
     }
-    req_headers = {"Content-Type": "application/json"}
-    if headers:
-        req_headers.update(headers)
-    return requests.post(url, json=payload, headers=req_headers, timeout=5)
+    return requests.post(url, json=payload, headers=gw_headers(headers), timeout=5)
 
 # ============================================================================
 # 1. PII Detection & Redaction (Pozytywny / Negatywny)
@@ -38,6 +44,8 @@ def test_pii_pesel_redacted():
     """Negatywny: prompt z numerem PESEL zostaje zredagowany w locie"""
     resp = send_chat_completion("My identification number is PESEL 95081212345.")
     assert resp.status_code == 200, f"Expected 200 OK (with redaction), got {resp.status_code}"
+    assert "95081212345" not in resp.text
+    assert "[REDACTED" in resp.text
 
 # ============================================================================
 # 2. Secrets Leakage (Pozytywny / Negatywny)
@@ -141,7 +149,7 @@ def test_model_scanner_malicious_pickle_blocked():
 # ============================================================================
 def test_policy_hot_reload():
     """Weryfikacja przeładowania konfiguracji bez restartu kontenera"""
-    resp = requests.post(f"{GATEWAY_URL}/admin/policy/reload", timeout=3)
+    resp = requests.post(f"{GATEWAY_URL}/admin/policy/reload", headers=gw_headers(), timeout=3)
     assert resp.status_code == 200
     assert resp.json().get("status") == "reloaded"
 
