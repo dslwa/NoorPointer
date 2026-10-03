@@ -60,12 +60,11 @@ docker compose run --rm -e GATEWAY_JWT="$(./scripts/token.sh)" tests
 
 ## Stan obecny
 
-Przechodzi **9 z 16** testów. Czerwone i ich przyczyny:
+Przechodzi **10 z 16** testów. Czerwone i ich przyczyny:
 
 | Testy | Przyczyna | Właściciel |
 | :--- | :--- | :--- |
 | `test_pii_pesel_redacted`, `test_secrets_api_key_blocked`, `test_prompt_injection_jailbreak_blocked`, `test_historical_exploit_shadowray_cve_blocked`, `test_budget_exceeded_rate_limited`, `test_loop_breaker_repeated_calls_terminated` | gateway nie egzekwuje jeszcze kontroli: sekrety, redakcja PII, prompt injection, sygnatury ataków, budżety, ogranicznik pętli | Go Developer |
-| `test_policy_hot_reload` | `POST /admin/policy/reload` wymaga `Bearer $GATEWAY_TOKEN`, a test wysyła token gatewaya | Python Developer |
 
 Testy wymagają tokenu w zmiennej `GATEWAY_JWT`. `make test` i `make test-local` wstrzykują go same,
 a jego brak przerywa pakiet czytelnym komunikatem zamiast serii odpowiedzi 401.

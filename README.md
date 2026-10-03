@@ -26,7 +26,7 @@ do sprawdzenia reguł przed ich włączeniem.
 | Audyt i eksport SIEM | działa po stronie control plane | eksport CEF/JSON/CSV i panel działają; gateway nie wysyła jeszcze własnych zdarzeń, więc dziennik zawiera dane demonstracyjne z `make seed` |
 | Katalog sygnatur | działa | 7 reguł startowych z migracji `V2__Seed_default_signatures` + 5 wpisów z naszego feedu; dodawanie z panelu i przez `make new-signature PATTERN='...'` |
 | Metryki i alerty | częściowo | Prometheus zbiera `semantic-service` i `controlplane`; gateway nie wystawia jeszcze `/metrics` |
-| Testy e2e | 9 z 16 przechodzi | pozostałe 7 wymagają kontroli wymienionych wyżej; szczegóły w `reports/INDEX.md` |
+| Testy e2e | 10 z 16 przechodzi | pozostałe 6 to kontrole, których gateway jeszcze nie egzekwuje; szczegóły w `reports/INDEX.md` |
 | Testy modułów | działają | `make test-unit` (Go, 4 pakiety) i `sudo make controlplane-test` (Java, 3 klasy w kontenerze, na osobnej bazie `noorpointer_test`) |
 
 Wniosek dla osób oceniających: działają mechanizmy wokół polityki (uwierzytelnianie, dystrybucja polityki,
@@ -289,17 +289,17 @@ repozytorium):
 7. `make traffic` — realny ruch na panele: zadania przez gateway oraz skany semantyczne, które
    oznaczają próbę prompt injection i dane osobowe. Bez tego kroku panele usługi semantycznej są puste,
    bo gateway nie wywołuje jej jeszcze w ścieżce żądania.
-8. Panel `http://localhost:3000` (login `local-dev-admin`) — incydenty, rewizje polityki, katalog sygnatur.
+8. Panel `http://localhost:3000` (login `local-dev-admin`) — incydenty, rewizje polityki, katalog sygnatur
+i strona „Prompt check”, która uruchamia kontrole semantyczne bez terminala.
 9. Grafana `http://localhost:3001` (admin/admin) — dostępność usług, kontrole semantyczne, ruch
    w control plane i alerty. Panel gatewaya jest tam opisany jako pusty do czasu `GET /metrics`.
 10. `sudo make test` — pakiet testów, `reports/test_report.html` i `reports/INDEX.md` z listą
     otwartych pozycji wraz z właścicielami; `sudo make controlplane-test` uruchamia dodatkowo testy
     modułu Java w kontenerze.
 
-Stan testów na dziś: **9 z 16 przechodzi**. Sześć czerwonych to kontrole, których gateway jeszcze nie
-egzekwuje (sekrety, redakcja PII, prompt injection, sygnatury, budżety, ogranicznik pętli), a jedna to
-`test_policy_hot_reload`, który wysyła token gatewaya zamiast tokenu serwisowego. Mówimy o tym wprost
-i pokazujemy `reports/INDEX.md` — nie obiecujemy kontroli, których jeszcze nie ma.
+Stan testów na dziś: **10 z 16 przechodzi**. Sześć czerwonych to kontrole, których gateway jeszcze nie
+egzekwuje (sekrety, redakcja PII, prompt injection, sygnatury, budżety, ogranicznik pętli). Mówimy o tym
+wprost i pokazujemy `reports/INDEX.md` — nie obiecujemy kontroli, których jeszcze nie ma.
 
 ## Jak odnosimy się do kryteriów oceny
 

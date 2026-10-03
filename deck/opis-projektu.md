@@ -37,7 +37,7 @@ niezależnie od konfiguracji timeoutu, a brak wyniku nigdy nie jest interpretowa
 Stan prac opisujemy wprost. Działają: uwierzytelnianie, dystrybucja i hot-reload polityki, katalog
 sygnatur (12 reguł), cztery detektory semantyczne i skaner artefaktów, audyt z eksportem dla SIEM,
 panel, telemetria oraz testy modułów. Egzekwowanie kontroli w gatewayu jest w trakcie implementacji,
-dlatego w pakiecie testów e2e 9 z 16 przypadków przechodzi, a sześć czerwonych dotyczy właśnie tych
+dlatego w pakiecie testów e2e 10 z 16 przypadków przechodzi, a sześć czerwonych dotyczy właśnie tych
 kontroli. Scenariusze demonstracyjne rozróżniają stan `PENDING` (kontrola jeszcze nie istnieje) od
 `FAIL` (błąd), żeby brak implementacji nie był mylony z awarią.
 
