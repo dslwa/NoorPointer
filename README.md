@@ -147,7 +147,7 @@ Każdy katalog posiada własny, szczegółowy plik `README.md` z zakresem i defi
 | [`tests/`](tests/README.md) | **Python + DevOps** | Samouruchamiający się zestaw testów e2e z parami pozytywnymi/negatywnymi (`make test`). |
 | [`benchmarks/`](benchmarks/README.md) | **DevOps** | Skrypty k6 mierzące narzut milisekundowy Gatewaya dla jury (`make bench`). |
 | [`agent-demo/`](agent-demo/README.md) | **DevOps + Devs** | Demonstracyjny agent MCP pokazujący blokowanie jailbreaków, wycieków danych i pętli. |
-| [`singatures-feed/`](singatures-feed/README.md) | **DevOps + Python**| Zewnętrzne repozytorium sygnatur znanych ataków (ShadowRay, Probllama, itp.). |
+| [`signatures-feed/`](signatures-feed/README.md) | **DevOps + Python**| Zewnętrzne repozytorium sygnatur znanych ataków (ShadowRay, Probllama, itp.). |
 
 ---
 

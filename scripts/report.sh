@@ -42,7 +42,7 @@ now=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
   echo "  This is what keeps the 7 red e2e tests red and the Grafana gateway panel empty."
   echo "- **Semantic controls are not in the request path**: the gateway does not call \`/v1/scan\` yet"
   echo "  (Prometheus alert \`SemanticNoTraffic\` tracks this)."
-  echo "- **Signature formats differ**: the nginx feed (\`singatures-feed/signatures.json\`, regex patterns,"
+  echo "- **Signature formats differ**: the nginx feed (\`signatures-feed/signatures.json\`, regex patterns,"
   echo "  gateway \`SIGNATURES_FEED_URL\`) and the control-plane schema (\`match.type: literal\` +"
   echo "  \`source/category/target\`) are not the same contract - unification pending."
   echo "- **Audit data is synthetic**: the dashboard shows demo batches created by \`make seed\`,"
