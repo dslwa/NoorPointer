@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 )
 
 type Policy struct {
@@ -109,5 +110,31 @@ func (p *Policy) validate() error {
 	if pi := p.Controls.PromptInjection; pi != nil && (pi.Threshold < 0 || pi.Threshold > 1) {
 		return fmt.Errorf("prompt_injection threshold %v: want 0..1", pi.Threshold)
 	}
+	c := p.Controls
+	for _, a := range []struct {
+		name    string
+		c       *Control
+		allowed []string
+	}{
+		{"pii_regex", ptr(c.PIIRegex, func(x *PatternControl) *Control { return &x.Control }), []string{"block", "redact", "monitor"}},
+		{"secrets", c.Secrets, []string{"block", "redact", "monitor"}},
+		// A score has no span to mask, so semantic controls cannot redact.
+		{"prompt_injection", ptr(c.PromptInjection, func(x *ScoreControl) *Control { return &x.Control }), []string{"block", "monitor"}},
+		{"content_safety", ptr(c.ContentSafety, func(x *CategoryControl) *Control { return &x.Control }), []string{"block", "monitor"}},
+		{"attack_signatures", ptr(c.AttackSignatures, func(x *SignatureControl) *Control { return &x.Control }), []string{"block", "monitor"}},
+		{"agent_loops", ptr(c.AgentLoops, func(x *LoopControl) *Control { return &x.Control }), []string{"block", "monitor"}},
+		{"mcp_tools", ptr(c.MCPTools, func(x *ToolControl) *Control { return &x.Control }), []string{"block", "monitor"}},
+	} {
+		if a.c != nil && a.c.Enabled && !slices.Contains(a.allowed, a.c.Action) {
+			return fmt.Errorf("%s action %q: want one of %v", a.name, a.c.Action, a.allowed)
+		}
+	}
 	return nil
+}
+
+func ptr[T any](x *T, f func(*T) *Control) *Control {
+	if x == nil {
+		return nil
+	}
+	return f(x)
 }

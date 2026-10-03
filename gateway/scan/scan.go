@@ -39,7 +39,7 @@ func actionFor(p *config.Policy, r rule) string {
 // A mask can complete a neighbour's match (a phone masked inside a base64
 // blob cuts off an encoded key), so masking repeats while a mask was glued
 // to a byte that some rule reads as part of a match.
-// ponytail: capped at 3 passes, deeper chains are crafted input, not data;
+// Capped at 3 passes, deeper chains are crafted input, not data;
 // the cap keeps a chain of glued tokens from costing one pass per token.
 func Text(p *config.Policy, text string, found *[]Finding) string {
 	for range 3 {

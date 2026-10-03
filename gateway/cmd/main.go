@@ -3,6 +3,8 @@ package main
 import (
 	"log"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/dslwa/NoorPointer/gateway/api"
 	pb "github.com/dslwa/NoorPointer/gateway/gen/semanticv1"
@@ -12,7 +14,9 @@ import (
 )
 
 func main() {
-	log.Fatal(run())
+	if err := run(); err != nil {
+		log.Fatal(err)
+	}
 }
 
 func run() error {
@@ -26,7 +30,6 @@ func run() error {
 	}
 
 	// NewClient dials lazily: the gateway starts while Python still loads its models.
-	// ponytail: plaintext inside the compose network, TLS if the service ever leaves it
 	conn, err := grpc.NewClient(env("SEMANTIC_GRPC_URL", "localhost:50051"),
 		grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
@@ -41,6 +44,13 @@ func run() error {
 	if err != nil {
 		return err
 	}
+
+	go func() {
+		sigch := make(chan os.Signal, 1)
+		signal.Notify(sigch, syscall.SIGINT, syscall.SIGTERM)
+		<-sigch
+		server.Stop()
+	}()
 	return server.Start()
 }
 
