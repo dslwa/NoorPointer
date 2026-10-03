@@ -17,12 +17,14 @@ export const options = {
 };
 
 const BASE_URL = __ENV.TARGET_URL || 'http://gateway:8080';
+// Gateway JWT (RS256) is required on every route except /healthz; injected by make bench-flood.
+const AUTH = __ENV.GATEWAY_JWT ? { Authorization: `Bearer ${__ENV.GATEWAY_JWT}` } : {};
 
 // setup() runs exactly once, before the first VU starts. Sequential requests warm the gateway and
 // the upstream (mock-llm thread pool) so the measured run is not skewed by the ~1.2s cold-start
 // outlier that otherwise trips the per-request checks. Its return value is passed to default(data).
 export function setup() {
-  const params = { headers: { 'Content-Type': 'application/json' } };
+  const params = { headers: { 'Content-Type': 'application/json', ...AUTH } };
   const codes = [];
   for (let i = 0; i < 5; i++) {
     codes.push(http.post(`${BASE_URL}/v1/chat/completions`, JSON.stringify({
@@ -50,7 +52,7 @@ export default function () {
     messages: [{ role: 'user', content: ATTACKS[Math.floor(Math.random() * ATTACKS.length)] }],
   });
   const res = http.post(`${BASE_URL}/v1/chat/completions`, payload, {
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...AUTH },
     tags: { name: 'malicious' },
   });
 

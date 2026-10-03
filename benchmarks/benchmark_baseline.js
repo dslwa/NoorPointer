@@ -15,11 +15,14 @@ export const options = {
 };
 
 const BASE_URL = __ENV.TARGET_URL || 'http://gateway:8080';
+// The gateway requires an RS256 JWT on every route except /healthz; the Makefile targets mint one
+// and pass it as GATEWAY_JWT.
+const AUTH = __ENV.GATEWAY_JWT ? { Authorization: `Bearer ${__ENV.GATEWAY_JWT}` } : {};
 
 // setup() runs once before the first VU: sequential requests warm the gateway + upstream so the
 // measured run is not skewed by the cold-start outlier. Return value is passed to default(data).
 export function setup() {
-  const params = { headers: { 'Content-Type': 'application/json' } };
+  const params = { headers: { 'Content-Type': 'application/json', ...AUTH } };
   const codes = [];
   for (let i = 0; i < 5; i++) {
     codes.push(http.post(`${BASE_URL}/v1/chat/completions`, JSON.stringify({
@@ -43,6 +46,7 @@ export default function () {
   const params = {
     headers: {
       'Content-Type': 'application/json',
+      ...AUTH,
     },
   };
 

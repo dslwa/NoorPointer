@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Zero-prep smoke check of the whole stack. Usage: make smoke
 set -uo pipefail
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"; cd "$ROOT"
 
 GATEWAY_URL="${GATEWAY_URL:-http://localhost:8080}"
 SEMANTIC_URL="${SEMANTIC_URL:-http://localhost:8001}"
@@ -11,6 +12,14 @@ FEED_URL="${FEED_URL:-http://localhost:8085/signatures.json}"
 PROMETHEUS_URL="${PROMETHEUS_URL:-http://localhost:9091}"
 GRAFANA_URL="${GRAFANA_URL:-http://localhost:3001}"
 ADMIN_TOKEN="${ADMIN_TOKEN:-local-dev-admin}"
+
+# The gateway requires an RS256 JWT on every route except /healthz. Mint one unless provided.
+GATEWAY_JWT="${GATEWAY_JWT:-}"
+if [[ -z "$GATEWAY_JWT" && -x scripts/token.sh ]]; then
+  GATEWAY_JWT="$(./scripts/token.sh 2>/dev/null || true)"
+fi
+AUTH=()
+[[ -n "$GATEWAY_JWT" ]] && AUTH=(-H "Authorization: Bearer $GATEWAY_JWT")
 
 pass=0; fail=0
 ok()   { printf '  PASS  %-26s %s\n' "$1" "$2"; pass=$((pass+1)); }
@@ -46,8 +55,12 @@ check_code "semantic /readyz"     "200,503" "$SEMANTIC_URL/readyz"
 
 echo "== proxy + guardrail wiring =="
 check_body "gateway -> mock-llm" "$GATEWAY_URL/v1/chat/completions" "choices" \
-  -X POST -H 'Content-Type: application/json' \
+  "${AUTH[@]+"${AUTH[@]}"}" -X POST -H 'Content-Type: application/json' \
   -d '{"model":"mock-llm","agent_id":"smoke","messages":[{"role":"user","content":"smoke test"}]}'
+# 200 = JWT not enforced yet, 401/403 = auth active (both are healthy outcomes here)
+check_code "gateway auth enforced?" "200,401,403" "$GATEWAY_URL/v1/chat/completions" \
+  -X POST -H 'Content-Type: application/json' \
+  -d '{"model":"mock-llm","messages":[{"role":"user","content":"no token"}]}'
 check_body "mock-llm guard /api/chat" "$MOCK_LLM_URL/api/chat" "safe" \
   -X POST -H 'Content-Type: application/json' \
   -d '{"messages":[{"role":"user","content":"nice weather"}]}'
@@ -62,5 +75,6 @@ check_code "audit export (admin)"    200 "$CONTROLPLANE_URL/api/v1/audit/export?
   -H "Authorization: Bearer $ADMIN_TOKEN"
 
 echo
+[[ -z "$GATEWAY_JWT" ]] && echo "note: no gateway JWT - run 'make keys' then retry (scripts/token.sh mints one)"
 echo "smoke: $pass passed, $fail failed"
 [[ "$fail" -eq 0 ]]

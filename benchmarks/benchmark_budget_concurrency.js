@@ -17,11 +17,13 @@ export const options = {
 
 const BASE_URL = __ENV.TARGET_URL || 'http://gateway:8080';
 const AGENT = __ENV.AGENT_ID || 'agent-budget-concurrency';
+// Gateway JWT (RS256) is required on every route except /healthz; injected by make bench-budget.
+const AUTH = __ENV.GATEWAY_JWT ? { Authorization: `Bearer ${__ENV.GATEWAY_JWT}` } : {};
 
 // setup() runs once before the VUs. It uses its own agent id so warming up does not consume the
 // measured agent's budget, and it removes the cold-start outlier from the measured run.
 export function setup() {
-  const params = { headers: { 'Content-Type': 'application/json' } };
+  const params = { headers: { 'Content-Type': 'application/json', ...AUTH } };
   const codes = [];
   for (let i = 0; i < 5; i++) {
     codes.push(http.post(`${BASE_URL}/v1/chat/completions`, JSON.stringify({
@@ -41,7 +43,7 @@ export default function () {
     messages: [{ role: 'user', content: 'run a large query' }],
   });
   const res = http.post(`${BASE_URL}/v1/chat/completions`, payload, {
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...AUTH },
     tags: { name: 'budget' },
   });
 

@@ -21,8 +21,10 @@ services:
       - UPSTREAM_LLM_URL=http://mock-llm:11434
       - POLICY_FILE=/app/config/policy.yaml
       - SIGNATURES_FEED_URL=http://signatures-feed:8085/signatures.json
+      - JWT_PUBLIC_KEY=/etc/noorpointer/jwt.pub
     volumes:
       - ./config/policy.yaml:/app/config/policy.yaml:ro
+      - ./gateway/keys/jwt.pub:/etc/noorpointer/jwt.pub:ro
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:8080/healthz"]
       interval: 10s
