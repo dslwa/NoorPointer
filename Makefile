@@ -28,7 +28,7 @@ K6        = $(COMPOSE) run --rm -e GATEWAY_JWT="$$jwt" benchmarks run
         smoke verify verify-strict offline-check report deck checkpoint \
         demo demo-ready demo-full demo-strict \
         keys mint-build token token-file reload-policy new-signature db-tidy doctor urls \
-        jury scan policy-edit policy-apply signature evidence stop scale scale-check \
+        jury scan policy-edit policy-apply signature evidence pack stop scale scale-check \
         ollama-up ollama-down up-real \
         postgres-up postgres-test-up controlplane-run controlplane-test controlplane-build dashboard-dev dashboard-test
 
@@ -55,6 +55,13 @@ signature: ## Dodaj wlasna regule ataku: make signature PATTERN='...' NAME='...'
 
 evidence: ## Zbiera dowody do katalogu dowody/ (widoczne na GitHubie bez uruchamiania)
 	./scripts/evidence.sh
+
+pack: ## Eksport do przekazania dalej: tylko pliki z gita (bez .env, kluczy i smieci) - PACK_OUT=sciezka
+	@out="$(or $(PACK_OUT),/tmp/noorpointer-src.tar.gz)"; \
+	git archive --format=tar.gz --prefix=noorpointer/ -o "$$out" HEAD; \
+	echo "  zapisano $$out"; \
+	echo "  plikow: $$(tar -tzf "$$out" | wc -l), rozmiar: $$(du -h "$$out" | cut -f1)"; \
+	echo "  w archiwum NIE MA: .env, gateway/keys (klucz prywatny), gateway/bin, reports/, policy.local.json, node_modules"
 
 stop: ## Zatrzymuje stos (dane i wolumeny zostaja, wracasz przez: make up)
 	@$(MAKE) --no-print-directory down
