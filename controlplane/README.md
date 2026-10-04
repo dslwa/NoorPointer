@@ -68,6 +68,27 @@ DEMO_ENABLED=false ./mvnw spring-boot:run
 
 Schemat tworzą migracje Flyway. W Compose Java używa osobnego schematu `controlplane`, dzięki czemu istniejące tabele mocka w schemacie `public` pozostają zachowane. Lokalnie i w Compose aplikacja używa wyłącznie PostgreSQL; schemat `controlplane` jest tworzony automatycznie.
 
+## Profile przygotowane do OUTPUT
+
+Nowe profile `permissive-output`, `balanced-output`, `strict-output` dodają `pii_ner` i `leakage`.
+**Są przygotowane do walidacji/draftów; nie publikuj ich do obecnego Go**, który odrzuca nieznane
+pola. Profile bez sufiksu zachowują dotychczasową strukturę. Nie zmieniono schematu gRPC.
+
+| Ustawienie | permissive-output | balanced-output | strict-output |
+|---|---|---|---|
+| PII: akcja / próg encji | monitor / 0,85 | redact / 0,5 | block / 0,3 |
+| Leakage: akcja / próg | monitor / 0,3 | block / 0,15 | block / 0,05 |
+| Domyślny timeout semantyki | 15 s | 15 s | 15 s |
+
+PII ma `directions: [input, output]`, konfigurowalne `entities` i `timeout_ms`. Leakage działa
+tylko na OUTPUT; `ngram` wynosi domyślnie 6, a `canaries` to opcjonalna lista markerów.
+Niższy próg zwiększa czułość. `enabled: false` wyłącza kontrolę, `monitor` obserwuje bez blokowania.
+Schemat i panel dopuszczają `redact` wyłącznie dla kontroli zwracających miejsca redakcji
+(`pii_regex`, `pii_ner`, `secrets`). Dla prompt injection, content safety, leakage, sygnatur,
+pętli i MCP dostępne są `block`/`monitor`.
+Przeniesienie parametrów detektorów do gRPC pozostaje do wspólnej integracji:
+[GO_HANDOFF.md](../tests/GO_HANDOFF.md).
+
 ## Kontrakt integracji
 
 API wymaga `Authorization: Bearer <token>`. Endpointy panelu mają wspólny prefiks `/api/v1`. Gateway może pobierać dokument aktywnej polityki, feed i schematy oraz wysyłać audyt; pozostałe operacje wymagają administratora. Healthcheck i pliki dashboardu są publiczne, dane panelu są chronione.
@@ -83,7 +104,7 @@ API wymaga `Authorization: Bearer <token>`. Endpointy panelu mają wspólny pref
 | `PUT /api/v1/active-policy` | Publikacja/rollback: `{ "version": 3 }`; ponowienie tej samej wersji zachowuje czas publikacji |
 | `GET /api/v1/active-policy/document` | Dokument dla gateway’a, ETag/304 |
 | `POST /api/v1/policy-validations` | Walidacja `{ "document": "JSON lub YAML" }` bez zapisu |
-| `GET /api/v1/policy-profiles/{name}` | `permissive`, `balanced`, `strict` |
+| `GET /api/v1/policy-profiles/{name}` | `permissive`, `balanced`, `strict`; wersje `*-output` przygotowane do przyszłej integracji |
 | `GET /api/v1/schemas/{name}` | JSON Schema: `policy`, `audit`, `signatures` |
 | `GET /api/v1/signature-feed` | Bieżący feed, ETag/304 |
 | `POST /api/v1/signatures` | Dodaje pojedynczą sygnaturę bez usuwania pozostałych; `201 Created` i `Location`. Powtórzone ID lub przekroczenie 1000 reguł: `409 Conflict` |

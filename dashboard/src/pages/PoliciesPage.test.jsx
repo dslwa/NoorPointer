@@ -38,6 +38,77 @@ async function card(name) {
 }
 
 describe('Policies', () => {
+  it('offers redact only for controls that can identify spans', async () => {
+    const controls = Object.fromEntries(
+      [
+        'pii_regex',
+        'pii_ner',
+        'secrets',
+        'prompt_injection',
+        'content_safety',
+        'attack_signatures',
+        'agent_loops',
+        'mcp_tools',
+        'leakage',
+      ].map((name) => [name, { enabled: true, action: 'block', directions: ['output'] }]),
+    );
+    setup({ policyDocument: { controls } });
+    for (const name of ['Personal data (PII)', 'Personal data (NER)', 'Secrets and API keys']) {
+      const select = await screen.findByRole('combobox', { name: `Action ${name}` });
+      expect(within(select).getByRole('option', { name: 'redact' })).toBeTruthy();
+    }
+    for (const name of [
+      'Prompt injection',
+      'Content safety',
+      'Attack signatures',
+      'Agent loops',
+      'MCP tools',
+      'System prompt leakage',
+    ]) {
+      const select = screen.getByRole('combobox', { name: `Action ${name}` });
+      expect(within(select).queryByRole('option', { name: 'redact' })).toBeNull();
+    }
+  });
+
+  it('edits OUTPUT control thresholds and scope without losing detector options', async () => {
+    const pii = {
+      enabled: true,
+      action: 'redact',
+      threshold: 0.5,
+      directions: ['input', 'output'],
+      entities: ['PERSON', 'EMAIL_ADDRESS'],
+      timeout_ms: 5000,
+    };
+    const leakage = {
+      enabled: true,
+      action: 'block',
+      threshold: 0.15,
+      directions: ['output'],
+      ngram: 6,
+      canaries: [],
+    };
+    const { user, request } = setup({ policyDocument: { controls: { pii_ner: pii, leakage } } });
+    const scope = await screen.findByRole('combobox', { name: 'Scope Personal data (NER)' });
+    await user.selectOptions(scope, 'output');
+    const threshold = screen.getByRole('spinbutton', { name: 'Threshold Personal data (NER)' });
+    await user.clear(threshold);
+    await user.type(threshold, '0.8');
+    expect(
+      within(screen.getByRole('combobox', { name: 'Scope System prompt leakage' })).queryByRole(
+        'option',
+        { name: 'Input' },
+      ),
+    ).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'Save new version' }));
+    await waitFor(() =>
+      expect(request.mock.calls.some(([, o]) => o?.method === 'POST')).toBe(true),
+    );
+    const [, options] = request.mock.calls.find(([, o]) => o?.method === 'POST');
+    const saved = JSON.parse(JSON.parse(options.body).document);
+    expect(saved.controls.pii_ner).toEqual({ ...pii, threshold: 0.8, directions: ['output'] });
+    expect(saved.controls.leakage).toEqual(leakage);
+  });
+
   it('saves selected personal data types without changing other controls or the active policy', async () => {
     const policyDocument = {
       defaults: { mode: 'enforce' },

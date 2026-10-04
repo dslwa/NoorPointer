@@ -93,6 +93,31 @@ class ControlPlaneIntegrationTest {
   }
 
   @Test
+  void outputProfileDraftPreservesDetectorParametersWithoutChangingActivePolicy() throws Exception {
+    var before =
+        mvc.perform(get("/api/gateway/policy").header("Authorization", GATEWAY))
+            .andExpect(status().isOk()).andReturn();
+    var document =
+        json(mvc.perform(get("/api/v1/policy-profiles/balanced-output").header("Authorization", ADMIN))
+            .andExpect(status().isOk()).andReturn());
+    ((ObjectNode) document.path("controls").path("leakage")).put("ngram", 4);
+    ((ObjectNode) document.path("controls").path("leakage")).withArray("canaries").add("TEST-CANARY");
+    var revision =
+        json(mvc.perform(post("/api/v1/policy-revisions").header("Authorization", ADMIN)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(mapper.writeValueAsString(Map.of("name", "output-draft", "document", document.toString()))))
+            .andExpect(status().isCreated()).andReturn());
+    var stored =
+        json(mvc.perform(get("/api/v1/policy-revisions/" + revision.path("version").asLong())
+            .header("Authorization", ADMIN)).andExpect(status().isOk()).andReturn());
+    ((ObjectNode) document).set("version", revision.path("version"));
+    assertThat(stored.path("document")).isEqualTo(document);
+    mvc.perform(get("/api/gateway/policy").header("Authorization", GATEWAY)
+        .header("If-None-Match", before.getResponse().getHeader("ETag")))
+        .andExpect(status().isNotModified());
+  }
+
+  @Test
   void creatingDraftDoesNotActivateItAndPublishingChangesGatewayEtag() throws Exception {
     MvcResult before =
         mvc.perform(get("/api/gateway/policy").header("Authorization", GATEWAY))

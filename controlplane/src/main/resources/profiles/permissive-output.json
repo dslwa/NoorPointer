@@ -61,6 +61,35 @@
         ]
       },
       "pinned_hashes": {}
+    },
+    "pii_ner": {
+      "enabled": true,
+      "action": "monitor",
+      "directions": [
+        "input",
+        "output"
+      ],
+      "threshold": 0.85,
+      "entities": [
+        "PERSON",
+        "EMAIL_ADDRESS",
+        "PHONE_NUMBER",
+        "PL_PESEL",
+        "IBAN_CODE",
+        "CREDIT_CARD"
+      ],
+      "timeout_ms": 5000
+    },
+    "leakage": {
+      "enabled": true,
+      "action": "monitor",
+      "directions": [
+        "output"
+      ],
+      "threshold": 0.3,
+      "ngram": 6,
+      "timeout_ms": 1000,
+      "canaries": []
     }
   },
   "budgets": [

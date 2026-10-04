@@ -1,7 +1,7 @@
 {
   "defaults": {
     "mode": "enforce",
-    "semantic_timeout_ms": 8000,
+    "semantic_timeout_ms": 15000,
     "on_semantic_timeout": "fail_closed"
   },
   "models": {

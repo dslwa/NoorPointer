@@ -14,6 +14,7 @@ backups/
 **/node_modules/
 dashboard/dist/
 .claude/
+signatures-feed/*.lock
 
 # Zrzut polityki do edycji przez osoby oceniajace (make policy-edit)
 policy.local.json

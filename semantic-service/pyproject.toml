@@ -43,5 +43,8 @@ explicit = true
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 pythonpath = ["."]
-markers = ["models: tests that load real ML models (slow, need downloads)"]
+markers = [
+    "models: tests that load real ML models (slow, need downloads)",
+    "ollama: requires real Ollama with GUARD_MODEL installed (not mock-llm)",
+]
 addopts = "-m 'not models'"

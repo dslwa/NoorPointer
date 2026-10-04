@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { formatDate } from '../utils/formatters.js';
-import { labels, piiTypes } from '../constants/controls.js';
+import { actionsFor, labels, piiTypes } from '../constants/controls.js';
 import { useAction } from '../hooks/useAction.js';
 import { useResource } from '../hooks/useResource.js';
 import { paths } from '../api/paths.js';
@@ -190,12 +190,13 @@ export default function PoliciesPage({ active, request, dashboard, refreshKey, r
                     onChange={(event) => updateControl(key, 'enabled', event.target.checked)}
                   />
                   <strong>{labels[key] || key}</strong>
-                  {key === 'prompt_injection' && (
+                  {['prompt_injection', 'pii_ner', 'leakage'].includes(key) && (
                     <label>
                       Threshold{' '}
                       <input
                         type="number"
-                        id="injection-threshold"
+                        id={`${key}-threshold`}
+                        aria-label={`Threshold ${labels[key] || key}`}
                         min="0"
                         max="1"
                         step="0.05"
@@ -214,10 +215,53 @@ export default function PoliciesPage({ active, request, dashboard, refreshKey, r
                     disabled={!!pending}
                     onChange={(event) => updateControl(key, 'action', event.target.value)}
                   >
-                    {['block', 'redact', 'monitor'].map((action) => (
+                    {!actionsFor(key).includes(control.action) && control.action && (
+                      <option value={control.action} disabled>
+                        {control.action} (unsupported)
+                      </option>
+                    )}
+                    {actionsFor(key).map((action) => (
                       <option key={action}>{action}</option>
                     ))}
                   </select>
+                  {['pii_ner', 'leakage'].includes(key) && (
+                    <>
+                      <label>
+                        Scope
+                        <select
+                          aria-label={`Scope ${labels[key]}`}
+                          value={(control.directions || []).join(',')}
+                          disabled={!!pending}
+                          onChange={(event) =>
+                            updateControl(key, 'directions', event.target.value.split(','))
+                          }
+                        >
+                          {key === 'pii_ner' && <option value="input">Input</option>}
+                          <option value="output">Output</option>
+                          {key === 'pii_ner' && (
+                            <option value="input,output">Input and output</option>
+                          )}
+                        </select>
+                      </label>
+                      <label>
+                        Timeout (ms)
+                        <input
+                          type="number"
+                          min="10"
+                          max="30000"
+                          step="10"
+                          aria-label={`Timeout ${labels[key]}`}
+                          value={
+                            control.timeout_ms ?? parsed.defaults?.semantic_timeout_ms ?? 15000
+                          }
+                          disabled={!!pending}
+                          onChange={(event) =>
+                            updateControl(key, 'timeout_ms', Number(event.target.value))
+                          }
+                        />
+                      </label>
+                    </>
+                  )}
                 </div>
               ))
             ) : (

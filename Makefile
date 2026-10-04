@@ -43,7 +43,7 @@ policy-apply: ## Opublikuj edytowane zasady i przeladuj gateway bez restartu
 	./scripts/policy-apply.sh
 
 signature: ## Dodaj wlasna regule ataku: make signature PATTERN='...' NAME='...'
-	@$(MAKE) --no-print-directory new-signature PATTERN="$(PATTERN)" NAME="$(NAME)" ACTION="$(ACTION)"
+	@$(MAKE) --no-print-directory new-signature
 
 evidence: ## Zbiera dowody do katalogu dowody/ (widoczne na GitHubie bez uruchamiania)
 	./scripts/evidence.sh
@@ -234,17 +234,9 @@ prometheus-token: ## Zapisuje ADMIN_TOKEN do pliku dla Prometheusa (zgodny z .en
 token: ## Wypisuje swiezy JWT i tylko jego (bez tego nie nadaje sie do TOK=$(make token))
 	@./scripts/token.sh
 
-new-signature: ## Demo dla jury: dodaje sygnature do feedu (PATTERN=, NAME=, ACTION=) i sprawdza, ze jest serwowana
-	@PATTERN="$(PATTERN)" NAME="$(NAME)" ACTION="$(ACTION)" ./signatures-feed/push_new_signature.sh
-	@echo "--- kontrola feedu ---"
-	@curl -s -m 5 http://localhost:8085/signatures.json | python3 -c "import sys,json;d=json.load(sys.stdin);s=d['signatures'][-1];print('  sygnatur w feedzie:',len(d['signatures']),'| ostatnia:',s['id'],'/',s['pattern'])"
-	@$(JWT_GUARD); \
-	 literal="$$(python3 -c 'import sys; p=sys.argv[1].strip(); p=p[1:-1] if p.startswith("(") and p.endswith(")") else p; print(p.split("|")[0].replace(chr(92),"").strip())' "$(PATTERN)")"; \
-	 echo "--- proba uzycia wzorca: $(PATTERN) ---"; \
-	 code=$$(curl -s -o /dev/null -w '%{http_code}' -m 6 -X POST http://localhost:8080/v1/chat/completions \
-	   -H 'Content-Type: application/json' -H "Authorization: Bearer $$jwt" \
-	   -d "{\"model\":\"llama3.2:1b\",\"agent_id\":\"agent-zero-day\",\"messages\":[{\"role\":\"user\",\"content\":\"$$literal\"}]}"); \
-	 echo "  HTTP $$code - gateway nie konsumuje jeszcze feedu, wiec 200 jest oczekiwane (403 po podlaczeniu sygnatur)"
+new-signature: ## Dodaj literal PATTERN= z TARGET=prompt/tool_arguments/... i odswiez gateway
+	@./signatures-feed/push_new_signature.sh
+	@$(MAKE) --no-print-directory reload-policy
 
 db-tidy: ## Porzadkuje dane demo: czysci audyt i usuwa zdublowane rewizje polityki (wymaga sudo)
 	./scripts/db-tidy.sh

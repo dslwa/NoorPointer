@@ -19,6 +19,7 @@ class Settings:
     spacy_model_pl: str = "pl_core_news_lg"  # empty disables Polish NER
     ollama_url: str = "http://localhost:11434"
     guard_model: str = "llama-guard3:1b"
+    guard_concurrency: int = 4
     torch_threads: int = 4
     max_upload_mb: int = 512
     max_unpacked_mb: int = 1024  # decompression budget for archives (zip bombs)
@@ -42,6 +43,7 @@ class Settings:
             spacy_model_pl=os.getenv("SPACY_MODEL_PL", cls.spacy_model_pl),
             ollama_url=os.getenv("OLLAMA_URL", cls.ollama_url).rstrip("/"),
             guard_model=os.getenv("GUARD_MODEL", cls.guard_model),
+            guard_concurrency=int(os.getenv("GUARD_CONCURRENCY", cls.guard_concurrency)),
             torch_threads=int(os.getenv("TORCH_THREADS", cls.torch_threads)),
             max_upload_mb=int(os.getenv("MAX_UPLOAD_MB", cls.max_upload_mb)),
             max_unpacked_mb=int(os.getenv("MAX_UNPACKED_MB", cls.max_unpacked_mb)),

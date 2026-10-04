@@ -96,7 +96,8 @@ public class DocumentService {
   }
 
   public JsonNode profile(String name) {
-    if (!java.util.Set.of("permissive", "balanced", "strict").contains(name)) {
+    if (!java.util.Set.of("permissive", "balanced", "strict",
+        "permissive-output", "balanced-output", "strict-output").contains(name)) {
       throw new org.springframework.web.server.ResponseStatusException(
           org.springframework.http.HttpStatus.NOT_FOUND, "Unknown profile");
     }

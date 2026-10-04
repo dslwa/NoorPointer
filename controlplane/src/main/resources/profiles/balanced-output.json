@@ -1,8 +1,8 @@
 {
   "defaults": {
-    "mode": "monitor",
+    "mode": "enforce",
     "semantic_timeout_ms": 15000,
-    "on_semantic_timeout": "fail_open"
+    "on_semantic_timeout": "fail_closed"
   },
   "models": {
     "allowed": [
@@ -13,7 +13,7 @@
   "controls": {
     "pii_regex": {
       "enabled": true,
-      "action": "monitor",
+      "action": "redact",
       "types": [
         "email",
         "pesel",
@@ -24,16 +24,16 @@
     },
     "secrets": {
       "enabled": true,
-      "action": "monitor"
+      "action": "block"
     },
     "prompt_injection": {
       "enabled": true,
-      "action": "monitor",
-      "threshold": 0.95
+      "action": "block",
+      "threshold": 0.85
     },
     "content_safety": {
       "enabled": true,
-      "action": "monitor",
+      "action": "block",
       "categories": [
         "S1",
         "S2",
@@ -42,18 +42,18 @@
     },
     "attack_signatures": {
       "enabled": true,
-      "action": "monitor",
+      "action": "block",
       "refresh_s": 60
     },
     "agent_loops": {
       "enabled": true,
-      "action": "monitor",
+      "action": "block",
       "max_steps": 25,
       "max_identical_tool_calls": 3
     },
     "mcp_tools": {
       "enabled": true,
-      "action": "monitor",
+      "action": "block",
       "allowed": {
         "demo-agent": [
           "search",
@@ -61,6 +61,35 @@
         ]
       },
       "pinned_hashes": {}
+    },
+    "pii_ner": {
+      "enabled": true,
+      "action": "redact",
+      "directions": [
+        "input",
+        "output"
+      ],
+      "threshold": 0.5,
+      "entities": [
+        "PERSON",
+        "EMAIL_ADDRESS",
+        "PHONE_NUMBER",
+        "PL_PESEL",
+        "IBAN_CODE",
+        "CREDIT_CARD"
+      ],
+      "timeout_ms": 5000
+    },
+    "leakage": {
+      "enabled": true,
+      "action": "block",
+      "directions": [
+        "output"
+      ],
+      "threshold": 0.15,
+      "ngram": 6,
+      "timeout_ms": 1000,
+      "canaries": []
     }
   },
   "budgets": [
@@ -68,12 +97,12 @@
       "subject": "team:finance",
       "monthly_usd": 50,
       "daily_tokens": 200000,
-      "on_exceed": "alert"
+      "on_exceed": "block"
     },
     {
       "subject": "model:local/*",
       "gpu_seconds_per_hour": 600,
-      "on_exceed": "alert"
+      "on_exceed": "block"
     }
   ]
 }

@@ -160,13 +160,18 @@ uv sync
 ollama pull llama-guard3:1b                  # dla content_safety
 uv run uvicorn app.main:app --port 8001 --loop asyncio
 uv run pytest                                # szybkie testy (bez modeli), w tym gRPC end-to-end
-uv run pytest -m models                      # prawdziwe modele
+uv run pytest -m 'models and not ollama'      # prawdziwe DeBERTa + spaCy
+OLLAMA_URL=http://localhost:11434 uv run pytest -m ollama  # prawdziwy Llama Guard (nie mock-llm)
 ./gen-proto.sh                               # po każdej zmianie .proto
 ```
 
+Testy OUTPUT obejmują PII/content safety/leakage, kontekst system/user, błędy cząstkowe i offsety
+UTF-8. Testy modeli obejmują także polski tekst i dane po redakcji. Instrukcje generowania raportów
+oraz uruchamiania gatewaya z kontrolowanymi odpowiedziami modelu: [tests/README.md](../tests/README.md).
+
 Zmienne środowiskowe: `GRPC_PORT` (0 = wyłączony), `ARTIFACT_ROOT`, `ARTIFACT_HOSTS`, `MAX_UNPACKED_MB`, `MODELS_OFFLINE`,
 `PI_WORKERS`, `PII_WORKERS`, `LEAKAGE_WORKERS`, `SCAN_WORKERS`, `TORCH_THREADS`, `MAX_MESSAGES`, `MAX_REQUEST_CHARS`,
-`ENABLED_CHECKS`, `PI_MODEL`, `SPACY_MODEL`, `OLLAMA_URL` (domyślnie `http://localhost:11434`), `GUARD_MODEL`,
+`ENABLED_CHECKS`, `PI_MODEL`, `SPACY_MODEL`, `OLLAMA_URL` (domyślnie `http://localhost:11434`), `GUARD_MODEL`, `GUARD_CONCURRENCY`,
 `MAX_UPLOAD_MB`.
 
 - **Wymóg środowiskowy:** model DeBERTa jest pobierany w trakcie `docker build` (`app/download.py`), a model spaCy
@@ -175,6 +180,15 @@ Zmienne środowiskowe: `GRPC_PORT` (0 = wyłączony), `ARTIFACT_ROOT`, `ARTIFACT
 - **Limity uploadu:** `MAX_UPLOAD_MB` jest egzekwowany w trakcie odbierania żądania (middleware), a nie po zapisaniu
   całego pliku. Skan repo HF pobiera pliki z konkretnego commita (`info.sha`) i sprawdza faktyczny rozmiar.
 - **Llama Guard:** odpowiedź inna niż `safe` / `unsafe` -> `STATUS_ERROR`, nigdy „bezpieczne”.
+- **Obciążenie CPU:** `GUARD_CONCURRENCY` ogranicza jednoczesne wywołania Ollamy (1–16, domyślnie 4).
+  Profil Compose z prawdziwą Ollamą ustawia 1, `TORCH_THREADS=2` i `PI_WORKERS=1`. Nowe profile
+  polityk mają `semantic_timeout_ms=15000`; istniejąca opublikowana polityka nie zmienia się automatycznie.
+  Przy równoległym ruchu czas oczekiwania też zużywa deadline, więc należy zmierzyć docelowe obciążenie.
+  Ollama w tym profilu ma `OLLAMA_NUM_PARALLEL=1`, dwa modele w pamięci i kolejkę 16;
+  znaczenie ustawień opisuje [oficjalne FAQ](https://docs.ollama.com/faq).
+- **Zamrożony kontrakt:** konfiguracja nowych kontroli w Javie nie zmienia bieżącego gRPC.
+  Ustawienia `entities` / `ngram` / progu ekstrakcji PII wymagają wspólnej integracji z Go;
+  patrz [GO_HANDOFF.md](../tests/GO_HANDOFF.md).
 
 ## Znane ograniczenia
 

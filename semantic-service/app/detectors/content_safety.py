@@ -109,13 +109,16 @@ class ContentSafetyDetector(Detector):
 
     name = "content_safety"
 
-    def __init__(self, client: httpx.AsyncClient, ollama_url: str, model: str) -> None:
+    def __init__(self, client: httpx.AsyncClient, ollama_url: str, model: str,
+                 concurrency: int = OLLAMA_CONCURRENCY) -> None:
         super().__init__()
+        if not 1 <= concurrency <= 16:
+            raise ValueError("GUARD_CONCURRENCY must be between 1 and 16")
         self.client = client
         self.url = ollama_url
         self.model = model
-        self.concurrency = OLLAMA_CONCURRENCY
-        self.slots = asyncio.Semaphore(OLLAMA_CONCURRENCY)
+        self.concurrency = concurrency
+        self.slots = asyncio.Semaphore(concurrency)
         # seconds per UTF-8 byte reviewed (bytes track tokens: dense CJK/emoji text is up to 4 bytes and 4
         # tokens per character); the first call may include loading the model
         self.cost = CostModel(min_units=500, skip_first=1)

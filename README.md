@@ -25,19 +25,20 @@ do sprawdzenia reguł przed ich włączeniem.
 | :--- | :--- | :--- |
 | Uwierzytelnianie na gatewayu | działa | JWT RS256 (`iss=noorpointer-cp`, `aud=noorpointer-gateway`), wszystkie trasy poza `/healthz`; klucze generuje `make keys` |
 | Pobieranie i przeładowanie polityki | działa | gateway pobiera politykę z control plane (`GET /api/gateway/policy`, `ETag`) i odświeża ją cyklicznie oraz na żądanie `make reload-policy` |
-| Egzekwowanie kontroli w gatewayu | **częściowo** | `withPolicy` egzekwuje allowlistę modeli oraz kontrole deterministyczne: sekrety (`block`) i `pii_regex` (`redact`); **brakuje**: sygnatur ataków, budżetów, ogranicznika pętli i listy narzędzi MCP |
+| Egzekwowanie kontroli w gatewayu | **częściowo** | Allowlista modeli, sekrety, PII i literalne sygnatury na wejściu; testy wykazują brak filtrowania OUTPUT, budżetów i ogranicznika pętli |
 | Kontrole semantyczne (Python) | działa jako usługa i **w ścieżce żądania** | gateway woła gRPC `Analyze` dla `prompt_injection` i `content_safety` (timeout i `fail_closed` z polityki); `pii_ner` i `leakage` działają w usłudze, ale brama ich jeszcze nie woła |
-| Audyt i eksport SIEM | działa po stronie control plane | eksport CEF/JSON/CSV i panel działają; gateway nie wysyła jeszcze własnych zdarzeń, więc dziennik zawiera dane demonstracyjne z `make seed` |
-| Katalog sygnatur | działa | 7 reguł startowych z migracji `V2__Seed_default_signatures` + 5 wpisów z naszego feedu; dodawanie z panelu i przez `make new-signature PATTERN='...'` |
+| Audyt i eksport SIEM | działa po stronie control plane | Eksport CEF/JSON/CSV, panel i audyt Prompt Check działają; zwykłe wywołania proxy wymagają jeszcze wysyłania decyzji i zużycia |
+| Katalog sygnatur | działa | 7 reguł startowych + 13 lokalnych literalnych wskaźników; importer zachowuje treść i target, odrzuca regex i konflikty ID |
 | Metryki i alerty | częściowo | Prometheus zbiera `semantic-service` (scrape naprawiony: `metrics_path: /metrics/` + `Host $http_host` w LB) i `controlplane`; gateway nie wystawia jeszcze `/metrics` |
 | Testy e2e | `tests/test_guardrails.py` — **25 przypadków** | pary dozwolone/blokowane (PII, sekrety, prompt injection, sygnatury, budżety, pętle, skaner modeli, hot-reload, eksport SIEM, kontrole semantyczne); aktualny wynik i lista otwartych pozycji w `reports/INDEX.md` |
-| Testy modułów | działają | `make test-unit` (Go, 5 pakietów z testami), `sudo make test-semantic` (**181 testów**, 27 pominiętych markerem `models`) i `sudo make controlplane-test` (Java, 4 klasy, osobna baza `noorpointer_test`) |
+| Testy modułów | działają | Python: 206 PASS; Java: 67 PASS w osobnej bazie; dashboard: 24 PASS; importer: 10 PASS. Bez zmiany Go: `./scripts/test-without-go.sh` |
 
 Wniosek dla osób oceniających: działa cała otoczka wokół polityki (uwierzytelnianie, dystrybucja polityki,
 przeładowanie, audyt, panel, telemetria, testy), a w samej ścieżce żądania brama egzekwuje już allowlistę
 modeli, wykrywanie sekretów, redakcję danych osobowych oraz kontrole semantyczne (prompt injection,
-content safety) przez gRPC. Otwarte pozostają sygnatury ataków, budżety, ogranicznik pętli i lista narzędzi
-MCP — brakujące elementy wypisuje `reports/INDEX.md`. `make verify` pokazuje ten stan bez ukrywania czegokolwiek.
+content safety) przez gRPC oraz literalne sygnatury. Otwarte pozostają OUTPUT, budżety,
+ogranicznik pętli i integracja audytu proxy. Aktualne dowody: [tests/VALIDATION.md](tests/VALIDATION.md).
+Nowe profile Java `*-output` są do walidacji/draftów; obecny Go ich jeszcze nie przyjmuje.
 
 ## Szybki start
 
@@ -71,7 +72,7 @@ sudo make controlplane-test  # testy modułu Java w kontenerze (nie wymaga Javy 
 sudo make demo-full        # scenariusze demonstracyjne agenta
 make reload-policy         # natychmiastowe przeładowanie polityki w gatewayu
 make new-signature         # demo: dodanie sygnatury ataku do feedu w trakcie działania
-make new-signature PATTERN='(/etc/passwd|\.\./)' NAME='Path traversal'   # wzorzec podany przez jury
+make new-signature PATTERN='/etc/passwd' NAME='Path indicator' TARGET=prompt   # tekst literalny
 sudo make db-tidy          # reset danych demo: audyt, katalog sygnatur, zdublowane rewizje polityki
 sudo make db-dump          # kopia bazy audytu do backups/ (pg_dump); odtworzenie: make db-restore FILE=...
 make lint                  # skladnia skryptow bash + go vet (shellcheck, jesli zainstalowany)
@@ -275,17 +276,14 @@ błędach uwierzytelniania. Odpowiedź po redakcji pozostaje `200`, a informacj�
 zredagowane, niesie nagłówek `X-NoorPointer-Redactions` (np. `pii_ner`); nie zmienia to tego,
 czego oczekują testy.
 
-Podmiot budżetu rozstrzygamy od najbardziej szczegółowego: `agent:<agent_id>` z ciała żądania ->
-`team:<team>` z tokenu JWT -> `model:<model>` z ciała. Okna: `daily_tokens` resetują się o 00:00 UTC,
-`monthly_usd` obowiązuje w miesiącu kalendarzowym, `gpu_seconds_per_hour` co godzinę. Liczniki
-trzymamy w Redisie pod kluczem `budget:<subject>:<okno>`, zwiększanym atomowo (`INCRBY` + `EXPIRE`).
-Przekroczenie daje `429` z nagłówkiem `Retry-After` w sekundach do końca okna. Gdy Redis nie
-odpowiada, budżet działa fail-open (kontroluje koszty, nie jest kontrolą bezpieczeństwa), natomiast
-kontrole bezpieczeństwa pozostają fail-closed. Tryb `monitor` liczy i zapisuje zdarzenie, ale nie blokuje.
-
-Wpis `{"subject": "agent:agent-budget-exhausted", "daily_tokens": 0}` jest świadomym przypadkiem
-testowym: limit 0 oznacza budżet przekroczony od pierwszego żądania, dzięki czemu test
-`test_budget_exceeded_rate_limited` nie zależy od wcześniejszego ruchu ani od stanu liczników.
+Budżety pozostają wymaganiem do implementacji w Go. Podmiot agenta musi pochodzić z `sub`
+zweryfikowanego JWT, zespołu z jego `team`; `agent_id` w ciele nie jest tożsamością.
+Należy egzekwować wszystkie pasujące limity agenta, zespołu i modelu, z atomową rezerwacją
+przed wywołaniem i rozliczeniem rzeczywistego zużycia po odpowiedzi. Sama atomowość końcowego
+`INCRBY` nie zapobiega przekroczeniu limitu przez równoległe żądania.
+`test_gateway_budgets.py` sprawdza wyczerpanie, wyścigi i podmianę tożsamości; test E2E z limitem 0
+ustawia limit dla rzeczywistego JWT. Kontrakt telemetrii kosztu/GPU i pozostałe uzgodnienia:
+[tests/GO_HANDOFF.md](tests/GO_HANDOFF.md).
 
 ### 6. Opcjonalny prawdziwy model (Ollama)
 

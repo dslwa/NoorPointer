@@ -12,7 +12,8 @@ def build_detectors(settings: Settings, client: httpx.AsyncClient) -> dict[str, 
     factories = {
         "prompt_injection": lambda: PromptInjectionDetector(settings.pi_model, settings.torch_threads, settings.models_offline,
                                                      settings.pi_workers),
-        "content_safety": lambda: ContentSafetyDetector(client, settings.ollama_url, settings.guard_model),
+        "content_safety": lambda: ContentSafetyDetector(client, settings.ollama_url, settings.guard_model,
+                                                       settings.guard_concurrency),
         "pii_ner": lambda: PiiDetector(settings.spacy_model, settings.pii_workers, settings.spacy_model_pl),
         "leakage": lambda: LeakageDetector(settings.leakage_workers),
     }

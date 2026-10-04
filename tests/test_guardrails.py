@@ -1,6 +1,11 @@
 import collections
+import base64
+import copy
+import json
 import os
 import pickle
+import uuid
+from contextlib import contextmanager
 
 import requests
 import pytest
@@ -11,6 +16,8 @@ SEMANTIC_URL = os.getenv("SEMANTIC_URL", "http://localhost:8001")
 CONTROLPLANE_URL = os.getenv("CONTROLPLANE_URL", "http://localhost:8082")
 ADMIN_TOKEN = os.getenv("ADMIN_TOKEN", "local-dev-admin")
 GATEWAY_TOKEN = os.getenv("GATEWAY_TOKEN", "local-dev-gateway")
+CHAT_MODEL = os.getenv("CHAT_MODEL", "llama3.2:1b")
+REQUEST_TIMEOUT = float(os.getenv("REQUEST_TIMEOUT", "30"))
 
 # Bez tokenu kazde zadanie do gatewaya zwroci 401, a komunikat testu nie powie dlaczego.
 # Uruchamiaj przez "make test" (wstrzykuje GATEWAY_JWT) albo ustaw recznie:
@@ -32,13 +39,59 @@ def gw_headers(extra: dict | None = None) -> dict:
 def send_chat_completion(content: str, agent_id: str = "agent-test-01", headers: dict = None):
     url = f"{GATEWAY_URL}/v1/chat/completions"
     payload = {
-        "model": "llama3.2:1b",
+        "model": CHAT_MODEL,
         "agent_id": agent_id,
+        "max_tokens": 64,
+        "stream": False,
         "messages": [
             {"role": "user", "content": content}
         ]
     }
-    return requests.post(url, json=payload, headers=gw_headers(headers), timeout=5)
+    return requests.post(url, json=payload, headers=gw_headers(headers), timeout=REQUEST_TIMEOUT)
+
+
+def _admin(method, path, **kwargs):
+    response = requests.request(method, f"{CONTROLPLANE_URL}/api/v1/{path}",
+                                headers={"Authorization": f"Bearer {ADMIN_TOKEN}"},
+                                timeout=REQUEST_TIMEOUT, **kwargs)
+    response.raise_for_status()
+    return response
+
+
+def _reload(version):
+    response = requests.post(f"{GATEWAY_URL}/admin/policy/reload",
+                             headers={"Authorization": f"Bearer {GATEWAY_TOKEN}"}, timeout=REQUEST_TIMEOUT)
+    assert response.status_code == 200, response.text
+    assert response.json()["version"] == version, response.text
+
+
+@contextmanager
+def temporary_policy():
+    """Use only on a test stack: publish immutable revisions, restore the original in finally."""
+    original = _admin("GET", "active-policy").json()["revision"]
+    versions = []
+
+    def publish(document):
+        draft = _admin("POST", "policy-revisions", json={
+            "name": "e2e-" + uuid.uuid4().hex[:12], "document": json.dumps(document),
+        }).json()
+        version = draft["version"]
+        versions.append(version)
+        _admin("PUT", "active-policy", json={"version": version})
+        _reload(version)
+        return version
+
+    try:
+        yield copy.deepcopy(original["document"]), publish
+    finally:
+        current = _admin("GET", "active-policy").json()["revision"]["version"]
+        if current in versions:
+            _admin("PUT", "active-policy", json={"version": original["version"]})
+            _reload(original["version"])
+        elif current != original["version"]:
+            pytest.fail("Another client changed the policy during E2E; refusing to overwrite its revision.")
+        for version in versions:
+            _admin("DELETE", f"policy-revisions/{version}")
 
 # ============================================================================
 # 1. PII Detection & Redaction (Pozytywny / Negatywny)
@@ -50,12 +103,12 @@ def test_pii_clean_prompt_allowed():
     data = resp.json()
     assert "choices" in data
 
-def test_pii_pesel_redacted():
-    """Negatywny: prompt z numerem PESEL zostaje zredagowany w locie"""
-    resp = send_chat_completion("My identification number is PESEL 95081212345.")
+def test_pii_pesel_response_does_not_expose_input():
+    """Smoke: brak PII w odpowiedzi. Dowód redakcji PRZED modelem: test_gateway_acceptance.py."""
+    resp = send_chat_completion("My identification number is PESEL 44051401359.")
     assert resp.status_code == 200, f"Expected 200 OK (with redaction), got {resp.status_code}"
-    assert "95081212345" not in resp.text
-    assert "[REDACTED" in resp.text
+    assert "44051401359" not in resp.text
+    assert "choices" in resp.json()  # Real models may refuse or paraphrase instead of echoing a marker.
 
 # ============================================================================
 # 2. Secrets Leakage (Pozytywny / Negatywny)
@@ -103,29 +156,68 @@ def test_historical_exploit_shadowray_cve_blocked():
 # 5. Budget Limits & Resource Governance (Wymóg 3: Pozytywny / Negatywny)
 # ============================================================================
 def test_budget_within_limit_allowed():
-    """Pozytywny: agent mieszczący się w budżecie dostaje odpowiedź"""
-    resp = send_chat_completion("Hello, summarize today's news.", agent_id="agent-normal-budget")
-    assert resp.status_code == 200
+    """Pozytywny: brak limitu dla uwierzytelnionego agenta pozwala na żądanie."""
+    with temporary_policy() as (document, publish):
+        document["budgets"] = []
+        publish(document)
+        resp = send_chat_completion("Hello.")
+        assert resp.status_code == 200, resp.text
 
 def test_budget_exceeded_rate_limited():
-    """Negatywny: agent z wyczerpanym budżetem dostaje 429 Too Many Requests"""
-    resp = send_chat_completion("Run large query", agent_id="agent-budget-exhausted")
-    assert resp.status_code == 429, f"Expected 429 Too Many Requests, got {resp.status_code}"
-    assert "BUDGET_EXCEEDED" in resp.text
+    """Limit dotyczy sub podpisanego JWT, nie magicznej nazwy w JSON. Realne zużycie: test_gateway_budgets.py."""
+    # Decode only to configure the test policy. Authentication/signature validation belongs to Go.
+    encoded = GATEWAY_JWT.split(".")[1]
+    subject = json.loads(base64.urlsafe_b64decode(encoded + "=" * (-len(encoded) % 4)))["sub"]
+    assert isinstance(subject, str) and subject
+    with temporary_policy() as (document, publish):
+        document["budgets"] = [{"subject": "agent:" + subject, "daily_tokens": 0, "on_exceed": "block"}]
+        for name in ("prompt_injection", "content_safety"):
+            document["controls"][name]["enabled"] = False
+        publish(document)
+        resp = send_chat_completion("Hello.", agent_id="untrusted-unlimited-agent")
+        assert resp.status_code == 429, (resp.status_code, resp.text)
+        assert resp.json().get("code") == "BUDGET_EXCEEDED", resp.text
 
 # ============================================================================
 # 6. Loop Breaker / Autonomous Agent Protection (Pozytywny / Negatywny)
 # ============================================================================
 def test_loop_breaker_normal_steps_allowed():
-    """Pozytywny: agent wykonujący normalne kroki nie jest blokowany"""
-    resp = send_chat_completion("Step 1: Check inventory", agent_id="agent-safe-workflow")
-    assert resp.status_code == 200
+    """Pozytywny: dwa rzeczywiste wywołania z różnymi argumentami narzędzia."""
+    session = uuid.uuid4().hex
+    messages = [{"role": "user", "content": "Please calculate the total."}]
+    for value in (1, 2):
+        response = _tool_step(messages, session, value)
+        assert response.status_code == 200, response.text
 
 def test_loop_breaker_repeated_calls_terminated():
-    """Negatywny: agent powtarzający 3 identyczne wywołania narzędzia jest przerywany"""
-    resp = send_chat_completion("LOOP_TRIGGER_TEST", agent_id="agent-runaway-loop", headers={"X-Tool-Call-Repeat": "3"})
-    assert resp.status_code == 403
-    assert "RUNAWAY_LOOP_DETECTED" in resp.text
+    """Negatywny: prawdziwe kolejne żądania, bez magicznego promptu/licznika w nagłówku."""
+    control = _admin("GET", "active-policy").json()["revision"]["document"]["controls"]["agent_loops"]
+    assert control["enabled"] and control["action"] == "block", "Enable agent_loops for this acceptance test"
+    limit = control["max_identical_tool_calls"]
+    assert 1 <= limit <= 10, "Use a test policy with a small loop limit"
+    session = uuid.uuid4().hex
+    messages = [{"role": "user", "content": "Please calculate the total."}]
+    responses = []
+    for _ in range(limit + 1):
+        response = _tool_step(messages, session, 1)
+        responses.append(response)
+        if response.status_code != 200:
+            break
+    assert responses[0].status_code == 200, responses[0].text
+    assert responses[-1].status_code == 403, [r.status_code for r in responses]
+    assert "RUNAWAY_LOOP_DETECTED" in responses[-1].text
+
+
+def _tool_step(messages, session, value):
+    call_id = "call_" + uuid.uuid4().hex
+    messages.extend([
+        {"role": "assistant", "content": "", "tool_calls": [{"id": call_id, "type": "function",
+         "function": {"name": "calculator", "arguments": json.dumps({"expression": f"{value}+1"})}}]},
+        {"role": "tool", "tool_call_id": call_id, "content": str(value + 1)},
+    ])
+    return requests.post(f"{GATEWAY_URL}/v1/chat/completions", headers=gw_headers({"X-Session-ID": session}),
+                         json={"model": CHAT_MODEL, "messages": messages, "stream": False, "max_tokens": 32},
+                         timeout=REQUEST_TIMEOUT)
 
 # ============================================================================
 # 7. Skaner Modeli Pickle RCE (Supply Chain Security: Pozytywny / Negatywny)
@@ -158,10 +250,27 @@ def test_model_scanner_malicious_pickle_blocked():
 # 8. Hot-Reload & SIEM Audit Export (Wymogi 1 & 5)
 # ============================================================================
 def test_policy_hot_reload():
-    """Weryfikacja przeładowania konfiguracji bez restartu kontenera"""
-    resp = requests.post(f"{GATEWAY_URL}/admin/policy/reload", headers={"Authorization": f"Bearer {GATEWAY_TOKEN}"}, timeout=3)
-    assert resp.status_code == 200
-    assert resp.json().get("status") == "reloaded"
+    """Ta sama treść: redact -> HTTP 200, block -> HTTP 403, redact -> HTTP 200."""
+    prompt = "Contact address: analyst@example.com."
+    with temporary_policy() as (document, publish):
+        document["defaults"]["mode"] = "enforce"
+        # This checks policy propagation for PII; ML quality/load is measured in separate tests.
+        for name in ("prompt_injection", "content_safety"):
+            if name in document["controls"]:
+                document["controls"][name]["enabled"] = False
+        control = document["controls"]["pii_regex"]
+        control.update(enabled=True, action="redact", types=["email"])
+        publish(document)
+        allowed = send_chat_completion(prompt)
+        assert allowed.status_code == 200, allowed.text
+        control["action"] = "block"
+        publish(document)
+        blocked = send_chat_completion(prompt)
+        assert blocked.status_code == 403 and "PII_DETECTED" in blocked.text, blocked.text
+        control["action"] = "redact"
+        publish(document)
+        allowed_again = send_chat_completion(prompt)
+        assert allowed_again.status_code == 200, allowed_again.text
 
 def test_audit_logs_siem_cef_export():
     """Weryfikacja formatu CEF dla systemów SIEM (Splunk, Sentinel)"""
@@ -177,8 +286,11 @@ def _scan(text: str, check: str, direction: str = "input", context: dict | None 
     body = {"text": text, "checks": [check], "direction": direction, "timeout_ms": 10_000, "context": context or {}}
     resp = requests.post(f"{SEMANTIC_URL}/v1/scan", json=body, timeout=15)
     assert resp.status_code == 200, resp.text
-    result = resp.json()["results"][0]
+    body = resp.json()
+    result = body["results"][0]
     assert result["status"] == "ok", result
+    # HTTP exposes redacted_text on ScanResponse, not inside a check's details.
+    result["redacted_text"] = body.get("redacted_text")
     return result
 
 def test_semantic_injection_safe_question_allowed():
@@ -198,7 +310,7 @@ def test_semantic_pii_polish_personal_data_redacted():
     """Negatywny: imię, miasto, PESEL i e-mail po polsku są wykrywane i zamazywane"""
     result = _scan("Anna Nowak pracuje w Krakowie, jej PESEL to 44051401359, mail anna.nowak@firma.pl.", "pii_ner")
     assert {"PERSON", "PL_PESEL", "EMAIL_ADDRESS"} <= set(result["details"]["counts"])
-    assert "44051401359" not in result["details"]["redacted_text"]
+    assert result["redacted_text"] and "44051401359" not in result["redacted_text"]
 
 def test_semantic_pii_invalid_pesel_allowed():
     """Pozytywny: 11 cyfr ze złą sumą kontrolną to nie PESEL"""

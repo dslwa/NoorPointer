@@ -31,7 +31,7 @@
         "semantic_timeout_ms": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 10000
+          "maximum": 30000
         },
         "on_semantic_timeout": {
           "enum": [
@@ -141,7 +141,6 @@
             "action": {
               "enum": [
                 "block",
-                "redact",
                 "monitor"
               ]
             },
@@ -167,7 +166,6 @@
             "action": {
               "enum": [
                 "block",
-                "redact",
                 "monitor"
               ]
             },
@@ -197,7 +195,6 @@
             "action": {
               "enum": [
                 "block",
-                "redact",
                 "monitor"
               ]
             },
@@ -224,7 +221,6 @@
             "action": {
               "enum": [
                 "block",
-                "redact",
                 "monitor"
               ]
             },
@@ -253,7 +249,6 @@
             "action": {
               "enum": [
                 "block",
-                "redact",
                 "monitor"
               ]
             },
@@ -274,6 +269,117 @@
               "additionalProperties": {
                 "type": "string",
                 "pattern": "^[a-f0-9]{64}$"
+              }
+            }
+          }
+        },
+        "pii_ner": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "enabled",
+            "action",
+            "directions",
+            "threshold",
+            "entities"
+          ],
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "action": {
+              "enum": [
+                "block",
+                "redact",
+                "monitor"
+              ]
+            },
+            "directions": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "enum": [
+                  "input",
+                  "output"
+                ]
+              }
+            },
+            "threshold": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "timeout_ms": {
+              "type": "integer",
+              "minimum": 10,
+              "maximum": 30000
+            },
+            "entities": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 100,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "pattern": "^[A-Z][A-Z0-9_]{0,79}$"
+              }
+            }
+          }
+        },
+        "leakage": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "enabled",
+            "action",
+            "directions",
+            "threshold",
+            "ngram"
+          ],
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "action": {
+              "enum": [
+                "block",
+                "monitor"
+              ]
+            },
+            "directions": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "enum": [
+                  "output"
+                ]
+              }
+            },
+            "threshold": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "timeout_ms": {
+              "type": "integer",
+              "minimum": 10,
+              "maximum": 30000
+            },
+            "ngram": {
+              "type": "integer",
+              "minimum": 2,
+              "maximum": 20
+            },
+            "canaries": {
+              "type": "array",
+              "maxItems": 100,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
               }
             }
           }
